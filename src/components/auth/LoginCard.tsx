@@ -29,24 +29,22 @@ export function LoginCard({
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <section className="login-card" aria-label="Ingreso a EduTic">
-      <span className="login-card__sparkle login-card__sparkle--left" aria-hidden="true">
-        ✦
-      </span>
-      <span className="login-card__sparkle login-card__sparkle--right" aria-hidden="true">
-        ✦
-      </span>
+    <section className="login-card" aria-label="Ingreso a TYPELY">
+      <span className="login-card__halo" aria-hidden="true" />
+      <span className="login-card__sparkle login-card__sparkle--left" aria-hidden="true">✦</span>
+      <span className="login-card__sparkle login-card__sparkle--right" aria-hidden="true">✦</span>
+      <span className="login-card__sparkle login-card__sparkle--top" aria-hidden="true">✧</span>
 
       <div className="edutic-login-brand">
         <span className="edutic-login-brand__mark" aria-hidden="true">
-          <Sparkles size={35} strokeWidth={2.6} />
+          <Sparkles size={32} strokeWidth={2.6} />
         </span>
-        <span>EduTic</span>
+        <span className="edutic-login-brand__wordmark">TYPELY</span>
       </div>
 
       <div className="login-card__copy">
-        <h1>Ingresá a EduTic</h1>
-        <p>Comenzá tu aventura digital</p>
+        <h1>Bienvenido a TYPELY</h1>
+        <p>Aprendé a escribir jugando entre las nubes ✨</p>
       </div>
 
       <form onSubmit={onSubmit} className="login-form">

@@ -21,7 +21,7 @@ export function RewardsPage() {
           Volver a mundos
         </Button>
         <div>
-          <span>EduTic</span>
+          <span>TYPELY</span>
           <h1>Logros</h1>
           <p>Insignias y recompensas de tu aventura digital.</p>
         </div>

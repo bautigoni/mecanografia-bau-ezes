@@ -21,7 +21,7 @@ export function AccountPage() {
           Volver a misiones
         </Button>
         <div>
-          <span>EduTic</span>
+          <span>TYPELY</span>
           <h1>Mi cuenta</h1>
           <p>Tu lugar para ver tu aventura y tus insignias.</p>
         </div>

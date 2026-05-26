@@ -22,7 +22,7 @@ export function TeacherPage() {
       <header className="admin-hero">
         <div>
           <span>
-            <Sparkles size={20} /> EduTic
+            <Sparkles size={20} /> TYPELY
           </span>
           <h1>Panel docente</h1>
           <p>Seguimiento simple de tu clase, credenciales y actividades asignadas.</p>

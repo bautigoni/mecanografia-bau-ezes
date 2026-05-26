@@ -132,7 +132,7 @@ export function SiteAdminPage() {
       <header className="admin-hero">
         <div>
           <span>
-            <Sparkles size={20} /> EduTic
+            <Sparkles size={20} /> TYPELY
           </span>
           <h1>Panel de sede</h1>
           <p>Organizá alumnos, docentes, clases y credenciales de la sede.</p>

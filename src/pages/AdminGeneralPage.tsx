@@ -79,7 +79,7 @@ export function AdminGeneralPage() {
       <header className="admin-hero">
         <div>
           <span>
-            <Sparkles size={20} /> EduTic
+            <Sparkles size={20} /> TYPELY
           </span>
           <h1>Panel de administración general</h1>
           <p>Gestioná sedes y códigos de acceso desde un tablero claro y seguro.</p>

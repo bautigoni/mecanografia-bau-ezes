@@ -1,0 +1,11 @@
+services:
+  mecanografia:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mecanografia
+    restart: unless-stopped
+    ports:
+      # Bind to loopback so the container is only reachable via the Caddy
+      # reverse proxy on the host, never directly from the public internet.
+      - "127.0.0.1:3005:80"

@@ -7,31 +7,6 @@ import { Toast } from "../components/common/Toast";
 import { getWorldBySlug, getWorlds, type LevelPosition } from "../data/worlds";
 import { assets } from "../utils/assets";
 
-const MASCOT_BUBBLES = {
-  Completado: [
-    "¡Genial! Otro nivel dominado.",
-    "Sos imparable.",
-    "¡Tres estrellas brillantes!",
-    "Lo lograste 💪",
-  ],
-  Actual: [
-    "¡Vamos! Este es tu nivel.",
-    "Respirá hondo y empezá.",
-    "Confío en vos.",
-    "Probá una vez más.",
-  ],
-  Bloqueado: [
-    "Primero terminá el nivel anterior.",
-    "Falta poquito para desbloquearlo.",
-    "Seguí el camino, paso a paso.",
-    "Lo vas a alcanzar pronto.",
-  ],
-} as const;
-
-function pickBubble(state: keyof typeof MASCOT_BUBBLES, levelIndex: number): string {
-  const pool = MASCOT_BUBBLES[state];
-  return pool[levelIndex % pool.length];
-}
 
 function getShipAsset(from: LevelPosition, to?: LevelPosition) {
   if (!to) {
@@ -162,7 +137,7 @@ export function IslandDetailPage() {
               </span>
               <span className="level-node__rating" aria-hidden="true">
                 {Array.from({ length: 3 }).map((_, ratingIndex) => (
-                  <Star key={ratingIndex} size={16} fill={isCompleted || isCurrent ? "currentColor" : "none"} />
+                  <Star key={ratingIndex} size={16} fill={isCompleted ? "currentColor" : "none"} />
                 ))}
               </span>
             </button>
@@ -206,21 +181,6 @@ export function IslandDetailPage() {
         <UserRound size={25} />
         <span>Perfil</span>
       </button>
-
-      <div className="island-mascots" aria-hidden="true">
-        <figure className="island-mascot island-mascot--left">
-          <div className={`island-mascot__bubble island-mascot__bubble--${selectedLevel.state.toLowerCase()}`}>
-            {pickBubble(selectedLevel.state, safeIndex)}
-          </div>
-          <img src={assets.mascotFemaleWave} alt="" />
-        </figure>
-        <figure className="island-mascot island-mascot--right">
-          <div className={`island-mascot__bubble island-mascot__bubble--${selectedLevel.state.toLowerCase()}`}>
-            {pickBubble(selectedLevel.state, (safeIndex + 1) % 4)}
-          </div>
-          <img src={assets.mascotMaleProud} alt="" />
-        </figure>
-      </div>
 
       <Toast message={message} />
     </main>

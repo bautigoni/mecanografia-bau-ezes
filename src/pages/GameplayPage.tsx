@@ -5,6 +5,24 @@ import { getActivityById } from "../data/activities";
 import { assets } from "../utils/assets";
 import { markLevelComplete } from "../utils/progress";
 
+const MOTIVATION_PHRASES = [
+  "¡Vamos que podés!",
+  "Probá despacio.",
+  "Respirá y seguí.",
+  "Buen ritmo 👏",
+  "Sos un crack.",
+  "¡Increíble, así se hace!",
+  "Una más y la sacás.",
+  "Practicar es ganar.",
+];
+
+const ERROR_PHRASES = [
+  "Tranqui, intentá de nuevo.",
+  "Todos nos equivocamos.",
+  "Mirá la tecla y volvelo a intentar.",
+  "¡Casi! Otra vez.",
+];
+
 type KeyboardRow = { id: string; tone: "num" | "top" | "home" | "bot" | "mod"; keys: string[] };
 
 const keyboardRows: KeyboardRow[] = [
@@ -54,13 +72,33 @@ const SHIFT_COMBOS: Record<string, string[]> = {
   ">":  ["Shift", "."],
 };
 
+/* Accented vowels: on a Spanish keyboard you press the dead key ´ then the
+   vowel; on an English/US keyboard the OS gives you the same letter via
+   Option/AltGr + the vowel. We show ´ + a as the universal hint — the kid
+   recognises "the tilde mark, then the letter". */
+const ACCENT_MAP: Record<string, string> = {
+  "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u", "ü": "u",
+  "Á": "A", "É": "E", "Í": "I", "Ó": "O", "Ú": "U", "Ü": "U",
+};
+
 function comboFor(character: string): string[] | null {
   if (!character) return null;
   if (SHIFT_COMBOS[character]) return SHIFT_COMBOS[character];
-  // Uppercase letters always need Shift + the lowercase letter.
-  if (/^[A-ZÑÁÉÍÓÚÜ]$/.test(character)) {
+
+  // Accented vowels — show the dead-key combo (´ + vowel). Uppercase accented
+  // letters also need Shift, so we surface a 3-step hint.
+  if (ACCENT_MAP[character]) {
+    const base = ACCENT_MAP[character];
+    if (base === base.toUpperCase() && /[A-Z]/.test(base)) {
+      return ["´", "Shift", base.toLowerCase().toUpperCase()];
+    }
+    return ["´", base];
+  }
+
+  // Plain uppercase letters always need Shift + the lowercase letter.
+  if (/^[A-ZÑ]$/.test(character)) {
     const lower = character.toLowerCase();
-    return ["Shift", stripAccents(lower).toUpperCase()];
+    return ["Shift", lower.toUpperCase()];
   }
   return null;
 }
@@ -77,6 +115,7 @@ export function GameplayPage() {
   const [lastKey, setLastKey] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
   const completionSaved = useRef(false);
+  const typedScrollRef = useRef<HTMLSpanElement | null>(null);
 
   const target = activity.targets[targetIndex];
   const isLastTarget = targetIndex === activity.targets.length - 1;
@@ -124,6 +163,13 @@ export function GameplayPage() {
     setIsCompleted(false);
     completionSaved.current = false;
   }, [activity.id]);
+
+  /* Keep the typed-preview pinned to the most recent character so long inputs
+     stay legible without wrapping to a new line. */
+  useEffect(() => {
+    const node = typedScrollRef.current;
+    if (node) node.scrollLeft = node.scrollWidth;
+  }, [typed]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -260,7 +306,11 @@ export function GameplayPage() {
             activity.inputType === "symbol" ? "symbol" :
             isPhrase ? "phrase" :
             "word";
-          const showCombo = activity.worldId === "island4" || activity.requiresShift;
+          const showCombo =
+            activity.worldId === "island4" ||
+            activity.worldId === "island3" ||
+            activity.requiresShift ||
+            activity.requiresAccent;
           const combo = showCombo ? comboFor(expectedChar) : null;
           const showTypedPreview =
             activity.inputType !== "letter" && activity.inputType !== "symbol";
@@ -270,11 +320,14 @@ export function GameplayPage() {
                 <span>Objetivo {targetIndex + 1} / {activity.targets.length}</span>
                 <strong>{target}</strong>
                 {combo && !isCompleted && (
-                  <div className="combo-hint" aria-label={`Tecla combinada: ${combo.join(" + ")}`}>
+                  <div className="combo-hint" aria-label={`Combinación: ${combo.join(" + ")}`}>
                     <span>Para escribir {expectedChar || "este símbolo"}</span>
-                    <kbd>{combo[0]}</kbd>
-                    <span className="combo-hint__plus">+</span>
-                    <kbd>{combo[1]}</kbd>
+                    {combo.map((step, i) => (
+                      <span key={`${step}-${i}`} className="combo-hint__step">
+                        {i > 0 && <span className="combo-hint__plus">+</span>}
+                        <kbd>{step}</kbd>
+                      </span>
+                    ))}
                   </div>
                 )}
                 {(activity.requiresShift || activity.requiresAccent) && !isCompleted && (
@@ -288,7 +341,10 @@ export function GameplayPage() {
               {showTypedPreview && (
                 <div className="typed-preview" aria-live="polite">
                   <span className="typed-preview__label">Lo que estás escribiendo</span>
-                  <span className={`typed-preview__value ${typed ? "" : "is-empty"}`}>
+                  <span
+                    ref={typedScrollRef}
+                    className={`typed-preview__value ${typed ? "" : "is-empty"}`}
+                  >
                     {typed || "Empezá a escribir…"}
                     {typed && <span className="typed-preview__caret" aria-hidden="true" />}
                   </span>
@@ -304,6 +360,26 @@ export function GameplayPage() {
           <span>Precisión: {accuracy}%</span>
         </div>
       </section>
+
+      {/* Two motivational robots flank the keyboard, switching phrases each target. */}
+      {!isCompleted && (() => {
+        const errored = errors > 0 && attempts > 0 && (attempts - errors) / attempts < 0.6;
+        const phrasePool = errored ? ERROR_PHRASES : MOTIVATION_PHRASES;
+        const leftPhrase = phrasePool[targetIndex % phrasePool.length];
+        const rightPhrase = phrasePool[(targetIndex + Math.max(1, Math.floor(phrasePool.length / 2))) % phrasePool.length];
+        return (
+          <div className="game-mascots" aria-hidden="true">
+            <figure className="game-mascot game-mascot--left">
+              <div className={`game-mascot__bubble ${errored ? "is-warn" : ""}`}>{leftPhrase}</div>
+              <img src={assets.mascotFemaleWave} alt="" />
+            </figure>
+            <figure className="game-mascot game-mascot--right">
+              <div className={`game-mascot__bubble ${errored ? "is-warn" : ""}`}>{rightPhrase}</div>
+              <img src={assets.mascotMaleJump} alt="" />
+            </figure>
+          </div>
+        );
+      })()}
 
       <section className="visual-keyboard" aria-label="Teclado visual">
         {keyboardRows.map((row) => (
