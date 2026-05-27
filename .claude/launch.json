@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "edutic-mecano",
+      "name": "typely-mecano",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "5191"],
-      "port": 5191
+      "runtimeArgs": ["run", "dev", "--", "--port", "5210", "--host", "127.0.0.1"],
+      "port": 5210
     }
   ]
 }

@@ -104,10 +104,10 @@ export function WorldsPage() {
               </feMerge>
             </filter>
           </defs>
-          <path className="world-map-path__halo" d="M 34 43 C 39 45, 39 53, 43 57 M 50 54 C 55 48, 58 39, 64 35 M 72 37 C 78 39, 78 50, 82 54" />
-          <path className="world-map-path__base" d="M 34 43 C 39 45, 39 53, 43 57 M 50 54 C 55 48, 58 39, 64 35 M 72 37 C 78 39, 78 50, 82 54" />
-          <path className="world-map-path__dots" d="M 34 43 C 39 45, 39 53, 43 57 M 50 54 C 55 48, 58 39, 64 35 M 72 37 C 78 39, 78 50, 82 54" />
-          <path className="world-map-path__shimmer" d="M 34 43 C 39 45, 39 53, 43 57 M 50 54 C 55 48, 58 39, 64 35 M 72 37 C 78 39, 78 50, 82 54" />
+          <path className="world-map-path__halo" d="M 14 26 C 24 30, 32 22, 50 18 C 64 16, 76 24, 86 26 M 28 60 C 38 55, 50 50, 62 55 C 70 58, 76 60, 82 62" />
+          <path className="world-map-path__base" d="M 14 26 C 24 30, 32 22, 50 18 C 64 16, 76 24, 86 26 M 28 60 C 38 55, 50 50, 62 55 C 70 58, 76 60, 82 62" />
+          <path className="world-map-path__dots" d="M 14 26 C 24 30, 32 22, 50 18 C 64 16, 76 24, 86 26 M 28 60 C 38 55, 50 50, 62 55 C 70 58, 76 60, 82 62" />
+          <path className="world-map-path__shimmer" d="M 14 26 C 24 30, 32 22, 50 18 C 64 16, 76 24, 86 26 M 28 60 C 38 55, 50 50, 62 55 C 70 58, 76 60, 82 62" />
         </svg>
 
         {worlds.map((world) => {

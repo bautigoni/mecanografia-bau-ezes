@@ -972,36 +972,38 @@ a {
   transform: scale(0.99);
 }
 
-/* Slug-based placement keeps visual composition independent from data order. */
+/* Slug-based placement keeps visual composition independent from data order.
+   5 islands arranged as two rows (3 on top, 2 on bottom) so nothing sits
+   below the corner mascots. No transform-based centering — that conflicts
+   with the hover/selected transforms. */
 .world-island--island1 {
-  left: 7%;
-  top: 14%;
-  width: clamp(18rem, 28vw, 31rem);
+  left: 4%;
+  top: 10%;
+  width: clamp(14rem, 22vw, 24rem);
 }
 
 .world-island--island2 {
-  left: 56%;
-  top: 9%;
-  width: clamp(15rem, 23vw, 25rem);
+  left: 40%;
+  top: 4%;
+  width: clamp(13rem, 20vw, 22rem);
 }
 
 .world-island--island3 {
-  right: 7%;
-  top: 39%;
-  width: clamp(17rem, 26vw, 29rem);
+  right: 6%;
+  top: 16%;
+  width: clamp(14rem, 22vw, 24rem);
 }
 
 .world-island--island4 {
-  left: 33%;
-  top: 49%;
-  width: clamp(16rem, 25vw, 28rem);
+  left: 18%;
+  top: 44%;
+  width: clamp(13rem, 21vw, 23rem);
 }
 
 .world-island--island5 {
-  left: 50%;
-  top: 64%;
-  transform: translateX(-50%);
-  width: clamp(15rem, 22vw, 24rem);
+  right: 18%;
+  top: 44%;
+  width: clamp(13rem, 21vw, 23rem);
 }
 
 .world-island--island2 img {
@@ -3189,23 +3191,28 @@ td {
   }
 
   .world-island--island1 {
-    left: 7%;
-    top: 20%;
+    left: 4%;
+    top: 8%;
   }
 
   .world-island--island2 {
-    left: 45%;
-    top: 32%;
+    left: 38%;
+    top: 4%;
   }
 
   .world-island--island3 {
-    right: 8%;
-    top: 48%;
+    right: 4%;
+    top: 8%;
   }
 
   .world-island--island4 {
-    left: 26%;
-    top: 66%;
+    left: 12%;
+    top: 38%;
+  }
+
+  .world-island--island5 {
+    right: 12%;
+    top: 38%;
   }
 
   .world-map-path {
