@@ -35,13 +35,6 @@ export function LoginCard({
       <span className="login-card__sparkle login-card__sparkle--right" aria-hidden="true">✦</span>
       <span className="login-card__sparkle login-card__sparkle--top" aria-hidden="true">✧</span>
 
-      <div className="edutic-login-brand">
-        <span className="edutic-login-brand__mark" aria-hidden="true">
-          <Sparkles size={32} strokeWidth={2.6} />
-        </span>
-        <span className="edutic-login-brand__wordmark">TYPELY</span>
-      </div>
-
       <div className="login-card__copy">
         <h1>Bienvenido a TYPELY</h1>
         <p>Aprendé a escribir jugando entre las nubes ✨</p>

@@ -1,9 +1,25 @@
-import { Flag, LogOut, Medal, Menu, Star, UserRound, X } from "lucide-react";
+import { BookOpen, Flag, FlaskConical, Flower2, Gem, LogOut, MousePointerClick, Medal, Menu, Star, UserRound, X, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { worlds, type World } from "../data/worlds";
 import { assets } from "../utils/assets";
+
+const worldBadges = {
+  island1: Gem,
+  island2: FlaskConical,
+  island3: Flower2,
+  island4: BookOpen,
+  island5: MousePointerClick,
+} satisfies Record<World["slug"], LucideIcon>;
+
+const worldLabels = {
+  island1: "Mundo código",
+  island2: "Mundo ciencia",
+  island3: "Mundo creatividad",
+  island4: "Mundo biblioteca",
+  island5: "Mundo digital",
+} satisfies Record<World["slug"], string>;
 
 export function WorldsPage() {
   const navigate = useNavigate();
@@ -66,22 +82,61 @@ export function WorldsPage() {
       </div>
 
       <section className="worlds-scene" aria-label="Selección de mundos">
-        {worlds.map((world, index) => (
-          <button
-            key={world.id}
-            type="button"
-            className={`world-island world-island--${index + 1} ${selectedWorld === world.id ? "is-selected" : ""}`}
-            onClick={() => openWorld(world)}
-            aria-label={`Abrir ${world.title}`}
-          >
-            <img src={world.thumbnail} alt={world.title} />
-          </button>
-        ))}
+        <svg className="world-map-path" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="world-route-gradient" x1="18%" y1="44%" x2="88%" y2="52%">
+              <stop offset="0%" stopColor="#fff8ff" stopOpacity="0.22" />
+              <stop offset="36%" stopColor="#e8ddff" stopOpacity="0.72" />
+              <stop offset="68%" stopColor="#d8fbff" stopOpacity="0.68" />
+              <stop offset="100%" stopColor="#fff5fb" stopOpacity="0.3" />
+            </linearGradient>
+            <filter id="world-route-glow" x="-18%" y="-32%" width="136%" height="164%">
+              <feGaussianBlur stdDeviation="1.25" result="blur" />
+              <feColorMatrix
+                in="blur"
+                result="tint"
+                type="matrix"
+                values="0.72 0 0 0 0.28 0 0.5 0 0 0.22 0 0 0.95 0 0.5 0 0 0 0.88 0"
+              />
+              <feMerge>
+                <feMergeNode in="tint" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <path className="world-map-path__halo" d="M 34 43 C 39 45, 39 53, 43 57 M 50 54 C 55 48, 58 39, 64 35 M 72 37 C 78 39, 78 50, 82 54" />
+          <path className="world-map-path__base" d="M 34 43 C 39 45, 39 53, 43 57 M 50 54 C 55 48, 58 39, 64 35 M 72 37 C 78 39, 78 50, 82 54" />
+          <path className="world-map-path__dots" d="M 34 43 C 39 45, 39 53, 43 57 M 50 54 C 55 48, 58 39, 64 35 M 72 37 C 78 39, 78 50, 82 54" />
+          <path className="world-map-path__shimmer" d="M 34 43 C 39 45, 39 53, 43 57 M 50 54 C 55 48, 58 39, 64 35 M 72 37 C 78 39, 78 50, 82 54" />
+        </svg>
+
+        {worlds.map((world) => {
+          const BadgeIcon = worldBadges[world.slug];
+          const isCurrentWorld = world.slug === "island1";
+
+          return (
+            <button
+              key={world.id}
+              type="button"
+              className={`world-island world-island--${world.slug} ${isCurrentWorld ? "is-current" : ""} ${selectedWorld === world.id ? "is-selected" : ""}`}
+              onClick={() => openWorld(world)}
+              aria-label={worldLabels[world.slug]}
+            >
+              <span className="world-icon-badge" aria-hidden="true">
+                <BadgeIcon size={28} strokeWidth={2.1} />
+              </span>
+              <img src={world.thumbnail} alt="" loading="eager" />
+            </button>
+          );
+        })}
       </section>
 
       <div className={selectedWorld ? "world-transition is-active" : "world-transition"} />
-      <img className="home-mascot home-mascot--left" src={assets.mascotFemaleLaptop} alt="Mascota con laptop" />
-      <img className="home-mascot home-mascot--right" src={assets.mascotMaleProud} alt="Mascota saludando" />
+      <img className="home-mascot home-mascot--left" src={assets.mascotFemaleLaptop} alt="" />
+      <div className="home-mascot-wrap home-mascot-wrap--right">
+        <span className="home-speech-bubble">¡Vamos!</span>
+        <img className="home-mascot home-mascot--right" src={assets.mascotMaleProud} alt="" />
+      </div>
     </main>
   );
 }

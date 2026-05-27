@@ -1,6 +1,6 @@
 import { ArrowLeft, Check, Gem, Lock, Star, Trophy, UserRound } from "lucide-react";
 import type { CSSProperties } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
@@ -52,15 +52,17 @@ export function IslandDetailPage() {
   }, [maybeWorld]);
   const [selectedIndex, setSelectedIndex] = useState(initialIndex);
 
+  useEffect(() => {
+    setSelectedIndex(initialIndex);
+  }, [initialIndex]);
+
   if (!maybeWorld) {
     return <Navigate to="/mundos" replace />;
   }
 
   const world = maybeWorld;
-  const currentIndex = Math.max(
-    0,
-    world.levels.findIndex((level) => level.state === "Actual"),
-  );
+  const actualIndex = world.levels.findIndex((level) => level.state === "Actual");
+  const currentIndex = actualIndex >= 0 ? actualIndex : initialIndex;
   const worldNumber = allWorlds.findIndex((item) => item.slug === world.slug) + 1;
   const safeIndex = Math.min(selectedIndex, world.levels.length - 1);
   const selectedLevel = world.levels[safeIndex];
@@ -91,7 +93,55 @@ export function IslandDetailPage() {
       className="island-detail scene-contain page-fade"
       style={{ "--scene-bg": `url("${world.background}")` } as CSSProperties}
     >
-      <img className="scene-full-image" src={world.background} alt={world.title} />
+      {/* Aspect-ratio-locked stage: the image and every level node share the
+          same 16:9 coordinate system, so % positions land on the real
+          painted platforms on every screen size. */}
+      <div className="island-stage" aria-hidden="false">
+        <div className="island-stage__frame">
+          <img className="island-stage__bg scene-full-image" src={world.background} alt={world.title} />
+
+          <section className="level-map" aria-label="Niveles del mundo">
+            <img
+              className="level-ship"
+              src={shipAsset}
+              alt="Nave de los estudiantes en el nivel actual"
+              style={{ left: `${currentPosition.x}%`, top: `${currentPosition.y - 13}%` }}
+            />
+
+            {world.levels.map((level, index) => {
+              const isSelected = index === selectedIndex;
+              const position = world.levelPositions[index];
+              const isCompleted = level.state === "Completado";
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const isCurrent = level.state === "Actual";
+              const isLocked = level.state === "Bloqueado";
+
+              return (
+                <button
+                  key={level.title}
+                  type="button"
+                  className={`level-node level-node--${level.state.toLowerCase()} ${isSelected ? "is-selected" : ""}`}
+                  style={{ left: `${position.x}%`, top: `${position.y}%` }}
+                  onClick={() => selectLevel(index)}
+                  aria-label={`${level.title}: ${level.name}. ${level.state}`}
+                >
+                  <span className="level-node__platform">
+                    {isCompleted && <Check className="level-node__check" size={28} strokeWidth={3.4} />}
+                    {isLocked && <Lock className="level-node__lock" size={24} />}
+                    <strong className="level-node__number">{level.levelNumber}</strong>
+                  </span>
+                  <span className="level-node__rating" aria-hidden="true">
+                    {Array.from({ length: 3 }).map((_, ratingIndex) => (
+                      <Star key={ratingIndex} size={16} fill={isCompleted ? "currentColor" : "none"} />
+                    ))}
+                  </span>
+                </button>
+              );
+            })}
+          </section>
+        </div>
+      </div>
+
       <button type="button" className="world-back-button" onClick={() => navigate("/mundos")}>
         <ArrowLeft size={23} />
         <span>Volver a mundos</span>
@@ -105,45 +155,6 @@ export function IslandDetailPage() {
         <h1>{world.title}</h1>
         <p>Elegí un nivel para continuar tu aventura.</p>
       </div>
-
-      <section className="level-map" aria-label="Niveles del mundo">
-        <img
-          className="level-ship"
-          src={shipAsset}
-          alt="Nave de los estudiantes en el nivel actual"
-          style={{ left: `${currentPosition.x}%`, top: `${currentPosition.y - 13}%` }}
-        />
-
-        {world.levels.map((level, index) => {
-          const isSelected = index === selectedIndex;
-          const position = world.levelPositions[index];
-          const isCompleted = level.state === "Completado";
-          const isCurrent = level.state === "Actual";
-          const isLocked = level.state === "Bloqueado";
-
-          return (
-            <button
-              key={level.title}
-              type="button"
-              className={`level-node level-node--${level.state.toLowerCase()} ${isSelected ? "is-selected" : ""}`}
-              style={{ left: `${position.x}%`, top: `${position.y}%` }}
-              onClick={() => selectLevel(index)}
-              aria-label={`${level.title}: ${level.name}. ${level.state}`}
-            >
-              <span className="level-node__platform">
-                {isCompleted && <Check className="level-node__check" size={28} strokeWidth={3.4} />}
-                {isLocked && <Lock className="level-node__lock" size={24} />}
-                <strong>{index + 1}</strong>
-              </span>
-              <span className="level-node__rating" aria-hidden="true">
-                {Array.from({ length: 3 }).map((_, ratingIndex) => (
-                  <Star key={ratingIndex} size={16} fill={isCompleted ? "currentColor" : "none"} />
-                ))}
-              </span>
-            </button>
-          );
-        })}
-      </section>
 
       <aside className="level-detail-panel" aria-label="Detalle del nivel seleccionado">
         <div className="level-detail-panel__icon">

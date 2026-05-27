@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { getActivityById } from "../data/activities";
 import { assets } from "../utils/assets";
 import { markLevelComplete } from "../utils/progress";
+import { SkillLevelView } from "./SkillLevelView";
 
 const MOTIVATION_PHRASES = [
   "¡Vamos que podés!",
@@ -26,10 +27,10 @@ const ERROR_PHRASES = [
 type KeyboardRow = { id: string; tone: "num" | "top" | "home" | "bot" | "mod"; keys: string[] };
 
 const keyboardRows: KeyboardRow[] = [
-  { id: "num",  tone: "num",  keys: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] },
+  { id: "num",  tone: "num",  keys: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "'", "¿"] },
   { id: "top",  tone: "top",  keys: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"] },
   { id: "home", tone: "home", keys: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ñ"] },
-  { id: "bot",  tone: "bot",  keys: ["Z", "X", "C", "V", "B", "N", "M", ",", ".", "Backspace"] },
+  { id: "bot",  tone: "bot",  keys: ["Z", "X", "C", "V", "B", "N", "M", ",", ".", "-", "Backspace"] },
   { id: "mod",  tone: "mod",  keys: ["Shift", "Space", "Enter"] },
 ];
 
@@ -37,22 +38,21 @@ function stripAccents(value: string): string {
   return value.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-function keyCapFor(character: string): string {
-  if (character === " ") return "Space";
-  const upper = character.toUpperCase();
-  const plain = stripAccents(upper);
-  if ("¿¡".includes(character) || "?!@:;-_".includes(character)) {
-    return "Shift";
-  }
-  return plain;
-}
+/* Accented vowels: on a Spanish keyboard you press the dead key ´ then the
+   vowel; on an English/US keyboard the OS gives you the same letter via
+   Option/AltGr + the vowel. We show ´ + a as the universal hint — the kid
+   recognises "the tilde mark, then the letter". */
+const ACCENT_MAP: Record<string, string> = {
+  "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u", "ü": "u",
+  "Á": "A", "É": "E", "Í": "I", "Ó": "O", "Ú": "U", "Ü": "U",
+};
 
-/* Shift combos shown on World 4 — covers Latin-American Spanish layout where
-   useful, but is mapped here per character regardless of physical layout so
-   kids see *what* the symbol "is made of" even on a US/Mac keyboard. */
+/* Shift combinations on a Latin-American Spanish keyboard.
+   Keys on the right of the table reference the *cap labels* used by the
+   visual keyboard above, so highlighting works without any extra mapping. */
 const SHIFT_COMBOS: Record<string, string[]> = {
   "!":  ["Shift", "1"],
-  "?":  ["Shift", "/"],
+  "?":  ["Shift", "'"],   // ES-LA: ? lives on the ' key
   "@":  ["Shift", "2"],
   "#":  ["Shift", "3"],
   "$":  ["Shift", "4"],
@@ -65,21 +65,46 @@ const SHIFT_COMBOS: Record<string, string[]> = {
   "+":  ["Shift", "="],
   ":":  ["Shift", "."],
   ";":  ["Shift", ","],
-  "¿":  ["Shift", "¡"],
-  "¡":  ["Shift", "¿"],
+  "¡":  ["Shift", "¿"],   // ¡ is Shift on the ¿ cap
   '"':  ["Shift", "'"],
   "<":  ["Shift", ","],
   ">":  ["Shift", "."],
 };
 
-/* Accented vowels: on a Spanish keyboard you press the dead key ´ then the
-   vowel; on an English/US keyboard the OS gives you the same letter via
-   Option/AltGr + the vowel. We show ´ + a as the universal hint — the kid
-   recognises "the tilde mark, then the letter". */
-const ACCENT_MAP: Record<string, string> = {
-  "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u", "ü": "u",
-  "Á": "A", "É": "E", "Í": "I", "Ó": "O", "Ú": "U", "Ü": "U",
-};
+/* Maps a character → the cap printed on our visual keyboard. */
+function keyCapFor(character: string): string {
+  if (!character) return "";
+  if (character === " ") return "Space";
+  // Accented vowels & ñ render on the keyboard as the *base* letter.
+  if (ACCENT_MAP[character]) return ACCENT_MAP[character].toUpperCase();
+  if (/^[a-zA-Z]$/.test(character)) return character.toUpperCase();
+  if (character === "ñ" || character === "Ñ") return "Ñ";
+  return character; // digits, punctuation, ¿, ', etc. render as-is.
+}
+
+/* Returns the set of keyboard caps to highlight for a given target char.
+   - lowercase letter / digit / punctuation that exists on the keyboard → 1 key
+   - Shift combo                                                       → 2 keys
+   - uppercase letter                                                   → 2 keys (Shift + LETTER)
+   - accented vowel                                                     → 1 key (base letter)
+   - uppercase accented vowel                                           → 2 keys (Shift + LETTER)
+*/
+function expectedKeysFor(character: string): string[] {
+  if (!character) return [];
+  if (SHIFT_COMBOS[character]) return SHIFT_COMBOS[character];
+
+  // Accented vowel
+  if (ACCENT_MAP[character]) {
+    const base = ACCENT_MAP[character];
+    if (/[A-Z]/.test(base)) return ["Shift", base];
+    return [base.toUpperCase()];
+  }
+
+  // Plain uppercase letter (a-z or Ñ)
+  if (/^[A-ZÑ]$/.test(character)) return ["Shift", character];
+
+  return [keyCapFor(character)];
+}
 
 function comboFor(character: string): string[] | null {
   if (!character) return null;
@@ -107,6 +132,13 @@ export function GameplayPage() {
   const { activityId } = useParams();
   const activity = getActivityById(activityId);
   const navigate = useNavigate();
+
+  /* Digital-skill levels (island 5) use a dedicated mini-shell rather than
+     the typing keyboard pipeline. We early-return before any keyboard
+     state is set up so the two modes stay cleanly isolated. */
+  if (activity.inputType === "skill") {
+    return <SkillLevelView activity={activity} />;
+  }
   const [targetIndex, setTargetIndex] = useState(0);
   const [typed, setTyped] = useState("");
   const [attempts, setAttempts] = useState(0);
@@ -127,9 +159,11 @@ export function GameplayPage() {
     return target[typed.length] ?? "";
   }, [activity.inputType, target, typed]);
 
-  const expectedKey = useMemo(() => {
-    if (!expectedChar) return "";
-    return keyCapFor(expectedChar);
+  /* Every keyboard cap that should glow for the current character.
+     Multi-key combos (Shift + 1, Shift + ¿) light up *both* caps. */
+  const expectedKeys = useMemo(() => {
+    if (!expectedChar) return new Set<string>();
+    return new Set(expectedKeysFor(expectedChar));
   }, [expectedChar]);
 
   const accuracy = attempts === 0 ? 100 : Math.max(0, Math.round(((attempts - errors) / attempts) * 100));
@@ -385,13 +419,14 @@ export function GameplayPage() {
         {keyboardRows.map((row) => (
           <div className={`keyboard-row keyboard-row--${row.tone}`} key={row.id}>
             {row.keys.map((key) => {
-              const isTarget = activity.mode === "assisted" && !isCompleted && expectedKey === key;
+              const isTarget = activity.mode === "assisted" && !isCompleted && expectedKeys.has(key);
+              const isCombo = isTarget && expectedKeys.size > 1;
               const isPressed = lastKey === key;
               return (
                 <button
                   key={key}
                   type="button"
-                  className={`key key--${row.tone} ${key === "Space" ? "key--space" : ""} ${key === "Backspace" || key === "Shift" || key === "Enter" ? "key--wide" : ""} ${isTarget ? "is-target" : ""} ${isPressed ? "is-pressed" : ""}`}
+                  className={`key key--${row.tone} ${key === "Space" ? "key--space" : ""} ${key === "Backspace" || key === "Shift" || key === "Enter" ? "key--wide" : ""} ${isTarget ? "is-target" : ""} ${isCombo ? "is-target-combo" : ""} ${isPressed ? "is-pressed" : ""}`}
                   tabIndex={-1}
                 >
                   {key === "Space" ? "Espacio" : key}

@@ -1,9 +1,9 @@
 export type ActivityMode = "assisted" | "independent";
-export type ActivityInputType = "letter" | "word" | "phrase" | "symbol" | "correction";
+export type ActivityInputType = "letter" | "word" | "phrase" | "symbol" | "correction" | "skill";
 
 export interface Activity {
   id: string;
-  worldId: "island1" | "island2" | "island3" | "island4";
+  worldId: "island1" | "island2" | "island3" | "island4" | "island5";
   levelNumber: number;
   level: number;
   title: string;
@@ -14,10 +14,12 @@ export interface Activity {
   mode: ActivityMode;
   type: ActivityInputType;
   inputType: ActivityInputType;
-  difficulty: 1 | 2 | 3 | 4 | 5 | 6;
+  difficulty: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   description: string;
   requiresShift?: boolean;
   requiresAccent?: boolean;
+  /** Set when inputType === "skill" — points at an entry in digitalSkillsCatalog. */
+  skillChallengeId?: string;
 }
 
 type ActivityDraft = Omit<Activity, "id" | "level" | "type" | "inputType" | "difficulty"> & {
@@ -374,13 +376,123 @@ const world4: Activity[] = [
   }),
 ];
 
-export const activities: Activity[] = [...world1, ...world2, ...world3, ...world4];
+/* =====================================================================
+   World 5 — Isla digital: 7 levels covering mouse / touchpad / shortcuts.
+   Each level is an Activity with `inputType: "skill"` and a link to the
+   matching entry in `digitalSkillsCatalog` (src/data/digitalSkills.ts).
+   The GameplayPage renders these through the SkillChallengeShell instead
+   of the typing keyboard pipeline.
+===================================================================== */
+const world5: Activity[] = [
+  makeActivity({
+    worldId: "island5",
+    levelNumber: 1,
+    title: "Clic izquierdo",
+    subtitle: "Tu primer gesto con el mouse",
+    instruction: "Hacé clic en el botón que aparece.",
+    listenText: "Hacé un clic con el botón izquierdo del mouse.",
+    targets: ["click:primary"],
+    mode: "assisted",
+    inputType: "skill",
+    difficulty: 1,
+    description: "Aprendé a hacer clic con el botón principal del mouse.",
+    skillChallengeId: "ds-click-1",
+  }),
+  makeActivity({
+    worldId: "island5",
+    levelNumber: 2,
+    title: "Clic derecho",
+    subtitle: "Abrir menús con el otro botón",
+    instruction: "Hacé clic derecho sobre el icono para abrir el menú.",
+    listenText: "Hacé clic con el botón derecho del mouse.",
+    targets: ["click:secondary"],
+    mode: "assisted",
+    inputType: "skill",
+    difficulty: 2,
+    description: "Descubrí los menús que esconde el clic derecho.",
+    skillChallengeId: "ds-click-2",
+  }),
+  makeActivity({
+    worldId: "island5",
+    levelNumber: 3,
+    title: "Doble clic",
+    subtitle: "Dos clics rapiditos",
+    instruction: "Hacé doble clic sobre la carpeta para abrirla.",
+    listenText: "Doble clic con el botón izquierdo, dos veces seguidas.",
+    targets: ["click:double"],
+    mode: "assisted",
+    inputType: "skill",
+    difficulty: 2,
+    description: "Diferenciá el clic simple del doble clic.",
+    skillChallengeId: "ds-click-3",
+  }),
+  makeActivity({
+    worldId: "island5",
+    levelNumber: 4,
+    title: "Arrastrar y soltar",
+    subtitle: "Mové cosas por la pantalla",
+    instruction: "Arrastrá la estrella hasta la mochila.",
+    listenText: "Mantené apretado el botón y movelo hasta el destino.",
+    targets: ["drag:item"],
+    mode: "independent",
+    inputType: "skill",
+    difficulty: 3,
+    description: "Practicá arrastrar y soltar elementos.",
+    skillChallengeId: "ds-drag-1",
+  }),
+  makeActivity({
+    worldId: "island5",
+    levelNumber: 5,
+    title: "Scroll",
+    subtitle: "Subir y bajar la pantalla",
+    instruction: "Hacé scroll hasta el final de la página.",
+    listenText: "Usá la rueda del mouse o dos dedos en el touchpad para bajar.",
+    targets: ["scroll:page"],
+    mode: "independent",
+    inputType: "skill",
+    difficulty: 3,
+    description: "Aprendé a desplazarte con la rueda o con el touchpad.",
+    skillChallengeId: "ds-scroll-1",
+  }),
+  makeActivity({
+    worldId: "island5",
+    levelNumber: 6,
+    title: "Pestañas",
+    subtitle: "Abrir y cerrar pestañas",
+    instruction: "Cerrá la pestaña actual con un atajo.",
+    listenText: "Usá Control y la W para cerrar la pestaña.",
+    targets: ["shortcut:Ctrl+W"],
+    mode: "independent",
+    inputType: "skill",
+    difficulty: 4,
+    description: "Gestioná pestañas del navegador con atajos.",
+    skillChallengeId: "ds-tab-3",
+    requiresShift: false,
+  }),
+  makeActivity({
+    worldId: "island5",
+    levelNumber: 7,
+    title: "Atajos del teclado",
+    subtitle: "Copiar, pegar y cambiar de pestaña",
+    instruction: "Combiná Ctrl + C, Ctrl + V y Ctrl + Tab según se pida.",
+    listenText: "Combinaciones de teclas para trabajar más rápido.",
+    targets: ["shortcut:Ctrl+C", "shortcut:Ctrl+V", "shortcut:Ctrl+Tab"],
+    mode: "independent",
+    inputType: "skill",
+    difficulty: 5,
+    description: "Reto final: dominá los atajos más usados.",
+    skillChallengeId: "ds-shortcut-ctrlc",
+  }),
+];
+
+export const activities: Activity[] = [...world1, ...world2, ...world3, ...world4, ...world5];
 
 export const activitiesByWorld: Record<Activity["worldId"], Activity[]> = {
   island1: world1,
   island2: world2,
   island3: world3,
   island4: world4,
+  island5: world5,
 };
 
 export const levelActivityIds = activities.map((activity) => activity.id);
