@@ -239,11 +239,11 @@ function useLevelProgress(activity: Activity, total: number) {
 /* ------------------------------------------------------------------ */
 
 const LEVEL1_OBJECTS = [
-  { id: "star", emoji: "⭐", tone: "gold" as const },
-  { id: "apple", emoji: "🍎", tone: "pink" as const },
-  { id: "bunny", emoji: "🐰", tone: "mint" as const },
-  { id: "ball", emoji: "🎈", tone: "blue" as const },
-  { id: "target", emoji: "🎯", tone: "violet" as const },
+  { id: "star",   art: assets.i5Star,   tone: "gold" as const,   label: "Estrella" },
+  { id: "apple",  art: assets.i5Apple,  tone: "pink" as const,   label: "Manzana"  },
+  { id: "rabbit", art: assets.i5Rabbit, tone: "mint" as const,   label: "Conejo"   },
+  { id: "ball",   art: assets.i5Ball,   tone: "blue" as const,   label: "Pelota"   },
+  { id: "target", art: assets.i5Shot,   tone: "violet" as const, label: "Diana"    },
 ];
 
 function LeftClickLevel({ activity }: { activity: Activity }) {
@@ -303,10 +303,10 @@ function LeftClickLevel({ activity }: { activity: Activity }) {
               className={`i5-clickable i5-clickable--${o.tone} ${popped[o.id] ? "is-popped" : ""}`}
               onClick={(e) => onPick(o.id, e)}
               disabled={popped[o.id]}
-              aria-label={`Hacer clic en ${o.id}`}
+              aria-label={`Hacer clic en ${o.label}`}
             >
               <span className="i5-clickable__aura" />
-              <span className="i5-clickable__emoji">{o.emoji}</span>
+              <img className="i5-clickable__art" src={o.art} alt="" draggable={false} />
               <span className="i5-clickable__pedestal" />
             </button>
           ))}
@@ -331,44 +331,47 @@ function LeftClickLevel({ activity }: { activity: Activity }) {
 const LEVEL2_ROUNDS = [
   {
     objects: [
-      { id: "penguin", emoji: "🐧" },
-      { id: "backpack", emoji: "🎒" },
-      { id: "chest", emoji: "🧰" },
-      { id: "potion", emoji: "🧪" },
+      { id: "penguin", art: assets.i5Penguin, label: "Pingüino" },
+      { id: "bag",     art: assets.i5Bag,     label: "Mochila"  },
+      { id: "chest",   art: assets.i5Chest,   label: "Cofre"    },
+      { id: "potion",  art: assets.i5Potion,  label: "Poción"   },
     ],
     target: "chest",
+    targetLabel: "Cofre",
     menu: [
-      { id: "open", label: "Abrir", emoji: "📦", correct: true },
-      { id: "look", label: "Mirar", emoji: "👁", correct: false },
-      { id: "save", label: "Guardar", emoji: "💾", correct: false },
+      { id: "open", label: "Abrir",    emoji: "📦", correct: true  },
+      { id: "look", label: "Mirar",    emoji: "👁",  correct: false },
+      { id: "save", label: "Guardar",  emoji: "💾", correct: false },
     ],
   },
   {
     objects: [
-      { id: "book", emoji: "📕" },
-      { id: "crystal", emoji: "💎" },
-      { id: "robot", emoji: "🤖" },
-      { id: "map", emoji: "🗺" },
+      { id: "penguin", art: assets.i5Penguin, label: "Pingüino" },
+      { id: "bag",     art: assets.i5Bag,     label: "Mochila"  },
+      { id: "chest",   art: assets.i5Chest,   label: "Cofre"    },
+      { id: "potion",  art: assets.i5Potion,  label: "Poción"   },
     ],
-    target: "crystal",
+    target: "potion",
+    targetLabel: "Poción",
     menu: [
-      { id: "polish", label: "Pulir", emoji: "✨", correct: true },
-      { id: "throw", label: "Tirar", emoji: "🗑", correct: false },
-      { id: "hide", label: "Esconder", emoji: "🙈", correct: false },
+      { id: "drink", label: "Beber",   emoji: "🧪", correct: true  },
+      { id: "throw", label: "Tirar",   emoji: "🗑",  correct: false },
+      { id: "hide",  label: "Esconder",emoji: "🙈", correct: false },
     ],
   },
   {
     objects: [
-      { id: "cup", emoji: "🥤" },
-      { id: "key", emoji: "🗝" },
-      { id: "cake", emoji: "🍰" },
-      { id: "ship", emoji: "🚀" },
+      { id: "penguin", art: assets.i5Penguin, label: "Pingüino" },
+      { id: "bag",     art: assets.i5Bag,     label: "Mochila"  },
+      { id: "chest",   art: assets.i5Chest,   label: "Cofre"    },
+      { id: "potion",  art: assets.i5Potion,  label: "Poción"   },
     ],
-    target: "key",
+    target: "bag",
+    targetLabel: "Mochila",
     menu: [
-      { id: "use", label: "Usar", emoji: "🔓", correct: true },
-      { id: "copy", label: "Copiar", emoji: "📋", correct: false },
-      { id: "lose", label: "Perder", emoji: "💨", correct: false },
+      { id: "open", label: "Abrir",   emoji: "📂", correct: true  },
+      { id: "tie",  label: "Atar",    emoji: "🪢", correct: false },
+      { id: "burn", label: "Quemar",  emoji: "🔥", correct: false },
     ],
   },
 ];
@@ -454,6 +457,9 @@ function RightClickLevel({ activity }: { activity: Activity }) {
       feedback={feedback}
     >
       <div className="i5-l2-floor">
+        <p className="i5-l2-prompt">
+          Hacé <strong>clic derecho</strong> sobre la <strong>{round.targetLabel}</strong>
+        </p>
         <div className="i5-l2-row">
           {round.objects.map((o) => {
             const isTarget = o.id === round.target;
@@ -464,11 +470,12 @@ function RightClickLevel({ activity }: { activity: Activity }) {
                 className={`i5-clickable i5-clickable--violet ${isTarget ? "is-target" : ""}`}
                 onContextMenu={(e) => onContext(e, o.id)}
                 onClick={onLeft}
-                aria-label={o.id}
+                aria-label={o.label}
               >
                 <span className="i5-clickable__aura" />
-                <span className="i5-clickable__emoji">{o.emoji}</span>
+                <img className="i5-clickable__art" src={o.art} alt="" draggable={false} />
                 <span className="i5-clickable__pedestal" />
+                <span className="i5-clickable__label">{o.label}</span>
                 {isTarget && <span className="i5-clickable__hint">click derecho</span>}
               </button>
             );
@@ -501,10 +508,10 @@ function RightClickLevel({ activity }: { activity: Activity }) {
 /* ------------------------------------------------------------------ */
 
 const LEVEL3_ITEMS = [
-  { id: "star", emoji: "⭐", silhouette: "★" },
-  { id: "apple", emoji: "🍎", silhouette: "🍎" },
-  { id: "ball", emoji: "🎈", silhouette: "🎈" },
-  { id: "bunny", emoji: "🐰", silhouette: "🐰" },
+  { id: "star",   art: assets.i5Star,   label: "Estrella" },
+  { id: "apple",  art: assets.i5Apple,  label: "Manzana"  },
+  { id: "ball",   art: assets.i5Ball,   label: "Pelota"   },
+  { id: "rabbit", art: assets.i5Rabbit, label: "Conejo"   },
 ];
 
 function DragDropLevel({ activity }: { activity: Activity }) {
@@ -586,10 +593,10 @@ function DragDropLevel({ activity }: { activity: Activity }) {
               draggable={!placed[it.id]}
               onDragStart={(e) => onDragStart(e, it.id)}
               onDragEnd={onDragEnd}
-              aria-label={`Arrastrar ${it.id}`}
+              aria-label={`Arrastrar ${it.label}`}
             >
               <span className="i5-drag-item__aura" />
-              <span className="i5-drag-item__emoji">{it.emoji}</span>
+              <img className="i5-drag-item__art" src={it.art} alt="" draggable={false} />
             </div>
           ))}
         </div>
@@ -608,7 +615,13 @@ function DragDropLevel({ activity }: { activity: Activity }) {
               onDragLeave={onDragLeave}
               onDrop={(e) => onDrop(e, it.id)}
             >
-              <span className="i5-drop-slot__silhouette">{placed[it.id] ? it.emoji : it.silhouette}</span>
+              <img
+                className={`i5-drop-slot__art ${placed[it.id] ? "is-filled" : ""}`}
+                src={it.art}
+                alt=""
+                draggable={false}
+              />
+              <span className="i5-drop-slot__label">{it.label}</span>
             </div>
           ))}
         </div>
@@ -746,8 +759,18 @@ function WindowsLevel({ activity }: { activity: Activity }) {
       feedback={feedback}
     >
       <div className="i5-desktop">
-        {windows.filter((w) => w.open).map((w) => (
-          <div key={w.id} className="i5-window">
+        {/* App dock — decorative, shows the icons available in the fantasy OS. */}
+        <div className="i5-dock" aria-hidden="true">
+          <img src={assets.i5Apps} alt="" />
+        </div>
+
+        {/* Stacked windows — each uses real artwork from /island5/ as its body. */}
+        {windows.filter((w) => w.open).map((w, idx) => (
+          <div
+            key={w.id}
+            className={`i5-window i5-window--${w.id}`}
+            style={{ ["--stack" as never]: idx }}
+          >
             <div className="i5-window__bar">
               {w.tabs ? (
                 <>
@@ -778,6 +801,9 @@ function WindowsLevel({ activity }: { activity: Activity }) {
                   <span>{w.emoji}</span> {w.title}
                 </span>
               )}
+              <span className="i5-window__controls" aria-hidden="true">
+                <img src={assets.i5WindowControls} alt="" />
+              </span>
               <button
                 type="button"
                 className="i5-window__close"
@@ -789,22 +815,36 @@ function WindowsLevel({ activity }: { activity: Activity }) {
             </div>
             <div className="i5-window__body">
               {w.id === "browser" && (
-                <div className="i5-browser">
-                  <div className="i5-browser__searchbar">🔍 Buscar...</div>
-                  <div className="i5-browser__planet">🌍</div>
-                </div>
+                <img
+                  className="i5-window__art"
+                  src={assets.i5BrowserTabs}
+                  alt="Explorador con pestañas"
+                  draggable={false}
+                />
               )}
               {w.id === "drawings" && (
-                <div className="i5-drawings">
-                  <div className="i5-drawings__pad">⭐ 🌸 ✏️</div>
-                </div>
+                <img
+                  className="i5-window__art"
+                  src={assets.i5DrawingsWindow}
+                  alt="Ventana de dibujos"
+                  draggable={false}
+                />
               )}
               {w.id === "notes" && (
-                <div className="i5-notes">¡Recordá practicar todos los días! 💛</div>
+                <img
+                  className="i5-window__art"
+                  src={assets.i5Notes}
+                  alt="Notas"
+                  draggable={false}
+                />
               )}
             </div>
           </div>
         ))}
+
+        {/* Floating message + media windows for visual richness. */}
+        <img className="i5-desktop__message" src={assets.i5Message} alt="" aria-hidden="true" />
+        <img className="i5-desktop__media" src={assets.i5WindowMedia} alt="" aria-hidden="true" />
       </div>
     </Island5Shell>
   );
@@ -903,18 +943,19 @@ function ScrollLevel({ activity }: { activity: Activity }) {
       <div className="i5-l5-grid">
         <div className="i5-mouse-illust" aria-hidden="true">
           <div className="i5-mouse-illust__arrow i5-mouse-illust__arrow--up">↑</div>
-          <div className="i5-mouse-illust__body">🖱</div>
+          <img className="i5-mouse-illust__art" src={assets.i5Mouse} alt="" draggable={false} />
           <div className="i5-mouse-illust__arrow i5-mouse-illust__arrow--down">↓</div>
         </div>
         <div className="i5-scroll-panel">
           <div className="i5-scroll-panel__viewport" onScroll={onScroll}>
-            <div className="i5-scroll-panel__content">
-              <div className="i5-scroll-card">🏰</div>
-              <div className="i5-scroll-card">🌳</div>
-              <div className="i5-scroll-card">⛰</div>
-              <div className="i5-scroll-card">🌈</div>
-              <div className="i5-scroll-card">🏰</div>
-              <div className="i5-scroll-card i5-scroll-card--end">🎉</div>
+            <div className="i5-scroll-panel__content i5-scroll-panel__content--castle">
+              <img
+                className="i5-scroll-panel__art"
+                src={assets.i5CastleVertical}
+                alt="Castillo flotante"
+                draggable={false}
+              />
+              <div className="i5-scroll-card i5-scroll-card--end">¡Llegaste al final!</div>
             </div>
           </div>
           <div className="i5-scroll-panel__cues">
@@ -924,13 +965,25 @@ function ScrollLevel({ activity }: { activity: Activity }) {
         </div>
         <div className="i5-zoom-panel">
           <div className="i5-zoom-stage">
-            <div className="i5-zoom-img" style={{ transform: `scale(${zoom})` }}>🏰</div>
-            <span className="i5-zoom-loupe">🔍</span>
+            <img
+              className="i5-zoom-art"
+              src={assets.i5CastleSquare}
+              alt="Castillo de zoom"
+              draggable={false}
+              style={{ transform: `scale(${zoom})` }}
+            />
           </div>
-        </div>
-        <div className="i5-zoom-buttons">
-          <button type="button" className="i5-zoom-btn" onClick={onZoomIn} aria-label="Zoom in">＋<span>ZOOM IN</span></button>
-          <button type="button" className="i5-zoom-btn" onClick={onZoomOut} aria-label="Zoom out">−<span>ZOOM OUT</span></button>
+          <img
+            className="i5-zoom-controls"
+            src={assets.i5ZoomBtns}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+          />
+          <div className="i5-zoom-buttons">
+            <button type="button" className="i5-zoom-btn" onClick={onZoomIn} aria-label="Zoom in">＋<span>ZOOM IN</span></button>
+            <button type="button" className="i5-zoom-btn" onClick={onZoomOut} aria-label="Zoom out">−<span>ZOOM OUT</span></button>
+          </div>
         </div>
       </div>
       <span className="i5-sr-only" aria-hidden="true">{didZoom ? "" : ""}{reachedTop ? "" : ""}</span>
