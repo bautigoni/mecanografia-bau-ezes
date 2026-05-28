@@ -81,7 +81,7 @@ function Island5Shell({
   }
 
   return (
-    <main className="i5-shell page-fade">
+    <main className={`i5-shell i5-shell--level-${activity.levelNumber} page-fade`}>
       <div className="i5-shell__bg" aria-hidden="true" />
       <div className="i5-shell__sparkles" aria-hidden="true">
         {Array.from({ length: 14 }).map((_, i) => (
@@ -463,6 +463,9 @@ function RightClickLevel({ activity }: { activity: Activity }) {
           ✨ {round.prompt}
         </p>
         <p className="i5-l2-hint">{round.hint}</p>
+        <p className="i5-l2-hint i5-l2-hint--touchpad">
+          💻 En notebook podés hacer click derecho tocando con <strong>dos dedos</strong> en el touchpad.
+        </p>
         <div className="i5-l2-row">
           {round.objects.map((o) => {
             const isTarget = o.id === round.target;
@@ -621,11 +624,14 @@ function DragDropLevel({ activity }: { activity: Activity }) {
       onRetry={retry}
       feedback={feedback}
     >
-      <div className="i5-l3-grid">
-        <div className="i5-l3-col i5-l3-col--items">
+      {/* Two-row layout: draggable items on top, mixed drop targets below.
+          Keeps every item visible inside the viewport at laptop sizes. */}
+      <div className="i5-l3-board">
+        <div className="i5-l3-row i5-l3-row--items" role="list" aria-label="Objetos para arrastrar">
           {LEVEL3_ITEMS.map((it) => (
             <div
               key={it.id}
+              role="listitem"
               className={`i5-drag-item ${placed[it.id] ? "is-placed" : ""} ${dragging === it.id ? "is-dragging" : ""}`}
               draggable={!placed[it.id]}
               onDragStart={(e) => onDragStart(e, it.id)}
@@ -633,20 +639,18 @@ function DragDropLevel({ activity }: { activity: Activity }) {
               aria-label={`Arrastrar ${it.label}`}
             >
               <span className="i5-drag-item__aura" />
-              <img className="i5-drag-item__art" src={it.art} alt="" draggable={false}  decoding="async" />
+              <img className="i5-drag-item__art" src={it.art} alt="" draggable={false} decoding="async" />
             </div>
           ))}
         </div>
-        <div className="i5-l3-path" aria-hidden="true">
-          <svg viewBox="0 0 200 280" preserveAspectRatio="none">
-            <path d="M 10 20 C 120 60, 80 160, 190 240" stroke="rgba(108,74,230,0.55)" strokeWidth="3" strokeDasharray="6 6" fill="none" />
-            <polygon points="180,230 200,240 180,250" fill="rgba(108,74,230,0.55)" />
-          </svg>
+        <div className="i5-l3-arrow" aria-hidden="true">
+          <span>↓ soltá acá ↓</span>
         </div>
-        <div className="i5-l3-col i5-l3-col--slots">
+        <div className="i5-l3-row i5-l3-row--slots" role="list" aria-label="Destinos">
           {slotOrder.map((it) => (
             <div
               key={it.id}
+              role="listitem"
               className={`i5-drop-slot ${hovered === it.id ? "is-hover" : ""} ${placed[it.id] ? "is-filled" : ""} ${rejectingSlot === it.id ? "is-rejecting" : ""}`}
               onDragOver={(e) => onDragOver(e, it.id)}
               onDragLeave={onDragLeave}
@@ -657,7 +661,8 @@ function DragDropLevel({ activity }: { activity: Activity }) {
                 src={it.art}
                 alt=""
                 draggable={false}
-               decoding="async" />
+                decoding="async"
+              />
               <span className="i5-drop-slot__label">{it.label}</span>
               {rejectingSlot === it.id && <span className="i5-drop-slot__cross" aria-hidden="true">✕</span>}
             </div>
@@ -1014,15 +1019,39 @@ function ScrollLevel({ activity }: { activity: Activity }) {
               <div className="i5-l5-mouse__arrow i5-l5-mouse__arrow--down">↓</div>
             </aside>
             <div className="i5-l5-scrollview" onScroll={onScroll}>
-              <div className="i5-l5-scrollview__reveal">
-                <img
-                  src={assets.i5CastleVertical}
-                  alt="Castillo flotante a descubrir"
-                  draggable={false}
-                  className="i5-l5-scrollview__art"
-                 decoding="async" />
-                <div className="i5-l5-scrollview__topflag">↑ arriba</div>
-                <div className="i5-l5-scrollview__endflag">🏁 ¡Llegaste al final!</div>
+              {/* The "tall vertical image" is composed in pure CSS so it
+                  never depends on an external file and can never bug out
+                  mid-scroll. Each band paints a different sky layer of a
+                  fantasy mountain → castle → cave journey. */}
+              <div className="i5-l5-scene" aria-hidden="true">
+                <div className="i5-l5-scene__band i5-l5-scene__band--top">
+                  <span className="i5-l5-scene__icon">☀️</span>
+                  <strong>Cielo</strong>
+                </div>
+                <div className="i5-l5-scene__band i5-l5-scene__band--clouds">
+                  <span className="i5-l5-scene__icon">☁️</span>
+                  <strong>Nubes</strong>
+                </div>
+                <div className="i5-l5-scene__band i5-l5-scene__band--peak">
+                  <span className="i5-l5-scene__icon">🏔️</span>
+                  <strong>Montaña</strong>
+                </div>
+                <div className="i5-l5-scene__band i5-l5-scene__band--castle">
+                  <span className="i5-l5-scene__icon">🏰</span>
+                  <strong>Castillo</strong>
+                </div>
+                <div className="i5-l5-scene__band i5-l5-scene__band--forest">
+                  <span className="i5-l5-scene__icon">🌲</span>
+                  <strong>Bosque</strong>
+                </div>
+                <div className="i5-l5-scene__band i5-l5-scene__band--cave">
+                  <span className="i5-l5-scene__icon">🪄</span>
+                  <strong>Cueva mágica</strong>
+                </div>
+                <div className="i5-l5-scene__band i5-l5-scene__band--end">
+                  <span className="i5-l5-scene__icon">🏁</span>
+                  <strong>¡Llegaste al final!</strong>
+                </div>
               </div>
             </div>
           </div>
@@ -1067,9 +1096,9 @@ function ScrollLevel({ activity }: { activity: Activity }) {
 /* ------------------------------------------------------------------ */
 
 const LEVEL6_FOLDERS = [
-  { id: "stars",    art: assets.i5Star,   label: "Estrellas",  reward: "✨" },
-  { id: "apples",   art: assets.i5Apple,  label: "Frutas",     reward: "🍎" },
-  { id: "bunnies",  art: assets.i5Rabbit, label: "Conejitos",  reward: "🐰" },
+  { id: "stars",    art: assets.i5Star,   label: "Estrellas" },
+  { id: "apples",   art: assets.i5Apple,  label: "Frutas" },
+  { id: "bunnies",  art: assets.i5Rabbit, label: "Conejitos" },
 ];
 
 function DoubleClickLevel({ activity }: { activity: Activity }) {
@@ -1077,33 +1106,46 @@ function DoubleClickLevel({ activity }: { activity: Activity }) {
   const prog = useLevelProgress(activity, total);
   const [opened, setOpened] = useState<Record<string, boolean>>({});
   const [feedback, setFeedback] = useState<string | undefined>();
-  const lastClickRef = useRef<{ id: string; t: number } | null>(null);
+  const singleClickTimerRef = useRef<number | null>(null);
 
   function onSingleClick(id: string) {
     if (prog.completed || opened[id]) return;
-    const now = Date.now();
-    const last = lastClickRef.current;
-    if (last && last.id === id && now - last.t < 400) {
-      // Double click!
-      setOpened((o) => ({ ...o, [id]: true }));
-      prog.tickCorrect();
-      setFeedback("¡Doble clic perfecto! Carpeta abierta.");
-      lastClickRef.current = null;
-      setTimeout(() => setFeedback(undefined), 1400);
-    } else {
-      lastClickRef.current = { id, t: now };
+    if (singleClickTimerRef.current !== null) window.clearTimeout(singleClickTimerRef.current);
+    singleClickTimerRef.current = window.setTimeout(() => {
       setFeedback("Un clic solo no alcanza — necesitás otro clic enseguida.");
       prog.tickWrong();
+      singleClickTimerRef.current = null;
       setTimeout(() => setFeedback(undefined), 1400);
+    }, 420);
+  }
+
+  function onDoubleClick(id: string) {
+    if (prog.completed || opened[id]) return;
+    if (singleClickTimerRef.current !== null) {
+      window.clearTimeout(singleClickTimerRef.current);
+      singleClickTimerRef.current = null;
     }
+    setOpened((o) => ({ ...o, [id]: true }));
+    prog.tickCorrect();
+    setFeedback("¡Doble clic perfecto! Carpeta abierta.");
+    setTimeout(() => setFeedback(undefined), 1400);
   }
 
   function retry() {
+    if (singleClickTimerRef.current !== null) {
+      window.clearTimeout(singleClickTimerRef.current);
+      singleClickTimerRef.current = null;
+    }
     prog.reset();
     setOpened({});
     setFeedback(undefined);
-    lastClickRef.current = null;
   }
+
+  useEffect(() => {
+    return () => {
+      if (singleClickTimerRef.current !== null) window.clearTimeout(singleClickTimerRef.current);
+    };
+  }, []);
 
   return (
     <Island5Shell
@@ -1116,8 +1158,8 @@ function DoubleClickLevel({ activity }: { activity: Activity }) {
       progress={prog.progress}
       total={total}
       metrics={{
-        left: "Intentos",
-        leftValue: prog.attempts,
+        left: "Errores",
+        leftValue: prog.errors,
         mid: "Aciertos",
         midValue: prog.progress,
         precision: prog.precision,
@@ -1133,13 +1175,14 @@ function DoubleClickLevel({ activity }: { activity: Activity }) {
             key={f.id}
             className={`i5-folder ${opened[f.id] ? "is-open" : ""}`}
             onClick={() => onSingleClick(f.id)}
+            onDoubleClick={() => onDoubleClick(f.id)}
             disabled={opened[f.id]}
             aria-label={`Doble clic en ${f.label}`}
           >
             <div className="i5-folder__tab" />
             <div className="i5-folder__body">
               {opened[f.id] ? (
-                <span className="i5-folder__reward">{f.reward}</span>
+                <span className="i5-folder__check">✓</span>
               ) : (
                 <img src={f.art} alt="" draggable={false}  decoding="async" />
               )}
@@ -1154,69 +1197,129 @@ function DoubleClickLevel({ activity }: { activity: Activity }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Level 7 — Keyboard shortcuts                                       */
+/* Level 7 — Copy & paste                                             */
 /* ------------------------------------------------------------------ */
 
-const LEVEL7_TASKS = [
-  { id: "copy",  combo: ["Ctrl", "C"],     instruction: "Copiá el texto: usá Ctrl + C",   matcher: (k: KeyboardEvent) => k.ctrlKey && k.key.toLowerCase() === "c", success: "¡Copiado!" },
-  { id: "paste", combo: ["Ctrl", "V"],     instruction: "Pegá el texto: usá Ctrl + V",    matcher: (k: KeyboardEvent) => k.ctrlKey && k.key.toLowerCase() === "v", success: "¡Pegado!" },
-  { id: "newtab",combo: ["Ctrl", "T"],     instruction: "Abrí una pestaña: Ctrl + T",     matcher: (k: KeyboardEvent) => k.ctrlKey && k.key.toLowerCase() === "t", success: "¡Pestaña abierta!" },
-  { id: "close", combo: ["Ctrl", "W"],     instruction: "Cerrá una pestaña: Ctrl + W",    matcher: (k: KeyboardEvent) => k.ctrlKey && k.key.toLowerCase() === "w", success: "¡Pestaña cerrada!" },
-];
+const LEVEL7_SOURCE = "¡Hola, soy un mensaje mágico!";
 
 function ShortcutsLevel({ activity }: { activity: Activity }) {
-  const total = LEVEL7_TASKS.length;
+  const total = 2; // 1) copy, 2) paste
   const prog = useLevelProgress(activity, total);
+  const [pasted, setPasted] = useState("");
+  const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<string | undefined>();
-  const [echo, setEcho] = useState<string>("");
-  const taskRef = useRef(0);
-  const task = LEVEL7_TASKS[Math.min(prog.progress, total - 1)];
+  const sourceRef = useRef<HTMLParagraphElement | null>(null);
+  const pasteRef = useRef<HTMLTextAreaElement | null>(null);
+  const progRef = useRef(prog);
+  progRef.current = prog;
 
-  useEffect(() => { taskRef.current = prog.progress; }, [prog.progress]);
+  /* Click/tap the source text → select it so Ctrl+C copies. */
+  function selectSource() {
+    const node = sourceRef.current;
+    if (!node) return;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }
 
+  /* Native copy event — fires whether the user pressed Ctrl+C or used
+     the right-click menu. We treat it as the "copy" milestone. */
+  useEffect(() => {
+    function onCopy(ev: ClipboardEvent) {
+      const sel = window.getSelection()?.toString() ?? "";
+      if (!sel) return;
+      // Mirror the selection into our clipboard so paste works even when the
+      // browser blocks raw clipboard reads.
+      ev.clipboardData?.setData("text/plain", sel);
+      ev.preventDefault();
+      if (sel.trim() === LEVEL7_SOURCE) {
+        if (!copied) {
+          setCopied(true);
+          // Only counts toward the copy objective.
+          if (progRef.current.progress === 0) {
+            progRef.current.tickCorrect();
+          }
+        }
+        setFeedback("¡Texto copiado! Ahora hacé Ctrl + V en la caja de abajo.");
+        setTimeout(() => setFeedback(undefined), 1800);
+      } else {
+        setFeedback("Seleccioná el mensaje completo de arriba y volvé a copiar.");
+        setTimeout(() => setFeedback(undefined), 1800);
+      }
+    }
+    document.addEventListener("copy", onCopy);
+    return () => document.removeEventListener("copy", onCopy);
+    // We rely on refs for current progress so the listener stays stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [copied]);
+
+  /* Paste from the textarea. The textarea's native onPaste gives us the
+     pasted text — we don't need clipboard.read() permission. */
+  function onPaste(ev: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const text = ev.clipboardData.getData("text/plain");
+    ev.preventDefault();
+    if (!text) return;
+    setPasted(text);
+    if (text.trim() === LEVEL7_SOURCE) {
+      if (!copied) {
+        setFeedback("Primero copiá el mensaje con Ctrl + C de arriba.");
+        setTimeout(() => setFeedback(undefined), 1800);
+        return;
+      }
+      if (progRef.current.progress === 1) {
+        progRef.current.tickCorrect();
+      }
+      setFeedback("¡Excelente! Copiaste y pegaste el mensaje.");
+      setTimeout(() => setFeedback(undefined), 1800);
+    } else {
+      setFeedback("Eso no es el mismo mensaje. Copiá el de arriba.");
+      setTimeout(() => setFeedback(undefined), 1800);
+    }
+  }
+
+  /* Show clear feedback if the user presses Ctrl+V somewhere outside the
+     textarea — guide them to click into the box first. */
   useEffect(() => {
     function onKey(ev: KeyboardEvent) {
-      if (prog.completed) return;
-      const idx = Math.min(taskRef.current, total - 1);
-      const t = LEVEL7_TASKS[idx];
-      if (!t) return;
-      // Only react if the user pressed a modifier — avoids spurious mismatch.
-      if (!ev.ctrlKey && !ev.metaKey) return;
-      // Cmd on macOS counts as Ctrl for this exercise.
+      if (progRef.current.completed) return;
       const ctrlLike = ev.ctrlKey || ev.metaKey;
       if (!ctrlLike) return;
-      // Ignore pure modifier presses.
-      if (ev.key === "Control" || ev.key === "Meta") return;
-      ev.preventDefault();
-      setEcho(`Ctrl + ${ev.key.toUpperCase()}`);
-      if (t.matcher({ ...ev, ctrlKey: true } as unknown as KeyboardEvent)) {
-        prog.tickCorrect();
-        setFeedback(t.success);
-        setTimeout(() => setFeedback(undefined), 1200);
-      } else {
-        prog.tickWrong();
-        setFeedback(`Eso fue Ctrl + ${ev.key.toUpperCase()}. Probá ${t.combo.join(" + ")}.`);
-        setTimeout(() => setFeedback(undefined), 1500);
+      const key = ev.key.toLowerCase();
+      if (key === "v" && document.activeElement !== pasteRef.current) {
+        setFeedback("Hacé click dentro de la caja de abajo antes de pegar.");
+        setTimeout(() => setFeedback(undefined), 1800);
+      }
+      if (key === "c" && !window.getSelection()?.toString()) {
+        setFeedback("Primero seleccioná el texto de arriba (click sobre el mensaje).");
+        setTimeout(() => setFeedback(undefined), 1800);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [prog, total]);
+  }, []);
 
   function retry() {
     prog.reset();
+    setPasted("");
+    setCopied(false);
     setFeedback(undefined);
-    setEcho("");
+    pasteRef.current && (pasteRef.current.value = "");
   }
+
+  const stepInstruction = !copied
+    ? "Hacé click en el mensaje de arriba y copialo con Ctrl + C."
+    : "¡Ahora pegalo en la caja de abajo con Ctrl + V!";
 
   return (
     <Island5Shell
       activity={activity}
       kicker="NIVEL 7"
-      title="Atajos del teclado"
-      subtitle="CTRL + LETRA"
-      instruction={task.instruction}
-      goal="Usá los atajos para copiar, pegar y cambiar de pestaña"
+      title="Copiar y pegar"
+      subtitle="CTRL + C / CTRL + V"
+      instruction={stepInstruction}
+      goal="Copiá el texto de arriba y pegalo abajo"
       progress={prog.progress}
       total={total}
       metrics={{
@@ -1230,22 +1333,43 @@ function ShortcutsLevel({ activity }: { activity: Activity }) {
       onRetry={retry}
       feedback={feedback}
     >
-      <div className="i5-l7-grid">
-        <div className="i5-l7-prompt">
-          <span className="i5-l7-prompt__kicker">Atajo a usar</span>
-          <div className="i5-l7-prompt__combo">
-            {task.combo.map((step, i) => (
-              <span key={`${step}-${i}`} className="i5-l7-key">
-                {i > 0 && <span className="i5-l7-plus">+</span>}
-                <kbd>{step}</kbd>
-              </span>
-            ))}
-          </div>
-          <p className="i5-l7-prompt__hint">{task.instruction}</p>
+      <div className="i5-l7-cp">
+        <div className={`i5-l7-cp__source ${copied ? "is-copied" : ""}`}>
+          <span className="i5-l7-cp__label">1 · Texto para copiar</span>
+          <p
+            ref={sourceRef}
+            className="i5-l7-cp__text"
+            onClick={selectSource}
+            tabIndex={0}
+            onFocus={selectSource}
+          >
+            {LEVEL7_SOURCE}
+          </p>
+          <span className="i5-l7-cp__action">
+            <kbd>Ctrl</kbd><span className="i5-l7-plus">+</span><kbd>C</kbd>
+          </span>
         </div>
-        <div className="i5-l7-echo" aria-live="polite">
-          <span>Última tecla detectada</span>
-          <strong>{echo || "—"}</strong>
+
+        <div className="i5-l7-cp__middle">
+          <span className="i5-l7-cp__step">2</span>
+          <p>Seleccioná el mensaje, copialo y pegalo abajo.</p>
+        </div>
+
+        <div className={`i5-l7-cp__paste ${pasted && pasted.trim() === LEVEL7_SOURCE ? "is-ok" : ""}`}>
+          <span className="i5-l7-cp__label">3 · Pegá acá</span>
+          <textarea
+            ref={pasteRef}
+            className="i5-l7-cp__box"
+            placeholder="Hacé click acá y presioná Ctrl + V…"
+            value={pasted}
+            onChange={(e) => setPasted(e.target.value)}
+            onPaste={onPaste}
+            spellCheck={false}
+            aria-label="Caja para pegar"
+          />
+          <span className="i5-l7-cp__action">
+            <kbd>Ctrl</kbd><span className="i5-l7-plus">+</span><kbd>V</kbd>
+          </span>
         </div>
       </div>
     </Island5Shell>

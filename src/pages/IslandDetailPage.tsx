@@ -51,10 +51,29 @@ export function IslandDetailPage() {
     return 0;
   }, [maybeWorld]);
   const [selectedIndex, setSelectedIndex] = useState(initialIndex);
+  /* Gate the entrance animation on the actual background image being
+     decoded. Until it's ready we still render the whole page (so React
+     can lay out level nodes etc.) but we keep the bg + animations hidden
+     under a soft sky-coloured layer. Once the image fires onLoad we flip
+     the flag and CSS transitions everything to its final state in one
+     smooth fade — no more top-to-bottom paint of the JPEG/WebP. */
+  const [bgReady, setBgReady] = useState(false);
 
   useEffect(() => {
     setSelectedIndex(initialIndex);
   }, [initialIndex]);
+
+  useEffect(() => {
+    if (!maybeWorld) return;
+    setBgReady(false);
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => setBgReady(true);
+    img.onerror = () => setBgReady(true);
+    img.src = maybeWorld.background;
+    // If the browser had it cached we may already be complete by now.
+    if (img.complete && img.naturalWidth > 0) setBgReady(true);
+  }, [maybeWorld]);
 
   if (!maybeWorld) {
     return <Navigate to="/mundos" replace />;
@@ -90,7 +109,7 @@ export function IslandDetailPage() {
 
   return (
     <main
-      className="island-detail scene-contain page-fade"
+      className={`island-detail scene-contain page-fade ${bgReady ? "is-bg-ready" : "is-bg-loading"}`}
       style={{ "--scene-bg": `url("${world.background}")` } as CSSProperties}
     >
       {/* Aspect-ratio-locked stage: the image and every level node share the
@@ -175,6 +194,10 @@ export function IslandDetailPage() {
           <span className={`status-pill status-pill--${selectedLevel.state.toLowerCase()}`}>{selectedLevel.state}</span>
         </div>
 
+        <Button className="level-detail-panel__cta" onClick={openLevel}>
+          Entrar al nivel
+        </Button>
+
         <p>{selectedLevel.description}</p>
 
         <div className="reward-row" aria-label="Recompensas">
@@ -191,10 +214,6 @@ export function IslandDetailPage() {
             reto
           </span>
         </div>
-
-        <Button className="level-detail-panel__cta" onClick={openLevel}>
-          Entrar al nivel
-        </Button>
       </aside>
 
       <button type="button" className="profile-bubble" aria-label="Perfil" onClick={() => setMessage("Perfil de Sofía")}>

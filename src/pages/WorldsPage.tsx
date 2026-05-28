@@ -1,9 +1,20 @@
 import { BookOpen, Flag, FlaskConical, Flower2, Gem, LogOut, MousePointerClick, Medal, Menu, Star, UserRound, X, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { worlds, type World } from "../data/worlds";
 import { assets } from "../utils/assets";
+
+/* Cache of `Image` objects we've already kicked off so a quick hover →
+   click sequence reuses the in-flight request rather than firing it twice. */
+const prefetched = new Set<string>();
+function prefetchImage(src: string) {
+  if (!src || prefetched.has(src)) return;
+  prefetched.add(src);
+  const img = new Image();
+  img.decoding = "async";
+  img.src = src;
+}
 
 const worldBadges = {
   island1: Gem,
@@ -26,6 +37,7 @@ export function WorldsPage() {
   const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedWorld, setSelectedWorld] = useState<string | null>(null);
+  const pendingNav = useRef<number | null>(null);
 
   function leave() {
     logout();
@@ -34,7 +46,44 @@ export function WorldsPage() {
 
   function openWorld(world: World) {
     setSelectedWorld(world.id);
-    window.setTimeout(() => navigate(world.route), 430);
+    /* Begin downloading the island background immediately. Once the image is
+       in cache, navigating to /worlds/:id is essentially instant — the
+       <img> inside IslandDetailPage resolves from the disk/memory cache. */
+    const bg = new Image();
+    bg.decoding = "async";
+    bg.src = world.background;
+    prefetched.add(world.background);
+
+    /* Race: keep the existing zoom-out transition, but if the image isn't
+       loaded by the end of it, wait up to 700 ms more so the destination
+       screen doesn't paint a blank background. */
+    const minDelay = 430;
+    const maxDelay = 1100;
+    const startedAt = performance.now();
+    function go() {
+      if (pendingNav.current != null) {
+        window.clearTimeout(pendingNav.current);
+        pendingNav.current = null;
+      }
+      navigate(world.route);
+    }
+    if (bg.complete && bg.naturalWidth > 0) {
+      pendingNav.current = window.setTimeout(go, minDelay);
+    } else {
+      bg.onload = () => {
+        const elapsed = performance.now() - startedAt;
+        pendingNav.current = window.setTimeout(go, Math.max(0, minDelay - elapsed));
+      };
+      // Absolute upper bound — even on flaky networks, never block forever.
+      pendingNav.current = window.setTimeout(go, maxDelay);
+    }
+  }
+
+  /* Begin downloading an island's full-resolution background as soon as the
+     student hovers or focuses its tile on the world map. The actual click
+     usually comes 200-800 ms later, by which time the file is already cached. */
+  function prefetchWorld(world: World) {
+    prefetchImage(world.background);
   }
 
   return (
@@ -120,6 +169,8 @@ export function WorldsPage() {
               type="button"
               className={`world-island world-island--${world.slug} ${isCurrentWorld ? "is-current" : ""} ${selectedWorld === world.id ? "is-selected" : ""}`}
               onClick={() => openWorld(world)}
+              onPointerEnter={() => prefetchWorld(world)}
+              onFocus={() => prefetchWorld(world)}
               aria-label={worldLabels[world.slug]}
             >
               <span className="world-icon-badge" aria-hidden="true">

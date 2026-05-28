@@ -115,6 +115,13 @@ function expectedKeysFor(character: string): string[] {
   return [keyCapFor(character)];
 }
 
+function expectedKeysForActivity(character: string, activity: ReturnType<typeof getActivityById>): string[] {
+  const keys = expectedKeysFor(character);
+  const teachesShift = activity.requiresShift || activity.worldId === "island3" || activity.worldId === "island4";
+  if (teachesShift) return keys;
+  return keys.filter((key) => key !== "Shift");
+}
+
 function comboFor(character: string): string[] | null {
   if (!character) return null;
   if (SHIFT_COMBOS[character]) return SHIFT_COMBOS[character];
@@ -137,6 +144,47 @@ function comboFor(character: string): string[] | null {
   return null;
 }
 
+function objectivePrompt(activity: ReturnType<typeof getActivityById>, target: string): string {
+  if (!target) return "Prepará tus dedos.";
+  if (activity.inputType === "letter") return `Tocá la letra ${target.toUpperCase()}.`;
+  if (activity.inputType === "symbol") return `Escribí el símbolo ${target}.`;
+  return `Escribí "${target}".`;
+}
+
+function keyLocationHint(character: string): string {
+  const cap = keyCapFor(character);
+  if (!cap) return "";
+  const row = keyboardRows.find((item) => item.keys.includes(cap));
+  const rowLabels: Record<string, string> = {
+    num: "fila de números",
+    top: "fila de arriba",
+    home: "fila central",
+    bot: "fila de abajo",
+    mod: "teclas grandes",
+  };
+  return row ? `Buscá ${cap === "Space" ? "Espacio" : `la tecla ${cap}`} en la ${rowLabels[row.tone]}.` : "";
+}
+
+function playErrorSound() {
+  const AudioContextCtor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextCtor) return;
+
+  const context = new AudioContextCtor();
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(180, context.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(110, context.currentTime + 0.12);
+  gain.gain.setValueAtTime(0.0001, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.06, context.currentTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.14);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start();
+  oscillator.stop(context.currentTime + 0.15);
+  window.setTimeout(() => void context.close(), 220);
+}
+
 export function GameplayPage() {
   const { activityId } = useParams();
   const activity = getActivityById(activityId);
@@ -152,10 +200,16 @@ export function GameplayPage() {
   const [typed, setTyped] = useState("");
   const [attempts, setAttempts] = useState(0);
   const [errors, setErrors] = useState(0);
-  const [feedback, setFeedback] = useState("Prepará tus dedos.");
+  const [feedback, setFeedback] = useState(() => objectivePrompt(activity, activity.targets[0] ?? ""));
   const [lastKey, setLastKey] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isErrorActive, setIsErrorActive] = useState(false);
+  const [isIdleHintActive, setIsIdleHintActive] = useState(false);
+  const [inputSignal, setInputSignal] = useState(0);
   const completionSaved = useRef(false);
+  const activityRef = useRef(activity);
+  const advanceTimeoutRef = useRef<number | null>(null);
+  const errorTimeoutRef = useRef<number | null>(null);
   const typedScrollRef = useRef<HTMLSpanElement | null>(null);
   const captureInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -168,10 +222,15 @@ export function GameplayPage() {
     isCompleted: false,
     attempts: 0,
     errors: 0,
+    isAdvancing: false,
   });
 
-  const target = activity.targets[targetIndex];
-  const isLastTarget = targetIndex === activity.targets.length - 1;
+  activityRef.current = activity;
+
+  const totalObjectives = Math.max(1, activity.targets.length);
+  const currentTargetIndex = Math.min(targetIndex, totalObjectives - 1);
+  const target = activity.targets[currentTargetIndex] ?? "";
+  const visibleObjective = isCompleted ? totalObjectives : Math.min(currentTargetIndex + 1, totalObjectives);
 
   const expectedChar = useMemo(() => {
     if (activity.inputType === "letter" || activity.inputType === "symbol") {
@@ -184,46 +243,149 @@ export function GameplayPage() {
      Multi-key combos (Shift + 1, Shift + ¿) light up *both* caps. */
   const expectedKeys = useMemo(() => {
     if (!expectedChar) return new Set<string>();
-    return new Set(expectedKeysFor(expectedChar));
-  }, [expectedChar]);
+    return new Set(expectedKeysForActivity(expectedChar, activity));
+  }, [activity, expectedChar]);
+
+  const locationHint = keyLocationHint(expectedChar);
+  const commaHint = target.includes(",");
 
   const accuracy = attempts === 0 ? 100 : Math.max(0, Math.round(((attempts - errors) / attempts) * 100));
 
   /* Keep the ref in sync with React state so the imperative input handlers
      below always read the latest values. */
   useEffect(() => {
-    stateRef.current = { targetIndex, typed, isCompleted, attempts, errors };
-  }, [targetIndex, typed, isCompleted, attempts, errors]);
+    stateRef.current.targetIndex = currentTargetIndex;
+    stateRef.current.typed = typed;
+    stateRef.current.isCompleted = isCompleted;
+    stateRef.current.attempts = attempts;
+    stateRef.current.errors = errors;
+  }, [currentTargetIndex, typed, isCompleted, attempts, errors]);
 
   function persistCompletion(finalAccuracy: number, finalAttempts: number) {
     if (completionSaved.current) return;
     completionSaved.current = true;
-    markLevelComplete(activity.worldId, activity.levelNumber, finalAccuracy, finalAttempts);
+    const currentActivity = activityRef.current;
+    markLevelComplete(currentActivity.worldId, currentActivity.levelNumber, finalAccuracy, finalAttempts);
+  }
+
+  function targetAt(index: number) {
+    const targets = activityRef.current.targets;
+    const lastIndex = Math.max(0, targets.length - 1);
+    return targets[Math.min(index, lastIndex)] ?? "";
+  }
+
+  function completeLevel() {
+    if (stateRef.current.isCompleted) return;
+    if (advanceTimeoutRef.current !== null) {
+      window.clearTimeout(advanceTimeoutRef.current);
+      advanceTimeoutRef.current = null;
+    }
+    const currentActivity = activityRef.current;
+    const lastIndex = Math.max(0, currentActivity.targets.length - 1);
+    const finalAttempts = stateRef.current.attempts;
+    const finalErrors = stateRef.current.errors;
+    const finalAccuracy = finalAttempts === 0
+      ? 100
+      : Math.max(0, Math.round(((finalAttempts - finalErrors) / finalAttempts) * 100));
+
+    stateRef.current.targetIndex = lastIndex;
+    stateRef.current.isCompleted = true;
+    stateRef.current.isAdvancing = false;
+    setTargetIndex(lastIndex);
+    persistCompletion(finalAccuracy, finalAttempts);
+    setIsCompleted(true);
+    setFeedback("¡Nivel completado! Ganaste estrellas.");
   }
 
   function advance() {
-    if (isLastTarget) {
-      const finalAttempts = attempts;
-      const finalAccuracy = finalAttempts === 0 ? 100 : Math.max(0, Math.round(((finalAttempts - errors) / finalAttempts) * 100));
-      persistCompletion(finalAccuracy, finalAttempts);
-      setIsCompleted(true);
-      setFeedback("¡Nivel completado! Ganaste estrellas.");
+    if (stateRef.current.isCompleted) return;
+    const currentActivity = activityRef.current;
+    const lastIndex = Math.max(0, currentActivity.targets.length - 1);
+    const nextIndex = stateRef.current.targetIndex + 1;
+
+    if (nextIndex > lastIndex) {
+      completeLevel();
       return;
     }
-    setTargetIndex((value) => value + 1);
+
+    stateRef.current.targetIndex = nextIndex;
+    stateRef.current.typed = "";
+    stateRef.current.isAdvancing = false;
+    setTargetIndex(nextIndex);
     setTyped("");
-    setFeedback("¡Muy bien! Seguimos.");
+    setFeedback(objectivePrompt(currentActivity, targetAt(nextIndex)));
+  }
+
+  function recordAttempt(isError: boolean) {
+    const nextAttempts = stateRef.current.attempts + 1;
+    const nextErrors = stateRef.current.errors + (isError ? 1 : 0);
+    stateRef.current.attempts = nextAttempts;
+    stateRef.current.errors = nextErrors;
+    setAttempts(nextAttempts);
+    setErrors(nextErrors);
+  }
+
+  function showMistake(message: string) {
+    setFeedback(message);
+    setIsIdleHintActive(false);
+    setIsErrorActive(true);
+    playErrorSound();
+    if (errorTimeoutRef.current !== null) window.clearTimeout(errorTimeoutRef.current);
+    errorTimeoutRef.current = window.setTimeout(() => {
+      setIsErrorActive(false);
+      errorTimeoutRef.current = null;
+    }, 520);
   }
 
   useEffect(() => {
+    if (advanceTimeoutRef.current !== null) {
+      window.clearTimeout(advanceTimeoutRef.current);
+      advanceTimeoutRef.current = null;
+    }
+    stateRef.current = {
+      targetIndex: 0,
+      typed: "",
+      isCompleted: false,
+      attempts: 0,
+      errors: 0,
+      isAdvancing: false,
+    };
     setTargetIndex(0);
     setTyped("");
     setAttempts(0);
     setErrors(0);
-    setFeedback("Prepará tus dedos.");
+    setFeedback(objectivePrompt(activity, activity.targets[0] ?? ""));
     setIsCompleted(false);
+    setIsErrorActive(false);
+    setIsIdleHintActive(false);
+    setInputSignal((value) => value + 1);
     completionSaved.current = false;
+    return () => {
+      if (advanceTimeoutRef.current !== null) {
+        window.clearTimeout(advanceTimeoutRef.current);
+        advanceTimeoutRef.current = null;
+      }
+      if (errorTimeoutRef.current !== null) {
+        window.clearTimeout(errorTimeoutRef.current);
+        errorTimeoutRef.current = null;
+      }
+    };
   }, [activity.id]);
+
+  useEffect(() => {
+    if (isCompleted || !expectedChar) {
+      setIsIdleHintActive(false);
+      return;
+    }
+
+    setIsIdleHintActive(false);
+    const show = window.setTimeout(() => setIsIdleHintActive(true), 4500);
+    const hide = window.setTimeout(() => setIsIdleHintActive(false), 6400);
+    return () => {
+      window.clearTimeout(show);
+      window.clearTimeout(hide);
+    };
+  }, [currentTargetIndex, expectedChar, inputSignal, isCompleted, typed]);
 
   /* Keep the typed-preview pinned to the most recent character so long inputs
      stay legible without wrapping to a new line. */
@@ -237,37 +399,42 @@ export function GameplayPage() {
      the beforeinput / composition pipeline used by touch keyboards. */
   function processCharacter(character: string) {
     if (stateRef.current.isCompleted) return;
+    if (stateRef.current.isAdvancing) return;
     if (!character || character.length === 0) return;
+    setIsIdleHintActive(false);
+    setInputSignal((value) => value + 1);
 
     if (character === " ") setLastKey("Space");
     else setLastKey(keyCapFor(character));
 
-    if (activity.inputType === "letter") {
-      setAttempts((v) => v + 1);
-      if (character.toUpperCase() === target.toUpperCase()) {
+    const currentActivity = activityRef.current;
+    const currentTarget = targetAt(stateRef.current.targetIndex);
+
+    if (currentActivity.inputType === "letter") {
+      const isCorrect = character.toUpperCase() === currentTarget.toUpperCase();
+      recordAttempt(!isCorrect);
+      if (isCorrect) {
         advance();
       } else {
-        setErrors((v) => v + 1);
-        setFeedback(`Buscá la tecla ${target.toUpperCase()}.`);
+        showMistake(`Buscá la tecla ${currentTarget.toUpperCase()}.`);
       }
       return;
     }
 
-    if (activity.inputType === "symbol") {
-      setAttempts((v) => v + 1);
-      if (character === target) advance();
+    if (currentActivity.inputType === "symbol") {
+      const isCorrect = character === currentTarget;
+      recordAttempt(!isCorrect);
+      if (isCorrect) advance();
       else {
-        setErrors((v) => v + 1);
-        setFeedback(`Escribí el símbolo ${target}.`);
+        showMistake(`Escribí el símbolo ${currentTarget}.`);
       }
       return;
     }
 
     const currentTyped = stateRef.current.typed;
     const nextTyped = currentTyped + character;
-    setAttempts((v) => v + 1);
 
-    const targetSoFar = target.slice(0, nextTyped.length);
+    const targetSoFar = currentTarget.slice(0, nextTyped.length);
     const matches = nextTyped === targetSoFar;
     const matchesLoose =
       !matches &&
@@ -275,22 +442,28 @@ export function GameplayPage() {
       stripAccents(nextTyped.toLowerCase()) === stripAccents(targetSoFar.toLowerCase());
 
     if (!matches && !matchesLoose) {
-      setErrors((v) => v + 1);
-      if (activity.inputType === "correction") {
-        setFeedback("Usá Backspace para corregir.");
+      recordAttempt(true);
+      if (currentActivity.inputType === "correction") {
+        showMistake("Usá Backspace para corregir.");
         stateRef.current.typed = nextTyped;
         setTyped(nextTyped);
       } else {
-        setFeedback(`Esperaba "${targetSoFar}". Intentá de nuevo.`);
+        showMistake(`Esperaba "${targetSoFar}". Intentá de nuevo.`);
       }
       return;
     }
 
+    recordAttempt(false);
     stateRef.current.typed = nextTyped;
     setTyped(nextTyped);
-    if (nextTyped === target) {
+    if (nextTyped === currentTarget) {
       setFeedback("¡Excelente!");
-      window.setTimeout(() => advance(), 350);
+      stateRef.current.isAdvancing = true;
+      if (advanceTimeoutRef.current !== null) window.clearTimeout(advanceTimeoutRef.current);
+      advanceTimeoutRef.current = window.setTimeout(() => {
+        advanceTimeoutRef.current = null;
+        advance();
+      }, 350);
     } else if (matchesLoose && !matches) {
       setFeedback("Ojo con la tilde o la mayúscula. Seguí.");
     } else {
@@ -300,8 +473,12 @@ export function GameplayPage() {
 
   function processBackspace() {
     if (stateRef.current.isCompleted) return;
+    if (stateRef.current.isAdvancing) return;
+    setIsIdleHintActive(false);
+    setInputSignal((value) => value + 1);
     setLastKey("Backspace");
-    if (activity.inputType === "letter" || activity.inputType === "symbol") return;
+    const currentActivity = activityRef.current;
+    if (currentActivity.inputType === "letter" || currentActivity.inputType === "symbol") return;
     const next = stateRef.current.typed.slice(0, -1);
     stateRef.current.typed = next;
     setTyped(next);
@@ -421,12 +598,27 @@ export function GameplayPage() {
   }, [activity.inputType, target]);
 
   function retry() {
+    if (advanceTimeoutRef.current !== null) {
+      window.clearTimeout(advanceTimeoutRef.current);
+      advanceTimeoutRef.current = null;
+    }
+    stateRef.current = {
+      targetIndex: 0,
+      typed: "",
+      isCompleted: false,
+      attempts: 0,
+      errors: 0,
+      isAdvancing: false,
+    };
     setTargetIndex(0);
     setTyped("");
     setAttempts(0);
     setErrors(0);
-    setFeedback("Prepará tus dedos.");
+    setFeedback(objectivePrompt(activityRef.current, activityRef.current.targets[0] ?? ""));
     setIsCompleted(false);
+    setIsErrorActive(false);
+    setIsIdleHintActive(false);
+    setInputSignal((value) => value + 1);
     completionSaved.current = false;
   }
 
@@ -443,7 +635,7 @@ export function GameplayPage() {
   }
 
   return (
-    <main className="gameplay-page gameplay-shell page-fade" style={{ backgroundImage: `url("${assets.gameplayBg}")` }}>
+    <main className={`gameplay-page gameplay-shell page-fade ${isErrorActive ? "is-error" : ""} ${isIdleHintActive ? "is-idle-hint" : ""}`} style={{ backgroundImage: `url("${assets.gameplayBg}")` }}>
       {/* Hidden capture field — drives beforeinput/composition so accented
           characters work on touch & Spanish-layout keyboards. */}
       <input
@@ -496,11 +688,18 @@ export function GameplayPage() {
           const altCombos = showCombo && expectedChar ? SECONDARY_COMBOS[expectedChar] : undefined;
           const showTypedPreview =
             activity.inputType !== "letter" && activity.inputType !== "symbol";
+          const isLongTarget = target.length > 14 || target.includes("@");
           return (
             <>
-              <div className={`target-card target--${variant}`}>
-                <span>Objetivo {targetIndex + 1} / {activity.targets.length}</span>
+              <div className={`target-card target--${variant} ${isLongTarget ? "target--long" : ""} ${isErrorActive ? "is-error" : ""} ${isIdleHintActive ? "is-idle-hint" : ""}`}>
+                <span>Objetivo {visibleObjective} / {totalObjectives}</span>
                 <strong>{target}</strong>
+                {locationHint && !isCompleted && (
+                  <small className="key-location-hint">{locationHint}</small>
+                )}
+                {commaHint && !isCompleted && (
+                  <small className="comma-hint">Después de una coma va un espacio antes de la siguiente palabra.</small>
+                )}
                 {combo && !isCompleted && (
                   <div className="combo-hint" aria-label={`Combinación: ${combo.join(" + ")}`}>
                     <span>Para escribir {expectedChar || "este símbolo"}</span>
@@ -553,7 +752,6 @@ export function GameplayPage() {
         })()}
 
         <div className="game-metrics">
-          <span>Intentos: {attempts}</span>
           <span>Errores: {errors}</span>
           <span>Precisión: {accuracy}%</span>
         </div>
@@ -561,9 +759,9 @@ export function GameplayPage() {
 
       {/* Two motivational robots flank the keyboard, switching phrases each target. */}
       {!isCompleted && (() => {
-        const errored = errors > 0 && attempts > 0 && (attempts - errors) / attempts < 0.6;
+        const errored = isErrorActive || (errors > 0 && attempts > 0 && (attempts - errors) / attempts < 0.6);
         const phrasePool = errored ? ERROR_PHRASES : MOTIVATION_PHRASES;
-        const leftPhrase = phrasePool[targetIndex % phrasePool.length];
+        const leftPhrase = isIdleHintActive && locationHint ? locationHint : phrasePool[targetIndex % phrasePool.length];
         const rightPhrase = phrasePool[(targetIndex + Math.max(1, Math.floor(phrasePool.length / 2))) % phrasePool.length];
         return (
           <div className="game-mascots" aria-hidden="true">
@@ -583,14 +781,15 @@ export function GameplayPage() {
         {keyboardRows.map((row) => (
           <div className={`keyboard-row keyboard-row--${row.tone}`} key={row.id}>
             {row.keys.map((key) => {
-              const isTarget = activity.mode === "assisted" && !isCompleted && expectedKeys.has(key);
+              const isTarget = !isCompleted && expectedKeys.has(key);
               const isCombo = isTarget && expectedKeys.size > 1;
+              const isFindHint = isTarget && isIdleHintActive;
               const isPressed = lastKey === key;
               return (
                 <button
                   key={key}
                   type="button"
-                  className={`key key--${row.tone} ${key === "Space" ? "key--space" : ""} ${key === "Backspace" || key === "Shift" || key === "Enter" ? "key--wide" : ""} ${isTarget ? "is-target" : ""} ${isCombo ? "is-target-combo" : ""} ${isPressed ? "is-pressed" : ""}`}
+                  className={`key key--${row.tone} ${key === "Space" ? "key--space" : ""} ${key === "Backspace" || key === "Shift" || key === "Enter" ? "key--wide" : ""} ${isTarget ? "is-target" : ""} ${isCombo ? "is-target-combo" : ""} ${isFindHint ? "is-find-hint" : ""} ${isPressed ? "is-pressed" : ""}`}
                   tabIndex={-1}
                 >
                   {key === "Space" ? "Espacio" : key}
@@ -626,7 +825,7 @@ export function GameplayPage() {
             </div>
             <div className="level-complete-trophy" aria-hidden="true">🏆</div>
             <h2 id="level-complete-title">¡Nivel completado!</h2>
-            <p>Sumaste {accuracy}% de precisión en {attempts} intento{attempts === 1 ? "" : "s"}.</p>
+            <p>Sumaste {accuracy}% de precisión.</p>
             <div className="level-complete-stars" aria-hidden="true">
               {[1, 2, 3].map((index) => (
                 <span

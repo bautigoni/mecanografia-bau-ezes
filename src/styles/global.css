@@ -864,12 +864,9 @@ a {
   padding: 0;
   background: transparent;
   cursor: pointer;
-  filter:
-    drop-shadow(0 22px 22px rgba(45, 73, 142, 0.22))
-    drop-shadow(0 52px 44px rgba(75, 88, 171, 0.14));
-  transition:
-    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
-    filter 300ms ease;
+  /* Drop shadows live on the inner <img> so the compositor can paint them
+     once per island instead of re-evaluating filter() on hover. */
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .world-island::before {
@@ -916,16 +913,17 @@ a {
   display: block;
   width: 100%;
   height: auto;
-  animation: islandFloat 6.4s ease-in-out infinite;
   object-fit: contain;
+  animation: islandFloat 6.4s ease-in-out infinite;
+  /* Shadow baked into the image once — cheap on the GPU and avoids paint
+     work on hover. We do not toggle filter on hover so the compositor only
+     has to re-rasterise the `transform`. */
+  filter: drop-shadow(0 22px 22px rgba(45, 73, 142, 0.22));
+  will-change: transform;
 }
 
 .world-island:hover {
-  transform: translateY(-0.55rem) scale(1.052);
-  filter:
-    drop-shadow(0 28px 26px rgba(45, 73, 142, 0.24))
-    drop-shadow(0 58px 52px rgba(75, 88, 171, 0.16))
-    drop-shadow(0 0 26px rgba(255, 255, 255, 0.64));
+  transform: translateY(-0.5rem) scale(1.05);
 }
 
 .world-island:hover::before {
@@ -934,19 +932,19 @@ a {
 }
 
 .world-island.is-selected {
-  transform: translateY(-0.75rem) scale(1.095);
+  transform: translateY(-0.7rem) scale(1.09);
+}
+.world-island.is-selected img {
+  /* Stronger ambient glow when selected — applied to the inner <img> so we
+     only repaint the image, not the whole island button. */
   filter:
-    drop-shadow(0 34px 30px rgba(45, 73, 142, 0.26))
-    drop-shadow(0 0 42px rgba(255, 255, 255, 0.95))
-    drop-shadow(0 0 24px rgba(91, 232, 186, 0.25));
+    drop-shadow(0 26px 22px rgba(45, 73, 142, 0.28))
+    drop-shadow(0 0 22px rgba(255, 255, 255, 0.7));
 }
 
 .world-island:focus-visible {
   outline: 0.22rem solid rgba(255, 255, 255, 0.92);
   outline-offset: 0.45rem;
-  filter:
-    drop-shadow(0 28px 26px rgba(45, 73, 142, 0.24))
-    drop-shadow(0 0 30px rgba(105, 232, 220, 0.38));
 }
 
 .world-transition {
@@ -1167,6 +1165,33 @@ a {
 
 .island-detail {
   background-position: center;
+}
+
+/* While the island background is still decoding we hide the heavy artwork
+   under a soft pastel sky so the kid never sees the JPEG painting in from
+   the top. Once `bgReady` flips on in React, the .is-bg-ready modifier
+   removes the cover and the cached image is already complete — so the
+   entrance animation runs against an already-painted picture. */
+.island-detail.is-bg-loading .island-stage__bg,
+.island-detail.is-bg-loading .level-ship,
+.island-detail.is-bg-loading .level-node {
+  opacity: 0;
+}
+.island-detail.is-bg-loading::before {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: linear-gradient(180deg, #cfeeff 0%, #b8dcff 55%, #d6c7ff 100%);
+  pointer-events: none;
+  content: "";
+  opacity: 1;
+  transition: opacity 320ms ease;
+}
+.island-detail.is-bg-ready::before {
+  opacity: 0;
+  /* Once invisible, stop accepting paint events. */
+  visibility: hidden;
+  transition: opacity 320ms ease, visibility 0s linear 320ms;
 }
 
 .scene-contain {
@@ -1808,6 +1833,14 @@ a {
     inset 0 1px 0 rgba(255, 255, 255, 0.36);
 }
 
+.level-detail-panel .level-detail-panel__cta {
+  width: 100%;
+  min-height: 3.65rem;
+  margin-top: 0.25rem;
+  font-size: clamp(1.05rem, 1.4vw, 1.18rem);
+  animation: softHintIn 280ms ease-out both;
+}
+
 .profile-bubble {
   position: absolute;
   right: 2rem;
@@ -1967,6 +2000,33 @@ a {
   word-break: break-word;
 }
 
+.target-card.is-error {
+  border-color: rgba(255, 118, 118, 0.92);
+  box-shadow:
+    0 0 0 5px rgba(255, 118, 118, 0.22),
+    0 22px 54px rgba(180, 60, 80, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  animation: gameplayErrorShake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+.target-card.is-idle-hint strong {
+  animation: targetFindPulse 1.15s ease-in-out 2;
+}
+
+.key-location-hint,
+.comma-hint {
+  display: block;
+  color: #4a5f8c;
+  font-weight: 850;
+  font-size: clamp(0.72rem, 1.4vw, 0.88rem);
+  line-height: 1.2;
+}
+
+.comma-hint {
+  margin-top: 0.15rem;
+  color: #6d4cc8;
+}
+
 /* Single-letter / single-word target stays huge. */
 .target-card.target--letter strong {
   font-size: clamp(5rem, 14vw, 9rem);
@@ -1986,6 +2046,19 @@ a {
   overflow: hidden;
   text-overflow: clip;
   max-width: 100%;
+}
+
+.target-card.target--long {
+  width: min(50rem, 100%);
+}
+
+.target-card.target--long strong {
+  font-size: clamp(1.55rem, 4.2vw, 3.5rem);
+  line-height: 1.02;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 /* Phrases (anything with a space) get a wider pill and smaller wrapped text. */
 .target-card.target--phrase {
@@ -2028,6 +2101,11 @@ a {
   color: #2d4476;
   font-weight: 850;
   font-size: clamp(0.78rem, 1.6vw, 0.95rem);
+}
+
+.gameplay-shell.is-error .instruction-panel {
+  border-color: rgba(255, 118, 118, 0.72);
+  background: rgba(255, 244, 244, 0.86);
 }
 
 .visual-keyboard {
@@ -2119,6 +2197,11 @@ a {
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
+.key.is-find-hint {
+  transform: translateY(-4px) scale(1.08);
+  animation: targetPulse 0.85s ease-in-out infinite, targetShimmer 1.6s linear infinite, keyFindBounce 1.15s ease-in-out 2;
+}
+
 .key.is-pressed {
   transform: translateY(3px) scale(0.96);
   box-shadow: 0 4px 8px rgba(67, 88, 130, 0.16), inset 0 -2px 0 rgba(95, 117, 188, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
@@ -2135,6 +2218,23 @@ a {
   0%   { transform: translateY(3px) scale(0.94); }
   60%  { transform: translateY(-3px) scale(1.06); }
   100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes gameplayErrorShake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-7px); }
+  40%, 60% { transform: translateX(7px); }
+}
+
+@keyframes targetFindPulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(83, 107, 255, 0)); }
+  45%      { transform: scale(1.08); filter: drop-shadow(0 10px 22px rgba(83, 107, 255, 0.35)); }
+}
+
+@keyframes keyFindBounce {
+  0%, 100% { transform: translateY(-4px) scale(1.06); }
+  50%      { transform: translateY(-8px) scale(1.14); }
 }
 
 /* Decorative shine that sweeps across keys on hover. */
@@ -2400,6 +2500,132 @@ a {
 .instruction-actions button svg {
   width: clamp(14px, 1.6vw, 18px);
   height: clamp(14px, 1.6vw, 18px);
+}
+
+@media (max-height: 720px) {
+  .gameplay-shell {
+    justify-content: start;
+    gap: clamp(0.18rem, 0.55vh, 0.35rem);
+    padding: clamp(0.25rem, 0.7vh, 0.45rem) clamp(0.45rem, 1vw, 0.75rem);
+  }
+
+  .game-exit {
+    top: 0.55rem;
+    right: 0.75rem;
+    padding: 0.45rem 0.7rem;
+  }
+
+  .game-stage {
+    gap: clamp(0.18rem, 0.55vh, 0.35rem);
+    width: min(42rem, calc(100vw - 1rem));
+  }
+
+  .game-status {
+    max-width: min(28rem, 100%);
+    padding: 0.28rem 0.85rem;
+    border-radius: 0.95rem;
+  }
+
+  .game-status strong {
+    font-size: clamp(1rem, 2.2vw, 1.35rem);
+  }
+
+  .game-status span,
+  .game-status em {
+    font-size: clamp(0.6rem, 1.2vw, 0.72rem);
+  }
+
+  .target-card {
+    max-width: min(32rem, 100%);
+    min-height: clamp(4.2rem, 19vh, 6.6rem);
+    padding: clamp(0.4rem, 0.9vh, 0.65rem) clamp(0.8rem, 1.6vw, 1rem);
+    border-radius: 1.25rem;
+  }
+
+  .target-card.target--letter strong,
+  .target-card.target--symbol strong {
+    font-size: clamp(3.4rem, 13vh, 5.4rem);
+  }
+
+  .target-card.target--word strong {
+    font-size: clamp(1.35rem, 5.2vh, 2.8rem);
+  }
+
+  .target-card.target--phrase strong,
+  .target-card.target--long strong {
+    font-size: clamp(1.25rem, 4.2vh, 2.15rem);
+  }
+
+  .key-location-hint,
+  .comma-hint,
+  .target-card small {
+    font-size: clamp(0.62rem, 1.1vw, 0.76rem);
+  }
+
+  .typed-preview {
+    width: min(34rem, calc(100vw - 1rem));
+    padding: 0.45rem 0.8rem;
+  }
+
+  .typed-preview__value {
+    font-size: clamp(1.45rem, 5vh, 2.45rem);
+    min-height: clamp(2.5rem, 7vh, 3.2rem);
+  }
+
+  .game-metrics {
+    padding: 0.25rem 0.8rem;
+    font-size: clamp(0.68rem, 1.3vw, 0.82rem);
+  }
+
+  .visual-keyboard {
+    gap: clamp(0.12rem, 0.35vh, 0.22rem);
+    max-width: min(42rem, calc(100vw - 0.7rem));
+  }
+
+  .keyboard-row {
+    gap: clamp(0.14rem, 0.38vw, 0.25rem);
+  }
+
+  .key {
+    min-width: clamp(1.8rem, 4.05vw, 2.65rem);
+    height: clamp(1.95rem, 5.4vh, 2.45rem);
+    border-radius: 0.62rem;
+    font-size: clamp(0.66rem, 1.3vw, 0.82rem);
+    padding: 0 clamp(0.22rem, 0.55vw, 0.42rem);
+  }
+
+  .key--wide {
+    min-width: clamp(3.8rem, 8vw, 5.8rem);
+  }
+
+  .key--space {
+    min-width: clamp(8rem, 22vw, 15rem);
+  }
+
+  .instruction-panel {
+    max-width: min(46rem, calc(100vw - 1rem));
+    padding: 0.28rem 0.55rem;
+    border-radius: 1rem;
+  }
+
+  .instruction-panel h1 {
+    font-size: clamp(0.72rem, 1.3vw, 0.88rem);
+    max-width: min(18rem, 34vw);
+  }
+
+  .instruction-panel p {
+    font-size: clamp(0.66rem, 1.15vw, 0.78rem);
+  }
+
+  .instruction-actions button {
+    padding: 0.28rem 0.55rem;
+    font-size: clamp(0.64rem, 1.1vw, 0.76rem);
+  }
+}
+
+@media (max-height: 620px) {
+  .game-mascot { width: clamp(4.8rem, 10vw, 7rem); }
+  .instruction-panel h1 { max-width: min(14rem, 30vw); }
 }
 
 .student-soft-page {
@@ -3418,9 +3644,9 @@ h3, h4 {
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* On narrow viewports the mascots can crowd the level detail panel — hide them. */
+/* On narrow viewports the mascots scale down instead of disappearing. */
 @media (max-width: 760px) {
-  .island-mascot--right { display: none; }
+  .island-mascot--right { right: 0.4rem; }
   .island-mascot--left img { width: 6.5rem; }
   .island-mascot__bubble { max-width: 9rem; font-size: 0.78rem; }
 }
@@ -3668,18 +3894,14 @@ h3, h4 {
 }
 
 /* Shrink the bubble + robot pair as the window narrows so they keep
-   peeking from the bottom corners. The full hide only kicks in on
-   genuinely tiny viewports where they would overlap the keyboard. */
+   peeking from the bottom corners. */
 @media (max-width: 1180px) {
   .game-mascot { width: clamp(5.5rem, 11vw, 9rem); }
   .game-mascot__bubble { font-size: clamp(0.72rem, 1vw, 0.9rem); padding: 0.35rem 0.6rem; }
 }
 @media (max-width: 900px) {
   .game-mascot { width: clamp(4.5rem, 14vw, 7rem); bottom: 0.2rem; }
-  .game-mascot__bubble { display: none; }
-}
-@media (max-width: 640px), (max-height: 520px) {
-  .game-mascots { display: none; }
+  .game-mascot__bubble { font-size: clamp(0.62rem, 1.8vw, 0.78rem); padding: 0.28rem 0.5rem; }
 }
 
 /* ===== Refreshed login card visuals ===== */
@@ -4079,11 +4301,15 @@ h3, h4 {
 }
 
 .i5-shell__top {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+  /* Centre the title pill relative to the *viewport* — the Salir button is
+     positioned absolutely top-right so it never pulls the title off-axis. */
   position: relative; z-index: 2;
+  display: grid;
+  justify-items: center;
+  align-items: start;
+  min-height: 3rem;
 }
 .i5-shell__card--title {
-  flex: 0 1 auto;
   margin: 0 auto;
   display: grid; place-items: center;
   padding: 0.75rem 2.2rem;
@@ -4092,7 +4318,7 @@ h3, h4 {
   border: 1px solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 16px 32px rgba(60, 80, 150, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.95);
   text-align: center;
-  min-width: min(440px, 70vw);
+  width: min(440px, 90vw);
 }
 .i5-shell__card--title .i5-shell__kicker {
   font-family: var(--font-display); font-weight: 700;
@@ -4107,6 +4333,11 @@ h3, h4 {
   color: #6b7aa8; font-size: 0.8rem; letter-spacing: 0.16em;
 }
 .i5-shell__exit {
+  /* Absolute top-right so it never pushes the title card off the viewport
+     center axis. */
+  position: absolute;
+  right: 0;
+  top: 0;
   display: inline-flex; align-items: center; gap: 0.4rem;
   border: 0; border-radius: 999px; padding: 0.55rem 1rem;
   background: #fff; color: #2c2666;
@@ -4122,7 +4353,9 @@ h3, h4 {
   background: linear-gradient(180deg, #e6f1ff 0%, #cee0ff 100%);
   border: 1px solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 18px 32px rgba(60, 80, 150, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  min-width: min(520px, 80vw);
+  /* Share the same maximum width as the title pill so both cards stack on
+     the same central axis regardless of how long the heading text is. */
+  width: min(520px, 92vw);
   position: relative; z-index: 2;
 }
 .i5-shell__goal-label {
@@ -4137,6 +4370,58 @@ h3, h4 {
   text-shadow: 0 1px 0 rgba(255,255,255,0.6);
 }
 
+.i5-shell--level-4,
+.i5-shell--level-5,
+.i5-shell--level-6 {
+  gap: clamp(0.22rem, 0.65vh, 0.5rem);
+}
+
+.i5-shell--level-4 .i5-shell__card--title,
+.i5-shell--level-5 .i5-shell__card--title,
+.i5-shell--level-6 .i5-shell__card--title {
+  padding: clamp(0.25rem, 0.65vh, 0.42rem) 1.4rem;
+  border-radius: 1.05rem;
+  gap: 0;
+}
+
+.i5-shell--level-4 .i5-shell__card--title strong,
+.i5-shell--level-5 .i5-shell__card--title strong,
+.i5-shell--level-6 .i5-shell__card--title strong {
+  font-size: clamp(1.05rem, 2.1vw, 1.35rem);
+  line-height: 1;
+}
+
+.i5-shell--level-4 .i5-shell__card--title .i5-shell__kicker,
+.i5-shell--level-5 .i5-shell__card--title .i5-shell__kicker,
+.i5-shell--level-6 .i5-shell__card--title .i5-shell__kicker,
+.i5-shell--level-4 .i5-shell__card--title em,
+.i5-shell--level-5 .i5-shell__card--title em,
+.i5-shell--level-6 .i5-shell__card--title em {
+  font-size: 0.66rem;
+  line-height: 1;
+}
+
+.i5-shell--level-4 .i5-shell__goal,
+.i5-shell--level-5 .i5-shell__goal,
+.i5-shell--level-6 .i5-shell__goal {
+  padding: clamp(0.35rem, 0.8vh, 0.55rem) 1.15rem;
+  border-radius: 1.15rem;
+  gap: 0.05rem;
+}
+
+.i5-shell--level-4 .i5-shell__goal h2,
+.i5-shell--level-5 .i5-shell__goal h2,
+.i5-shell--level-6 .i5-shell__goal h2 {
+  font-size: clamp(1.08rem, 2.4vw, 1.55rem);
+  line-height: 1.05;
+}
+
+.i5-shell--level-4 .i5-shell__goal-label,
+.i5-shell--level-5 .i5-shell__goal-label,
+.i5-shell--level-6 .i5-shell__goal-label {
+  font-size: clamp(0.78rem, 1.4vw, 0.9rem);
+}
+
 .i5-shell__stage {
   position: relative; z-index: 1;
   display: grid; place-items: center;
@@ -4145,14 +4430,45 @@ h3, h4 {
   overflow: hidden;
 }
 .i5-scene { min-height: 0; max-height: 100%; }
+
+/* Reserve room on both sides of .i5-shell__stage for the flanking mascots
+   so the level content (Level 4 desktop, Level 5 panels) never paints on
+   top of the robots, and the central content stays naturally centred. */
+.i5-shell__stage {
+  --i5-mascot-gutter: clamp(0.5rem, 12vw, 11rem);
+  padding-inline: var(--i5-mascot-gutter);
+}
+@media (max-height: 720px), (max-width: 760px) {
+  .i5-shell__stage { --i5-mascot-gutter: clamp(0.5rem, 9vw, 8rem); }
+}
+@media (max-width: 520px), (max-height: 560px) {
+  .i5-shell__stage { --i5-mascot-gutter: 0.5rem; }
+}
 .i5-mascot {
-  position: absolute; bottom: -0.8rem; pointer-events: none;
-  width: clamp(7rem, 13vw, 11rem);
+  position: absolute;
+  bottom: 0;
+  pointer-events: none;
+  /* The two mascot PNGs have very different aspect ratios (women-wave is
+     1:1, mascot-proud is 1:2). Sizing by *height* with width:auto gives
+     both robots the same on-screen vertical scale so they look balanced. */
+  height: clamp(7rem, 26vh, 14rem);
+  width: auto;
+  max-width: 32%;
+  object-fit: contain;
+  object-position: center bottom;
   filter: drop-shadow(0 14px 18px rgba(40,60,120,0.25));
   animation: i5-float 4.5s ease-in-out infinite;
+  z-index: 0;
 }
-.i5-mascot--left  { left: 0.8rem; }
-.i5-mascot--right { right: 0.8rem; animation-delay: 1.2s; }
+.i5-mascot--left  { left: 0.4rem; }
+.i5-mascot--right { right: 0.4rem; animation-delay: 1.2s; }
+@media (max-height: 720px) {
+  .i5-mascot { height: clamp(6rem, 22vh, 10rem); }
+}
+@media (max-height: 560px) {
+  .i5-mascot { height: clamp(4.5rem, 18vh, 6.5rem); }
+  .i5-bubble { font-size: 0.68rem; padding: 0.25rem 0.5rem; }
+}
 /* Violet pill bubble attached to each mascot's head — matches the
    reference's "¡Vos podés!" / "¡Sos un crack!" tags. */
 .i5-bubble {
@@ -4175,7 +4491,10 @@ h3, h4 {
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(-10px); }
 }
-@media (max-width: 880px) { .i5-mascot, .i5-bubble { display: none; } }
+@media (max-width: 520px) {
+  .i5-mascot { height: clamp(4rem, 16vh, 5.8rem); }
+  .i5-bubble { font-size: 0.62rem; padding: 0.22rem 0.45rem; }
+}
 
 .i5-scene {
   position: relative;
@@ -4344,6 +4663,46 @@ h3, h4 {
   max-height: 100%;
   padding: 0.3rem 0;
 }
+
+/* Two-row board: draggable items on top, mixed drop slots below.
+   Fits comfortably inside .i5-shell__stage without any browser scrolling. */
+.i5-l3-board {
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: clamp(0.4rem, 1.4vh, 0.8rem);
+  width: min(880px, 96%);
+  max-height: 100%;
+  padding: 0.2rem 0;
+}
+.i5-l3-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(0.6rem, 2vw, 1.4rem);
+  justify-items: center;
+  align-items: center;
+}
+.i5-l3-row--slots { margin-top: 0.2rem; }
+.i5-l3-arrow {
+  display: grid; justify-items: center;
+  font-family: var(--font-display); font-weight: 800;
+  color: #6c4ae6;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.i5-l3-arrow span {
+  padding: 0.18rem 0.85rem;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  border: 1px solid rgba(108, 74, 230, 0.3);
+}
+/* Slightly smaller cells so all 4+4 always fit at narrow laptop widths. */
+.i5-l3-board .i5-drag-item,
+.i5-l3-board .i5-drop-slot {
+  width: clamp(3.6rem, 8vw, 5rem);
+  height: clamp(3.6rem, 8vw, 5rem);
+}
 .i5-l3-col {
   display: grid; gap: clamp(0.35rem, 1vh, 0.7rem);
   align-content: center;
@@ -4500,6 +4859,11 @@ h3, h4 {
 .i5-window__body {
   padding: 0.8rem; min-height: 120px;
   display: grid; place-items: center;
+}
+
+.i5-shell--level-4 .i5-window__body {
+  padding: 0.55rem;
+  min-height: clamp(5.4rem, 13vh, 8.5rem);
 }
 .i5-browser { width: 100%; display: grid; gap: 0.6rem; }
 .i5-browser__searchbar {
@@ -4791,16 +5155,19 @@ h3, h4 {
    props from /assets/edutic-art/island5/.
 ===================================================================== */
 
-/* Level 1 + 2 pedestals — bigger and cleaner so the PNG art has room. */
+/* Level 1 + 2 pedestals — tighter padding so the objects sit higher on
+   the stage and never get clipped by the metrics bar below. */
 .i5-l1-row,
 .i5-l2-row {
   align-items: flex-end;
-  padding: clamp(1.2rem, 3.5vh, 2.2rem) clamp(1.4rem, 3.5vw, 2.6rem);
+  padding: clamp(0.4rem, 1.2vh, 0.8rem) clamp(0.6rem, 2vw, 1.4rem);
   width: min(960px, 96%);
 }
 .i5-clickable {
-  width: clamp(5.4rem, 10.5vw, 8.2rem);
-  height: clamp(7.5rem, 14vw, 11rem);
+  /* Capped against viewport *height* too so the row never grows taller
+     than the stage on short laptop windows (e.g. 600-700 px). */
+  width: clamp(4.2rem, 9vw, 7.2rem);
+  height: clamp(5.5rem, 18vh, 9.5rem);
 }
 .i5-clickable__art {
   position: relative;
@@ -4834,22 +5201,34 @@ h3, h4 {
 }
 
 .i5-l2-prompt {
-  margin: 0 0 clamp(0.6rem, 1.6vh, 1rem);
+  margin: 0 0 clamp(0.3rem, 0.8vh, 0.5rem);
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: clamp(0.95rem, 1.7vw, 1.15rem);
+  font-size: clamp(0.9rem, 1.6vw, 1.05rem);
   color: #2c2666;
   text-align: center;
 }
 .i5-l2-prompt strong { color: #5a2cb6; }
 .i5-l2-hint {
-  margin: -0.4rem 0 clamp(0.6rem, 1.6vh, 1rem);
+  margin: -0.4rem 0 clamp(0.4rem, 1.2vh, 0.7rem);
   text-align: center;
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 0.85rem;
   color: #5a6f9b;
 }
+.i5-l2-hint--touchpad {
+  margin-top: 0;
+  font-size: 0.78rem;
+  color: #4757a8;
+  background: rgba(255, 255, 255, 0.65);
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem;
+  display: inline-block;
+  align-self: center;
+  margin-inline: auto;
+}
+.i5-l2-floor { display: grid; gap: 0.3rem; justify-items: center; }
 
 /* Level 3 — image-based drag & drop */
 .i5-drag-item {
@@ -4905,20 +5284,32 @@ h3, h4 {
   box-shadow: 0 4px 10px rgba(50, 70, 140, 0.18);
 }
 
-/* Level 4 — virtual OS scene (clean rewrite — no uploaded-image bodies) */
+/* Level 4 — virtual OS scene (clean rewrite — no uploaded-image bodies)
+   The desktop fits within the stage's mascot-gutter so it never paints on
+   top of either robot. Height is capped to .i5-shell__stage. */
 .i5-desktop.i5-desktop--clean {
   position: relative;
-  width: min(1100px, 98%);
+  width: 100%;
+  max-width: min(820px, 100%);
+  max-height: 100%;
   display: grid;
-  gap: clamp(0.7rem, 1.6vh, 1.1rem);
+  gap: clamp(0.4rem, 1vh, 0.7rem);
   grid-template-columns: 1fr;
-  padding: clamp(0.7rem, 1.6vh, 1.1rem);
-  border-radius: 1.6rem;
+  padding: clamp(0.5rem, 1.2vh, 0.9rem);
+  border-radius: 1.4rem;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(225, 220, 255, 0.6));
   border: 1px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 22px 50px rgba(60, 60, 140, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(12px);
+  overflow: hidden;
 }
+
+.i5-shell--level-4 .i5-desktop.i5-desktop--clean {
+  max-width: min(900px, 100%);
+  gap: clamp(0.3rem, 0.75vh, 0.5rem);
+  padding: clamp(0.35rem, 0.85vh, 0.65rem);
+}
+
 .i5-desktop__task {
   display: grid;
   gap: 0.15rem;
@@ -4929,6 +5320,20 @@ h3, h4 {
   font-family: var(--font-display);
   box-shadow: 0 12px 24px rgba(80, 100, 180, 0.28);
 }
+
+.i5-shell--level-4 .i5-desktop__task {
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.85rem;
+}
+
+.i5-shell--level-4 .i5-desktop__task strong {
+  font-size: clamp(0.85rem, 1.35vw, 1rem);
+}
+
+.i5-shell--level-4 .i5-desktop__task-kicker {
+  font-size: 0.62rem;
+}
+
 .i5-desktop__task-kicker {
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -4943,6 +5348,11 @@ h3, h4 {
   display: grid;
   gap: clamp(0.6rem, 1.4vw, 1rem);
   grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+}
+
+.i5-shell--level-4 .i5-desktop__grid {
+  gap: clamp(0.45rem, 1vw, 0.75rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
 }
 .i5-window__tabstrip {
   display: flex;
@@ -5050,9 +5460,9 @@ h3, h4 {
   from { opacity: 0; transform: translateY(10px) scale(0.96); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-.i5-window--browser  { grid-column: auto; min-height: clamp(10rem, 24vh, 14rem); }
-.i5-window--drawings { grid-column: auto; min-height: clamp(8rem, 20vh, 12rem); }
-.i5-window--notes    { grid-column: auto; min-height: clamp(8rem, 20vh, 12rem); }
+.i5-window--browser  { grid-column: auto; min-height: clamp(6rem, 14vh, 10rem); }
+.i5-window--drawings { grid-column: auto; min-height: clamp(5rem, 12vh, 9rem); }
+.i5-window--notes    { grid-column: auto; min-height: clamp(5rem, 12vh, 9rem); }
 .i5-window__controls {
   display: inline-flex; align-items: center;
   margin-left: auto; margin-right: 0.4rem;
@@ -5143,6 +5553,21 @@ h3, h4 {
   font-size: clamp(2.6rem, 5vw, 3.6rem);
   animation: i5-rewardPop 0.6s cubic-bezier(0.22, 1.3, 0.36, 1) both;
 }
+.i5-folder__check {
+  display: grid;
+  place-items: center;
+  width: clamp(3.6rem, 8vw, 5.2rem);
+  height: clamp(3.6rem, 8vw, 5.2rem);
+  border-radius: 999px;
+  color: #fff;
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  font-weight: 950;
+  background: linear-gradient(135deg, #54e8c6, #22c7b8, #536bff);
+  box-shadow:
+    0 14px 26px rgba(34, 199, 184, 0.34),
+    inset 0 2px 0 rgba(255, 255, 255, 0.45);
+  animation: i5-rewardPop 0.6s cubic-bezier(0.22, 1.3, 0.36, 1) both;
+}
 @keyframes i5-rewardPop {
   0% { opacity: 0; transform: scale(0.4); }
   60% { opacity: 1; transform: scale(1.18); }
@@ -5228,19 +5653,156 @@ h3, h4 {
 .i5-l7-echo span { opacity: 0.7; letter-spacing: 0.14em; font-size: 0.78rem; text-transform: uppercase; }
 .i5-l7-echo strong { font-size: clamp(1.4rem, 2.8vw, 2rem); letter-spacing: 0.04em; }
 
+/* ---- Level 7 — Copy & paste layout ---- */
+.i5-l7-cp {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: clamp(0.5rem, 1.4vh, 0.9rem);
+  width: min(640px, 96%);
+  max-height: 100%;
+}
+.i5-l7-cp__source,
+.i5-l7-cp__paste {
+  position: relative;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.7rem 0.9rem 0.9rem;
+  border-radius: 1.1rem;
+  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(224,232,255,0.78));
+  border: 1px solid rgba(255,255,255,0.95);
+  box-shadow: 0 14px 26px rgba(60,60,140,0.2);
+}
+.i5-l7-cp__label {
+  font-family: var(--font-display); font-weight: 800;
+  font-size: 0.7rem; letter-spacing: 0.16em;
+  color: #5a6f9b; text-transform: uppercase;
+}
+.i5-l7-cp__text {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.7rem;
+  background: linear-gradient(135deg, #fff8d6, #ffe28a);
+  color: #5a2d00;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(1rem, 1.7vw, 1.2rem);
+  cursor: pointer;
+  user-select: text;
+  border: 1px dashed rgba(245, 159, 46, 0.55);
+  outline: none;
+  transition: background 200ms ease, transform 200ms ease;
+}
+.i5-l7-cp__text:hover { transform: translateY(-1px); }
+.i5-l7-cp__source.is-copied .i5-l7-cp__text {
+  background: linear-gradient(135deg, #d4f7e1, #93e8b9);
+  color: #084b1e;
+  border-color: rgba(40, 160, 80, 0.55);
+}
+.i5-l7-cp__action {
+  position: absolute;
+  right: 0.7rem; top: 0.6rem;
+  display: inline-flex; align-items: center; gap: 0.25rem;
+}
+.i5-l7-cp__action kbd {
+  padding: 0.18rem 0.5rem;
+  border-radius: 0.4rem;
+  background: linear-gradient(180deg, #fff, #e2eaff);
+  border: 1px solid rgba(120,130,200,0.4);
+  color: #1c2c5e;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 0.78rem;
+  box-shadow: 0 2px 0 rgba(80,100,180,0.25);
+}
+.i5-l7-cp__middle {
+  display: grid; grid-template-columns: auto 1fr; align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, #54e8c6, #536bff);
+  color: #fff;
+  font-family: var(--font-display);
+}
+.i5-l7-cp__middle p { margin: 0; font-weight: 700; font-size: 0.95rem; }
+.i5-l7-cp__step {
+  display: inline-grid; place-items: center;
+  width: 1.8rem; height: 1.8rem;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  font-weight: 900;
+}
+.i5-l7-cp__box {
+  width: 100%;
+  min-height: clamp(4rem, 10vh, 6rem);
+  resize: none;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.7rem;
+  border: 1px dashed rgba(108, 74, 230, 0.55);
+  background: rgba(255,255,255,0.92);
+  color: #1c2c5e;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+  outline: none;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+.i5-l7-cp__box:focus {
+  border-color: #6c4ae6;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(108, 74, 230, 0.18);
+}
+.i5-l7-cp__paste.is-ok .i5-l7-cp__box {
+  border-color: rgba(40, 160, 80, 0.75);
+  border-style: solid;
+  background: linear-gradient(135deg, #d4f7e1, #b6efc9);
+  color: #084b1e;
+}
+
 /* Level 5 — cleaned-up scroll + zoom layout. We bias the grid wider so
    each card has real breathing room on a laptop screen, and we cap
    vertical size so the entire level fits inside .i5-shell__stage. */
 .i5-l5-grid--clean {
   display: grid;
-  grid-template-columns: minmax(260px, 1.05fr) minmax(260px, 1fr);
-  gap: clamp(0.7rem, 1.6vw, 1.3rem);
-  width: min(1180px, 98vw);
+  /* Side-by-side scroll + zoom panels with equal weight so both get the
+     same horizontal real estate. */
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(0.6rem, 1.4vw, 1.2rem);
+  /* Take the full width available between the two mascots — the stage
+     already pads itself with the mascot gutter so this 100% can never
+     overlap a robot. */
+  width: 100%;
+  max-width: min(820px, 100%);
   max-height: 100%;
   padding: 0;
 }
+
+.i5-shell--level-5 .i5-shell__stage {
+  --i5-mascot-gutter: clamp(0.5rem, 8vw, 7rem);
+}
+
+.i5-shell--level-5 .i5-scene {
+  width: min(1060px, 98%);
+}
+
+.i5-shell--level-5 .i5-l5-grid--clean {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  max-width: min(980px, 100%);
+  gap: clamp(0.8rem, 1.8vw, 1.4rem);
+}
+
+.i5-l5-grid.i5-l5-grid--clean {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
 @media (max-width: 760px) {
-  .i5-l5-grid--clean { grid-template-columns: 1fr; }
+  /* Narrow viewports: shrink the card chrome and hide the mouse cue so the
+     scroll + zoom cards still fit side-by-side at small laptop widths. */
+  .i5-l5-card { padding: 0.45rem; gap: 0.3rem; }
+  .i5-l5-card__head h3 { font-size: 0.9rem; }
+  .i5-l5-card__chip { padding: 0.15rem 0.5rem; font-size: 0.6rem; }
+  .i5-l5-card__body--scroll { grid-template-columns: 1fr; gap: 0.35rem; }
+  .i5-l5-mouse { display: none; }
+  .i5-l5-zoom-btn { padding: 0.4rem 0.7rem; font-size: 0.8rem; }
 }
 .i5-l5-card {
   display: grid;
@@ -5251,6 +5813,7 @@ h3, h4 {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(220, 226, 255, 0.65));
   border: 1px solid rgba(255, 255, 255, 0.92);
   box-shadow: 0 18px 36px rgba(60, 60, 140, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  min-width: 0;
 }
 .i5-l5-card__head {
   display: flex; align-items: center; gap: 0.6rem;
@@ -5274,6 +5837,10 @@ h3, h4 {
   gap: 0.7rem;
   align-items: center;
 }
+
+.i5-shell--level-5 .i5-l5-card__body--scroll {
+  grid-template-columns: clamp(4.2rem, 8vw, 5.8rem) minmax(12rem, 1fr);
+}
 .i5-l5-mouse {
   display: grid; place-items: center; gap: 0.25rem;
   padding: 0.5rem 0.4rem;
@@ -5294,7 +5861,10 @@ h3, h4 {
 .i5-l5-mouse__arrow--down { animation-direction: reverse; }
 .i5-l5-scrollview {
   position: relative;
-  height: clamp(14rem, 50vh, 26rem);
+  /* Tight cap so the whole card (head + scrollview) and the zoom card next
+     to it always fit inside .i5-shell__stage without page scrolling. */
+  height: clamp(9rem, 28vh, 14rem);
+  width: 100%;
   overflow-y: auto;
   scroll-behavior: smooth;
   border-radius: 1rem;
@@ -5305,6 +5875,40 @@ h3, h4 {
   box-shadow: inset 0 12px 18px -12px rgba(60, 60, 140, 0.35),
               inset 0 -12px 18px -12px rgba(60, 60, 140, 0.35);
 }
+
+.i5-shell--level-5 .i5-l5-scrollview {
+  height: clamp(11rem, 31vh, 16.5rem);
+}
+
+/* Tall painted fantasy scene used by Level 5's scroll mechanic. Pure CSS
+   so it can't break — each band is a coloured layer with a label icon. */
+.i5-l5-scene {
+  display: grid;
+  grid-auto-rows: clamp(8rem, 18vh, 10rem);
+  gap: 0;
+  width: 100%;
+}
+.i5-l5-scene__band {
+  display: grid; place-items: center; gap: 0.3rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(0.85rem, 1.2vw, 1rem);
+  letter-spacing: 0.02em;
+  color: #1c2c5e;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+}
+.i5-l5-scene__icon {
+  font-size: clamp(2.6rem, 5vw, 3.6rem);
+  filter: drop-shadow(0 6px 8px rgba(60, 60, 140, 0.22));
+}
+.i5-l5-scene__band--top    { background: linear-gradient(180deg, #ffe1a3, #ffd552); }
+.i5-l5-scene__band--clouds { background: linear-gradient(180deg, #cfeeff, #b8dcff); }
+.i5-l5-scene__band--peak   { background: linear-gradient(180deg, #b8c8ee, #8aa2dc); color: #fff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.18); }
+.i5-l5-scene__band--castle { background: linear-gradient(180deg, #d6c7ff, #b58aff); color: #fff; text-shadow: 0 2px 4px rgba(60, 30, 100, 0.32); }
+.i5-l5-scene__band--forest { background: linear-gradient(180deg, #b6e3b2, #6dbf6a); color: #1c3a1c; }
+.i5-l5-scene__band--cave   { background: linear-gradient(180deg, #5b3a98, #2c1b4d); color: #fff; }
+.i5-l5-scene__band--end    { background: linear-gradient(135deg, #54e8c6, #536bff); color: #fff; border-bottom: 0; }
 .i5-l5-scrollview__reveal {
   position: relative;
   display: grid;
@@ -5371,8 +5975,11 @@ h3, h4 {
 }
 .i5-l5-card__body--zoom {
   display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 0.6rem;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  /* Match the height of the scroll card next to it so the zoom buttons
+     never get pushed off-screen on short laptop windows. */
+  min-height: 0;
 }
 .i5-l5-zoomstage {
   position: relative;
@@ -5381,10 +5988,23 @@ h3, h4 {
     radial-gradient(120% 80% at 50% 100%, rgba(255, 255, 255, 0.6), transparent 70%),
     linear-gradient(180deg, #f1f4ff, #d8d8ff);
   display: grid; place-items: center;
-  padding: 0.6rem;
+  padding: 0.4rem;
   overflow: hidden;
-  min-height: clamp(8rem, 18vh, 11rem);
+  /* Square-ish card so the castle artwork stays nicely framed. */
+  aspect-ratio: 1 / 1;
+  max-height: clamp(8rem, 22vh, 12rem);
+  width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.9);
+}
+
+.i5-shell--level-5 .i5-l5-zoomstage {
+  max-height: clamp(10rem, 27vh, 15rem);
+}
+.i5-l5-zoomart {
+  /* Keep the artwork tucked inside the rounded square — never overflow it
+     even when zoomed in to 200%. */
+  max-width: 90%;
+  max-height: 90%;
 }
 .i5-l5-zoomart {
   max-width: 78%;
@@ -5409,6 +6029,9 @@ h3, h4 {
 .i5-l5-zoom-controls {
   display: flex; gap: 0.6rem;
   justify-content: center;
+  /* Force the controls row to always be visible inside the zoom card. */
+  flex-shrink: 0;
+  padding: 0.2rem 0;
 }
 .i5-l5-zoom-btn {
   display: inline-flex; align-items: center; gap: 0.45rem;
@@ -5533,5 +6156,241 @@ h3, h4 {
 @media (max-width: 880px) {
   .i5-l5-grid { grid-template-columns: 1fr; }
   .i5-mouse-illust__art { width: 50%; }
+}
+
+/* Surgical comfort pass: keep gameplay readable without despawning mascots. */
+.game-mascots { display: block !important; }
+.game-mascot {
+  display: flex !important;
+  width: clamp(6.6rem, 13vw, 15rem);
+  max-height: 42vh;
+}
+.game-mascot__bubble {
+  display: block !important;
+  animation: softHintIn 260ms ease-out both;
+}
+.i5-mascot,
+.island-mascot {
+  display: block !important;
+}
+.i5-bubble,
+.island-mascot__bubble {
+  display: block !important;
+  animation: softHintIn 260ms ease-out both;
+}
+
+.gameplay-shell {
+  justify-content: space-between;
+  gap: clamp(0.35rem, 0.9vh, 0.8rem);
+}
+
+.game-stage {
+  width: min(48rem, calc(100vw - 1rem));
+}
+
+.game-status {
+  max-width: min(38rem, 100%);
+  padding: clamp(0.45rem, 1vh, 0.72rem) clamp(1rem, 2vw, 1.35rem);
+}
+
+.target-card {
+  width: 39rem;
+  max-width: 100%;
+  min-height: clamp(7.2rem, 20vh, 10.5rem);
+  padding: clamp(0.85rem, 1.7vh, 1.25rem) clamp(1.2rem, 2.2vw, 1.8rem);
+  transition: box-shadow 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.target-card.target--letter,
+.target-card.target--symbol {
+  min-height: clamp(8rem, 23vh, 12rem);
+}
+
+.target-card.target--word {
+  width: 42rem;
+  max-width: 100%;
+  min-height: clamp(7.4rem, 20vh, 10.5rem);
+}
+
+.target-card.target--phrase,
+.target-card.target--long {
+  width: 48rem;
+  max-width: 100%;
+  min-height: clamp(7.6rem, 21vh, 10.8rem);
+}
+
+.target-card.target--letter strong,
+.target-card.target--symbol strong {
+  font-size: clamp(5.4rem, 15vw, 9.2rem);
+}
+
+.target-card.target--word strong {
+  font-size: clamp(3.3rem, 7.2vw, 5.1rem);
+}
+
+.target-card.target--phrase strong,
+.target-card.target--long strong {
+  font-size: clamp(1.8rem, 4.4vw, 3.35rem);
+}
+
+.key-location-hint,
+.comma-hint,
+.target-card small {
+  min-height: 1.1rem;
+  animation: softHintIn 240ms ease-out both;
+}
+
+.typed-preview {
+  width: 40rem;
+  max-width: 100%;
+  min-height: clamp(5.3rem, 13vh, 6.5rem);
+  align-content: center;
+  animation: softHintIn 260ms ease-out both;
+}
+
+.typed-preview__value {
+  min-height: clamp(3.4rem, 8.5vh, 4.4rem);
+  font-size: clamp(2.05rem, 4.4vw, 3.2rem);
+}
+
+.typed-preview__value.is-empty {
+  font-style: normal;
+}
+
+.visual-keyboard {
+  max-width: min(52rem, calc(100vw - 1rem));
+  gap: clamp(0.24rem, 0.62vh, 0.42rem);
+}
+
+.keyboard-row {
+  gap: clamp(0.26rem, 0.55vw, 0.42rem);
+}
+
+.key {
+  min-width: clamp(2.35rem, 4.55vw, 3.25rem);
+  height: clamp(2.45rem, 5.2vw, 3.18rem);
+  font-size: clamp(0.82rem, 1.55vw, 1rem);
+}
+
+.key--wide {
+  min-width: clamp(4.8rem, 9.2vw, 7.4rem);
+}
+
+.key--space {
+  min-width: clamp(10rem, 24vw, 18.5rem);
+}
+
+.instruction-panel {
+  max-width: min(48rem, calc(100vw - 1rem));
+  min-height: clamp(2.5rem, 6vh, 3.2rem);
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.instruction-panel h1 {
+  display: inline !important;
+}
+
+@media (max-height: 720px) {
+  .gameplay-shell {
+    gap: clamp(0.26rem, 0.65vh, 0.5rem);
+    padding: clamp(0.35rem, 0.85vh, 0.6rem) clamp(0.55rem, 1.2vw, 0.9rem);
+  }
+
+  .game-status {
+    max-width: min(34rem, 100%);
+  }
+
+  .target-card {
+    width: 36rem;
+    max-width: 100%;
+    min-height: clamp(6.5rem, 19vh, 8.7rem);
+    padding: clamp(0.7rem, 1.4vh, 1rem) clamp(1rem, 2vw, 1.4rem);
+  }
+
+  .target-card.target--letter,
+  .target-card.target--symbol {
+    min-height: clamp(7rem, 21vh, 9.5rem);
+  }
+
+  .target-card.target--word {
+    width: 38rem;
+    max-width: 100%;
+    min-height: clamp(6.6rem, 18.5vh, 8.8rem);
+  }
+
+  .target-card.target--phrase,
+  .target-card.target--long {
+    width: 42rem;
+    max-width: 100%;
+  }
+
+  .target-card.target--letter strong,
+  .target-card.target--symbol strong {
+    font-size: clamp(4.8rem, 15vh, 6.8rem);
+  }
+
+  .target-card.target--word strong {
+    font-size: clamp(2.55rem, 7.1vh, 4rem);
+  }
+
+  .target-card.target--phrase strong,
+  .target-card.target--long strong {
+    font-size: clamp(1.55rem, 4.8vh, 2.65rem);
+  }
+
+  .typed-preview {
+    width: 38rem;
+    max-width: 100%;
+    min-height: clamp(4.8rem, 12.5vh, 5.8rem);
+  }
+
+  .typed-preview__value {
+    min-height: clamp(3rem, 8vh, 3.8rem);
+    font-size: clamp(1.85rem, 5.8vh, 2.75rem);
+  }
+
+  .key {
+    min-width: clamp(2.1rem, 4.35vw, 2.9rem);
+    height: clamp(2.25rem, 5.8vh, 2.8rem);
+    font-size: clamp(0.74rem, 1.35vw, 0.9rem);
+  }
+
+  .key--wide {
+    min-width: clamp(4.4rem, 8.8vw, 6.5rem);
+  }
+
+  .key--space {
+    min-width: clamp(9.4rem, 23vw, 16.5rem);
+  }
+
+  .game-mascot {
+    width: clamp(5.4rem, 10.5vw, 8.8rem);
+  }
+
+  .game-mascot__bubble {
+    font-size: clamp(0.72rem, 1vw, 0.9rem);
+    padding: 0.38rem 0.65rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .game-mascot {
+    width: clamp(4.6rem, 13vw, 7rem);
+  }
+
+  .game-mascot__bubble,
+  .i5-bubble {
+    font-size: clamp(0.62rem, 1.8vw, 0.78rem);
+    padding: 0.28rem 0.5rem;
+  }
+
+  .i5-mascot {
+    height: clamp(5.2rem, 19vh, 8rem);
+  }
+}
+
+@keyframes softHintIn {
+  from { opacity: 0; transform: translateY(4px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
