@@ -125,17 +125,29 @@ export function WorldsPage() {
               <span className="world-icon-badge" aria-hidden="true">
                 <BadgeIcon size={28} strokeWidth={2.1} />
               </span>
-              <img src={world.thumbnail} alt="" loading="eager" />
+              <img src={world.thumbnail} alt="" loading="eager" decoding="async" />
             </button>
           );
         })}
       </section>
 
       <div className={selectedWorld ? "world-transition is-active" : "world-transition"} />
-      <img className="home-mascot home-mascot--left" src={assets.mascotFemaleLaptop} alt="" />
+      <img
+        className="home-mascot home-mascot--left"
+        src={assets.mascotFemaleLaptop}
+        alt=""
+        decoding="async"
+        loading="lazy"
+      />
       <div className="home-mascot-wrap home-mascot-wrap--right">
         <span className="home-speech-bubble">¡Vamos!</span>
-        <img className="home-mascot home-mascot--right" src={assets.mascotMaleProud} alt="" />
+        <img
+          className="home-mascot home-mascot--right"
+          src={assets.mascotMaleProud}
+          alt=""
+          decoding="async"
+          loading="lazy"
+        />
       </div>
     </main>
   );

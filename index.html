@@ -12,6 +12,15 @@
       href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap"
       rel="stylesheet"
     />
+    <!--
+      Preload only the few images the first painted screen actually needs:
+      the login background art + the two mascots that flank the login card.
+      Other islands, ship sprites and gameplay backgrounds load on demand
+      so the home screen stays snappy.
+    -->
+    <link rel="preload" as="image" href="/assets/edutic-art/login-sky-islands-bg.webp" type="image/webp" fetchpriority="high" />
+    <link rel="preload" as="image" href="/assets/edutic-art/mascot-women-wave.webp" type="image/webp" />
+    <link rel="preload" as="image" href="/assets/edutic-art/mascot-wave.webp" type="image/webp" />
     <title>TYPELY</title>
   </head>
   <body>

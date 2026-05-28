@@ -53,7 +53,10 @@ const ACCENT_MAP: Record<string, string> = {
 const SHIFT_COMBOS: Record<string, string[]> = {
   "!":  ["Shift", "1"],
   "?":  ["Shift", "'"],   // ES-LA: ? lives on the ' key
-  "@":  ["Shift", "2"],
+  /* @ is special: on ES-LA keyboards it is AltGr + Q (or AltGr + 2 on ES-ES).
+     We surface AltGr + Q as the primary combo and light up the Q cap. The
+     `comboFor()` helper adds the playful "o también Shift + 2" hint. */
+  "@":  ["AltGr", "Q"],
   "#":  ["Shift", "3"],
   "$":  ["Shift", "4"],
   "%":  ["Shift", "5"],
@@ -69,6 +72,12 @@ const SHIFT_COMBOS: Record<string, string[]> = {
   '"':  ["Shift", "'"],
   "<":  ["Shift", ","],
   ">":  ["Shift", "."],
+};
+
+/* Friendly alternate ways to type the same symbol — purely informational,
+   rendered as a secondary hint below the primary combo. */
+const SECONDARY_COMBOS: Record<string, string[][]> = {
+  "@": [["Shift", "2"], ["AltGr", "2"]],
 };
 
 /* Maps a character → the cap printed on our visual keyboard. */
@@ -148,6 +157,18 @@ export function GameplayPage() {
   const [isCompleted, setIsCompleted] = useState(false);
   const completionSaved = useRef(false);
   const typedScrollRef = useRef<HTMLSpanElement | null>(null);
+  const captureInputRef = useRef<HTMLInputElement | null>(null);
+
+  /* Latest state lives in refs so the beforeinput handler can read up-to-date
+     values without being torn down/rebuilt on every keystroke (which loses
+     focus on some Android browsers). */
+  const stateRef = useRef({
+    targetIndex: 0,
+    typed: "",
+    isCompleted: false,
+    attempts: 0,
+    errors: 0,
+  });
 
   const target = activity.targets[targetIndex];
   const isLastTarget = targetIndex === activity.targets.length - 1;
@@ -167,6 +188,12 @@ export function GameplayPage() {
   }, [expectedChar]);
 
   const accuracy = attempts === 0 ? 100 : Math.max(0, Math.round(((attempts - errors) / attempts) * 100));
+
+  /* Keep the ref in sync with React state so the imperative input handlers
+     below always read the latest values. */
+  useEffect(() => {
+    stateRef.current = { targetIndex, typed, isCompleted, attempts, errors };
+  }, [targetIndex, typed, isCompleted, attempts, errors]);
 
   function persistCompletion(finalAccuracy: number, finalAttempts: number) {
     if (completionSaved.current) return;
@@ -205,97 +232,193 @@ export function GameplayPage() {
     if (node) node.scrollLeft = node.scrollWidth;
   }, [typed]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
-      if (isCompleted) return;
+  /* Process one logical character (with accent, ñ, mayúscula already
+     composed by the OS). Reused by both the physical-keyboard fallback and
+     the beforeinput / composition pipeline used by touch keyboards. */
+  function processCharacter(character: string) {
+    if (stateRef.current.isCompleted) return;
+    if (!character || character.length === 0) return;
 
-      const key = event.key;
+    if (character === " ") setLastKey("Space");
+    else setLastKey(keyCapFor(character));
 
-      if (key === "Shift" || key === "CapsLock" || key === "Dead") return;
-
-      if (key === "Backspace") {
-        event.preventDefault();
-        setLastKey("Backspace");
-        if (activity.inputType === "letter" || activity.inputType === "symbol") return;
-        setTyped((value) => value.slice(0, -1));
-        return;
-      }
-
-      if (key === "Enter") return;
-
-      if (key === " ") {
-        setLastKey("Space");
-      } else if (key.length === 1) {
-        setLastKey(keyCapFor(key));
+    if (activity.inputType === "letter") {
+      setAttempts((v) => v + 1);
+      if (character.toUpperCase() === target.toUpperCase()) {
+        advance();
       } else {
-        return;
+        setErrors((v) => v + 1);
+        setFeedback(`Buscá la tecla ${target.toUpperCase()}.`);
       }
-
-      const character = key;
-      if (character.length !== 1) return;
-
-      if (activity.inputType === "letter") {
-        event.preventDefault();
-        setAttempts((value) => value + 1);
-        if (character.toUpperCase() === target.toUpperCase()) {
-          advance();
-        } else {
-          setErrors((value) => value + 1);
-          setFeedback(`Buscá la tecla ${target.toUpperCase()}.`);
-        }
-        return;
-      }
-
-      if (activity.inputType === "symbol") {
-        event.preventDefault();
-        setAttempts((value) => value + 1);
-        if (character === target) {
-          advance();
-        } else {
-          setErrors((value) => value + 1);
-          setFeedback(`Escribí el símbolo ${target}.`);
-        }
-        return;
-      }
-
-      event.preventDefault();
-      const nextTyped = typed + character;
-      setAttempts((value) => value + 1);
-
-      const targetSoFar = target.slice(0, nextTyped.length);
-      const matches = nextTyped === targetSoFar;
-      const matchesLoose =
-        !matches &&
-        nextTyped.toLowerCase() === targetSoFar.toLowerCase() &&
-        stripAccents(nextTyped.toLowerCase()) === stripAccents(targetSoFar.toLowerCase());
-
-      if (!matches && !matchesLoose) {
-        setErrors((value) => value + 1);
-        if (activity.inputType === "correction") {
-          setFeedback("Usá Backspace para corregir.");
-          setTyped(nextTyped);
-        } else {
-          setFeedback(`Esperaba "${targetSoFar}". Intentá de nuevo.`);
-        }
-        return;
-      }
-
-      setTyped(nextTyped);
-
-      if (nextTyped === target) {
-        setFeedback("¡Excelente!");
-        window.setTimeout(() => advance(), 350);
-      } else if (matchesLoose && !matches) {
-        setFeedback("Ojo con la tilde o la mayúscula. Seguí.");
-      } else {
-        setFeedback("Vas muy bien.");
-      }
+      return;
     }
 
+    if (activity.inputType === "symbol") {
+      setAttempts((v) => v + 1);
+      if (character === target) advance();
+      else {
+        setErrors((v) => v + 1);
+        setFeedback(`Escribí el símbolo ${target}.`);
+      }
+      return;
+    }
+
+    const currentTyped = stateRef.current.typed;
+    const nextTyped = currentTyped + character;
+    setAttempts((v) => v + 1);
+
+    const targetSoFar = target.slice(0, nextTyped.length);
+    const matches = nextTyped === targetSoFar;
+    const matchesLoose =
+      !matches &&
+      nextTyped.toLowerCase() === targetSoFar.toLowerCase() &&
+      stripAccents(nextTyped.toLowerCase()) === stripAccents(targetSoFar.toLowerCase());
+
+    if (!matches && !matchesLoose) {
+      setErrors((v) => v + 1);
+      if (activity.inputType === "correction") {
+        setFeedback("Usá Backspace para corregir.");
+        stateRef.current.typed = nextTyped;
+        setTyped(nextTyped);
+      } else {
+        setFeedback(`Esperaba "${targetSoFar}". Intentá de nuevo.`);
+      }
+      return;
+    }
+
+    stateRef.current.typed = nextTyped;
+    setTyped(nextTyped);
+    if (nextTyped === target) {
+      setFeedback("¡Excelente!");
+      window.setTimeout(() => advance(), 350);
+    } else if (matchesLoose && !matches) {
+      setFeedback("Ojo con la tilde o la mayúscula. Seguí.");
+    } else {
+      setFeedback("Vas muy bien.");
+    }
+  }
+
+  function processBackspace() {
+    if (stateRef.current.isCompleted) return;
+    setLastKey("Backspace");
+    if (activity.inputType === "letter" || activity.inputType === "symbol") return;
+    const next = stateRef.current.typed.slice(0, -1);
+    stateRef.current.typed = next;
+    setTyped(next);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Input pipeline                                                     */
+  /* A hidden <input> stays focused so:                                  */
+  /*   - mobile / Chrome touch devices can pop up the OS keyboard,       */
+  /*   - dead keys (´ + a → á) and IME-composed text come through        */
+  /*     beforeinput / compositionend with the *final* character,        */
+  /*   - AltGr combos (e.g. AltGr+Q → @ on ES-LA) are not blocked.       */
+  /* On desktop the window-level keydown is still used as a fallback so  */
+  /* keys arrive even if the hidden input briefly loses focus. */
+  /* ------------------------------------------------------------------ */
+  useEffect(() => {
+    const input = captureInputRef.current;
+    if (!input) return;
+
+    /* React's synthetic onBeforeInput is *not* a 1:1 alias for the native
+       beforeinput event — it's a polyfilled compositionend on most engines.
+       We attach the listener natively so dead keys + touch keyboards on
+       real Chrome / Edge / Safari deliver composed characters reliably. */
+    function onBeforeInput(this: HTMLInputElement, ev: Event) {
+      const native = ev as InputEvent;
+      const type = native.inputType;
+      if (type === "deleteContentBackward" || type === "deleteContentForward" || type === "deleteByCut") {
+        ev.preventDefault();
+        processBackspace();
+        input!.value = "";
+        return;
+      }
+      if (type && type.startsWith("insert")) {
+        const data = native.data ?? "";
+        if (data && data !== "´" && data !== "`" && data !== "^" && data !== "~" && data !== "¨") {
+          for (const ch of data) processCharacter(ch);
+        }
+        // Android browsers ignore preventDefault — clear next tick to be safe.
+        window.setTimeout(() => { if (input) input.value = ""; }, 0);
+        ev.preventDefault();
+      }
+    }
+    function onCompositionEnd(this: HTMLInputElement, ev: CompositionEvent) {
+      const data = ev.data ?? "";
+      if (data) for (const ch of data) processCharacter(ch);
+      window.setTimeout(() => { if (input) input.value = ""; }, 0);
+    }
+
+    function refocus() {
+      window.setTimeout(() => {
+        const a = document.activeElement;
+        if (a && a.tagName === "BUTTON") return;
+        if (a && a.tagName === "INPUT" && a !== input) return;
+        input?.focus({ preventScroll: true });
+      }, 0);
+    }
+
+    input.addEventListener("beforeinput", onBeforeInput as EventListener);
+    input.addEventListener("compositionend", onCompositionEnd as EventListener);
+    input.focus({ preventScroll: true });
+    window.addEventListener("pointerdown", refocus);
+    window.addEventListener("touchend", refocus);
+    return () => {
+      input.removeEventListener("beforeinput", onBeforeInput as EventListener);
+      input.removeEventListener("compositionend", onCompositionEnd as EventListener);
+      window.removeEventListener("pointerdown", refocus);
+      window.removeEventListener("touchend", refocus);
+    };
+    // processCharacter / processBackspace are stable via stateRef.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      // Backspace is captured here so even when the input is empty it still
+      // erases a typed character.
+      if (event.key === "Backspace") {
+        event.preventDefault();
+        processBackspace();
+        return;
+      }
+      // Visual press feedback for modifier keys (so the cap glows).
+      if (event.key === "Shift") { setLastKey("Shift"); return; }
+      if (event.key === "CapsLock" || event.key === "Dead" || event.key === "Process") return;
+
+      // Fallback character pipeline.
+      // If the hidden capture input lost focus (e.g. the user clicked a
+      // button outside it), beforeinput will not fire and the level would
+      // silently ignore keystrokes — including uppercase letters typed with
+      // Shift. We process the printable character here and refocus the
+      // capture input so subsequent strokes go through the IME pipeline
+      // again. We skip when isComposing so accented characters arrive
+      // through compositionend instead.
+      const active = document.activeElement;
+      const captureFocused = active === captureInputRef.current;
+
+      if (!captureFocused && !event.isComposing && event.key.length === 1) {
+        // AltGr (Ctrl+Alt) on Windows still produces a printable character —
+        // accept it. Skip raw Ctrl/Meta shortcuts.
+        const isAltGr = event.ctrlKey && event.altKey;
+        if (!isAltGr && (event.ctrlKey || event.metaKey)) return;
+        event.preventDefault();
+        processCharacter(event.key);
+        captureInputRef.current?.focus({ preventScroll: true });
+        return;
+      }
+
+      // Space scroll guard when no input focused.
+      if (event.key === " " && !captureFocused && !event.isComposing) {
+        event.preventDefault();
+        processCharacter(" ");
+      }
+    }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activity.inputType, target, typed, isCompleted, attempts, errors, isLastTarget]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activity.inputType, target]);
 
   function retry() {
     setTargetIndex(0);
@@ -321,6 +444,30 @@ export function GameplayPage() {
 
   return (
     <main className="gameplay-page gameplay-shell page-fade" style={{ backgroundImage: `url("${assets.gameplayBg}")` }}>
+      {/* Hidden capture field — drives beforeinput/composition so accented
+          characters work on touch & Spanish-layout keyboards. */}
+      <input
+        ref={captureInputRef}
+        className="gameplay-capture"
+        type="text"
+        defaultValue=""
+        autoCapitalize="off"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+        inputMode="text"
+        lang="es"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={(e) => { e.currentTarget.value = ""; }}
+        onBlur={(e) => {
+          // If focus moved to a real interactive element (button/link) let it
+          // keep focus. Otherwise re-grab so the keyboard stays available.
+          const next = e.relatedTarget as HTMLElement | null;
+          if (next && (next.tagName === "BUTTON" || next.tagName === "A")) return;
+          window.setTimeout(() => captureInputRef.current?.focus({ preventScroll: true }), 30);
+        }}
+      />
       <button className="game-exit" type="button" onClick={() => navigate(`/worlds/${activity.worldId}`)}>
         <X size={20} />
         Salir
@@ -346,6 +493,7 @@ export function GameplayPage() {
             activity.requiresShift ||
             activity.requiresAccent;
           const combo = showCombo ? comboFor(expectedChar) : null;
+          const altCombos = showCombo && expectedChar ? SECONDARY_COMBOS[expectedChar] : undefined;
           const showTypedPreview =
             activity.inputType !== "letter" && activity.inputType !== "symbol";
           return (
@@ -360,6 +508,22 @@ export function GameplayPage() {
                       <span key={`${step}-${i}`} className="combo-hint__step">
                         {i > 0 && <span className="combo-hint__plus">+</span>}
                         <kbd>{step}</kbd>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {altCombos && !isCompleted && (
+                  <div className="combo-hint combo-hint--alt" aria-label="Otras formas">
+                    <span>o también</span>
+                    {altCombos.map((alt, idx) => (
+                      <span key={idx} className="combo-hint__alt">
+                        {alt.map((step, i) => (
+                          <span key={`${step}-${i}`} className="combo-hint__step">
+                            {i > 0 && <span className="combo-hint__plus">+</span>}
+                            <kbd>{step}</kbd>
+                          </span>
+                        ))}
+                        {idx < altCombos.length - 1 && <span className="combo-hint__sep">·</span>}
                       </span>
                     ))}
                   </div>
@@ -405,11 +569,11 @@ export function GameplayPage() {
           <div className="game-mascots" aria-hidden="true">
             <figure className="game-mascot game-mascot--left">
               <div className={`game-mascot__bubble ${errored ? "is-warn" : ""}`}>{leftPhrase}</div>
-              <img src={assets.mascotFemaleWave} alt="" />
+              <img src={assets.mascotFemaleWave} alt="" decoding="async" />
             </figure>
             <figure className="game-mascot game-mascot--right">
               <div className={`game-mascot__bubble ${errored ? "is-warn" : ""}`}>{rightPhrase}</div>
-              <img src={assets.mascotMaleJump} alt="" />
+              <img src={assets.mascotMaleJump} alt="" decoding="async" />
             </figure>
           </div>
         );

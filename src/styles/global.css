@@ -1206,9 +1206,12 @@ a {
   height: 100%;
   object-fit: cover;
   object-position: center;
-  /* Magical zoom-in on entry: starts large + blurred, settles to normal. */
-  animation: islandZoomIn 950ms cubic-bezier(0.18, 1.05, 0.36, 1) both;
+  /* Magical zoom-in on entry: starts slightly enlarged + dreamy, settles
+     to normal. Softer than before so it feels like a fade-up rather than
+     a punchy zoom. */
+  animation: islandZoomIn 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
   transform-origin: center 56%;
+  will-change: transform, filter, opacity;
 }
 
 /* Re-enable pointer events on level nodes inside the stage. */
@@ -1225,43 +1228,48 @@ a {
 }
 
 @keyframes islandZoomIn {
-  0%   { opacity: 0; transform: scale(1.55); filter: blur(14px) saturate(1.4) brightness(1.12); }
-  45%  { opacity: 1; filter: blur(4px) saturate(1.2) brightness(1.06); }
-  100% { opacity: 1; transform: scale(1); filter: blur(0) saturate(1) brightness(1); }
+  0%   { opacity: 0; transform: scale(1.18) translateY(2%); filter: blur(8px) saturate(1.2) brightness(1.06); }
+  55%  { opacity: 1; filter: blur(2px) saturate(1.08) brightness(1.03); }
+  100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0) saturate(1) brightness(1); }
 }
 
-/* A bright flash sweeps over the island as it lands. */
+/* A soft glow blooms behind the island as it settles — no harsh flash. */
 .island-detail::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 3;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.85), rgba(167, 234, 255, 0.32) 28%, transparent 60%);
+  background:
+    radial-gradient(circle at 50% 58%, rgba(255, 255, 255, 0.45), rgba(167, 234, 255, 0.18) 36%, transparent 70%);
   opacity: 0;
-  animation: islandFlash 950ms ease-out both;
+  animation: islandFlash 1400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  mix-blend-mode: screen;
 }
 
 @keyframes islandFlash {
-  0%   { opacity: 0;   transform: scale(0.65); }
-  35%  { opacity: 0.9; transform: scale(1);    }
-  100% { opacity: 0;   transform: scale(1.4);  }
+  0%   { opacity: 0;   transform: scale(0.85); }
+  40%  { opacity: 0.55; transform: scale(1);    }
+  100% { opacity: 0;   transform: scale(1.25);  }
 }
 
-/* Level nodes pop in one after another after the island lands. */
+/* Level nodes pop in one after another after the island lands.
+   The overshoot is subtle so each platform feels like it's "landing"
+   rather than springing. */
 .level-node {
-  animation: nodePop 460ms cubic-bezier(0.22, 1.4, 0.36, 1) both;
+  animation: nodePop 560ms cubic-bezier(0.22, 1.2, 0.34, 1) both;
 }
-.level-node:nth-child(2) { animation-delay: 540ms; }
-.level-node:nth-child(3) { animation-delay: 620ms; }
-.level-node:nth-child(4) { animation-delay: 700ms; }
-.level-node:nth-child(5) { animation-delay: 780ms; }
-.level-node:nth-child(6) { animation-delay: 860ms; }
-.level-node:nth-child(7) { animation-delay: 940ms; }
+.level-node:nth-child(1) { animation-delay: 620ms; }
+.level-node:nth-child(2) { animation-delay: 700ms; }
+.level-node:nth-child(3) { animation-delay: 780ms; }
+.level-node:nth-child(4) { animation-delay: 860ms; }
+.level-node:nth-child(5) { animation-delay: 940ms; }
+.level-node:nth-child(6) { animation-delay: 1020ms; }
+.level-node:nth-child(7) { animation-delay: 1100ms; }
 
 @keyframes nodePop {
-  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
-  60%  { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+  0%   { opacity: 0; transform: translate(-50%, -36%) scale(0.6); }
+  60%  { opacity: 1; transform: translate(-50%, -52%) scale(1.06); }
   100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
@@ -1285,15 +1293,15 @@ a {
   to   { opacity: 1; transform: translateX(0); }
 }
 
-/* The ship parachutes in last. */
+/* The ship glides in last — smooth arc + gentle sway, no harsh bounce. */
 .level-ship {
-  animation: shipDropIn 800ms 1.1s cubic-bezier(0.22, 1.05, 0.36, 1) both,
-             shipHover 3.4s 1.9s ease-in-out infinite;
+  animation: shipDropIn 1100ms 1.3s cubic-bezier(0.22, 1, 0.36, 1) both,
+             shipHover 3.4s 2.4s ease-in-out infinite;
 }
 
 @keyframes shipDropIn {
-  0%   { opacity: 0; transform: translate(-50%, -260%) rotate(-12deg) scale(0.85); }
-  60%  { opacity: 1; transform: translate(-50%, -38%) rotate(6deg) scale(1.08); }
+  0%   { opacity: 0; transform: translate(-50%, -180%) rotate(-6deg) scale(0.92); }
+  70%  { opacity: 1; transform: translate(-50%, -46%) rotate(2deg) scale(1.02); }
   100% { opacity: 1; transform: translate(-50%, -50%) rotate(0) scale(1); }
 }
 
@@ -1868,17 +1876,21 @@ a {
 .game-stage {
   display: grid;
   width: min(46rem, calc(100vw - 1.5rem));
-  align-self: center;
+  margin-inline: auto;
   justify-self: center;
+  justify-items: center;
   gap: clamp(0.3rem, 0.9vh, 0.7rem);
   text-align: center;
   grid-template-rows: auto auto auto auto;
 }
 
-/* Target card grows to fit its content — no clipped text. */
+/* All top cards share the SAME inner width + the same horizontal
+   centering rule so the title pill and the objective pill line up
+   perfectly on every viewport. */
 .target-card {
   min-height: clamp(5.5rem, 12vh, 8rem);
-  width: min(34rem, 100%);
+  width: 100%;
+  max-width: min(38rem, 100%);
   margin-inline: auto;
   display: grid;
   align-content: center;
@@ -1886,7 +1898,7 @@ a {
   padding: clamp(0.55rem, 1.4vh, 0.95rem) clamp(0.9rem, 1.8vw, 1.4rem);
 }
 .target-card.target--phrase {
-  width: min(40rem, 100%);
+  max-width: min(42rem, 100%);
   min-height: clamp(6rem, 13vh, 8.5rem);
 }
 
@@ -1905,7 +1917,8 @@ a {
 .game-status {
   border-radius: 1.1rem;
   padding: clamp(0.45rem, 1vh, 0.7rem) clamp(0.9rem, 2vw, 1.2rem);
-  width: min(34rem, 100%);
+  width: 100%;
+  max-width: min(38rem, 100%);
   margin-inline: auto;
   text-align: center;
 }
@@ -1933,8 +1946,7 @@ a {
 .target-card {
   border-radius: 1.8rem;
   padding: 1.2rem 2rem;
-  max-width: min(56rem, 92vw);
-  margin: 0 auto;
+  margin-inline: auto;
 }
 
 .target-card span {
@@ -1948,14 +1960,32 @@ a {
   font-size: clamp(4rem, 10vw, 7rem);
   font-weight: 950;
   line-height: 1;
+  /* Long targets (emails, urls) must always fit the pill — let them shrink
+     horizontally instead of overflowing the rounded edges. */
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Single-letter / single-word target stays huge. */
 .target-card.target--letter strong {
   font-size: clamp(5rem, 14vw, 9rem);
 }
+.target-card.target--word {
+  width: min(46rem, 100%);
+}
 .target-card.target--word strong {
-  font-size: clamp(3.5rem, 8vw, 5.6rem);
+  font-size: clamp(2rem, 6vw, 4.6rem);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  /* If the word is genuinely too wide (info@edutic.com, etc.) the browser
+     auto-shrinks the inline glyphs via JS-free font-size-adjust fallback:
+     we cap the visible chars by clipping with ellipsis only as last resort.
+     In practice the clamp() above keeps everything readable up to ~18 chars
+     even on narrow screens. */
+  overflow: hidden;
+  text-overflow: clip;
+  max-width: 100%;
 }
 /* Phrases (anything with a space) get a wider pill and smaller wrapped text. */
 .target-card.target--phrase {
@@ -3427,7 +3457,10 @@ h3, h4 {
   min-height: clamp(2.6rem, 7vh, 3.4rem);
   padding: clamp(0.2rem, 0.9vh, 0.4rem) clamp(0.6rem, 1.5vw, 1rem);
   border-radius: 1rem;
-  background: rgba(245, 243, 255, 0.86);
+  /* No solid panel behind the typed text — the dashed outer border already
+     frames the preview. Keeps it lighter and removes the "gray box" artifact
+     reported in the long-word screenshot. */
+  background: transparent;
   color: #2c2666;
   font-family: var(--font-display);
   font-weight: 700;
@@ -3514,6 +3547,42 @@ h3, h4 {
   gap: 0.15rem;
 }
 
+.combo-hint--alt {
+  margin-top: 0.2rem;
+  opacity: 0.78;
+  font-size: 0.78em;
+}
+.combo-hint__alt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.combo-hint__sep {
+  margin: 0 0.35rem;
+  opacity: 0.5;
+}
+
+/* Hidden text capture — drives the OS keyboard on touch devices and lets
+   beforeinput / compositionend events deliver dead-key + accented chars.
+   Kept *inside* the viewport so iOS/Android show the on-screen keyboard
+   when the field gains focus; visually invisible. */
+.gameplay-capture {
+  position: fixed;
+  left: 50%;
+  bottom: 0.2rem;
+  transform: translateX(-50%);
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  z-index: -1;
+}
+
 /* ===== Gameplay — flanking robots with motivational bubbles =====
    Mascot + bubble live in the SAME flex container so the pointer connects
    visually to the robot's head. Sizes scale with clamp(). */
@@ -3526,28 +3595,38 @@ h3, h4 {
 
 .game-mascot {
   position: absolute;
-  bottom: clamp(0.4rem, 1vh, 1.2rem);
+  bottom: clamp(0.2rem, 0.8vh, 1rem);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0;
   margin: 0;
   animation: mascotFloat 4.6s ease-in-out infinite;
-  width: clamp(9rem, 16vw, 16rem);
+  /* Scales gracefully from ~6rem on small windows up to ~16rem on widescreens
+     so robots remain visible in normal (non-fullscreen) browser windows. */
+  width: clamp(6rem, 13vw, 16rem);
+  max-height: 38vh;
 }
 
-.game-mascot--left  { left:  clamp(0.4rem, 1vw, 1.2rem); animation-delay: -1.2s; }
-.game-mascot--right { right: clamp(0.4rem, 1vw, 1.2rem); animation-delay: -2.6s; }
+.game-mascot--left  { left:  clamp(0.2rem, 0.8vw, 1.2rem); animation-delay: -1.2s; }
+.game-mascot--right { right: clamp(0.2rem, 0.8vw, 1.2rem); animation-delay: -2.6s; }
 
 .game-mascot img {
   width: 100%;
-  height: auto;
+  height: clamp(8rem, 22vh, 18rem);
+  /* Both mascot PNGs ship with different transparent padding — using
+     `cover` with a center bottom anchor visually equalises their on-screen
+     size so the left and right robots feel like the same character. */
   object-fit: contain;
+  object-position: center bottom;
   filter: drop-shadow(0 18px 24px rgba(60, 65, 130, 0.32));
   user-select: none;
-  /* Pull the robot up slightly so the bubble pointer touches its head. */
   margin-top: -0.4rem;
 }
+/* The female-wave art is rendered ~15% smaller than the male-jump art at
+   the same container width due to its inner transparent padding. Bump it
+   up so both mascots land at the same visible scale. */
+.game-mascot--left img { transform: scale(1.18); transform-origin: center bottom; }
 
 .game-mascot__bubble {
   position: relative;
@@ -3588,10 +3667,18 @@ h3, h4 {
   color: #5a1f00;
 }
 
-/* Below this width the keyboard already shrinks; hide the mascots to give the
-   keyboard the whole horizontal corridor. Also hide on shorter viewports so
-   they never overlap the instruction pill / keyboard. */
-@media (max-width: 1180px), (max-height: 760px) {
+/* Shrink the bubble + robot pair as the window narrows so they keep
+   peeking from the bottom corners. The full hide only kicks in on
+   genuinely tiny viewports where they would overlap the keyboard. */
+@media (max-width: 1180px) {
+  .game-mascot { width: clamp(5.5rem, 11vw, 9rem); }
+  .game-mascot__bubble { font-size: clamp(0.72rem, 1vw, 0.9rem); padding: 0.35rem 0.6rem; }
+}
+@media (max-width: 900px) {
+  .game-mascot { width: clamp(4.5rem, 14vw, 7rem); bottom: 0.2rem; }
+  .game-mascot__bubble { display: none; }
+}
+@media (max-width: 640px), (max-height: 520px) {
   .game-mascots { display: none; }
 }
 
@@ -3951,11 +4038,15 @@ h3, h4 {
    ============================================================ */
 .i5-shell {
   position: relative;
-  min-height: 100dvh;
+  /* Hard-bind to the visible viewport so a level never forces the browser
+     to scroll. Inside, the central .i5-shell__stage takes the remaining
+     space and any oversized child clips/scrolls *inside* the level. */
+  height: 100dvh;
+  max-height: 100dvh;
   display: grid;
-  grid-template-rows: auto auto 1fr auto auto;
-  gap: clamp(0.5rem, 1.2vh, 0.9rem);
-  padding: clamp(0.8rem, 1.6vh, 1.1rem) clamp(0.9rem, 2vw, 1.4rem);
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  gap: clamp(0.35rem, 0.9vh, 0.75rem);
+  padding: clamp(0.5rem, 1vh, 0.9rem) clamp(0.9rem, 2vw, 1.4rem);
   overflow: hidden;
   font-family: var(--font-body);
 }
@@ -3965,7 +4056,7 @@ h3, h4 {
 .i5-shell__bg {
   position: absolute; inset: 0; z-index: -2;
   background:
-    url("/assets/edutic-art/gameplay-bg.png") center / cover no-repeat,
+    url("/assets/edutic-art/gameplay-bg.webp") center / cover no-repeat,
     linear-gradient(180deg, #cfeeff 0%, #b8dcff 45%, #d6c7ff 100%);
 }
 .i5-shell__sparkles {
@@ -4049,9 +4140,11 @@ h3, h4 {
 .i5-shell__stage {
   position: relative; z-index: 1;
   display: grid; place-items: center;
-  padding: clamp(0.5rem, 2vh, 1.4rem);
+  padding: clamp(0.4rem, 1.4vh, 1rem);
   min-height: 0;
+  overflow: hidden;
 }
+.i5-scene { min-height: 0; max-height: 100%; }
 .i5-mascot {
   position: absolute; bottom: -0.8rem; pointer-events: none;
   width: clamp(7rem, 13vw, 11rem);
@@ -4245,13 +4338,15 @@ h3, h4 {
 /* ---- Level 3 drag & drop ---- */
 .i5-l3-grid {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center; gap: clamp(0.6rem, 2vw, 2rem);
-  width: min(880px, 96%);
-  padding: 1rem 0;
+  grid-template-columns: auto minmax(40px, 1fr) auto;
+  align-items: center; gap: clamp(0.4rem, 1.4vw, 1.4rem);
+  width: min(820px, 96%);
+  max-height: 100%;
+  padding: 0.3rem 0;
 }
 .i5-l3-col {
-  display: grid; gap: 0.8rem;
+  display: grid; gap: clamp(0.35rem, 1vh, 0.7rem);
+  align-content: center;
 }
 .i5-l3-col--items { justify-items: center; }
 .i5-l3-col--slots { justify-items: center; }
@@ -4281,7 +4376,7 @@ h3, h4 {
 .i5-drag-item__emoji { font-size: clamp(2rem, 4.5vw, 2.8rem); filter: drop-shadow(0 6px 8px rgba(40,60,120,0.25)); }
 
 .i5-l3-path {
-  height: 100%; min-height: 240px; width: 100%;
+  height: 100%; min-height: clamp(140px, 30vh, 220px); width: 100%;
 }
 .i5-l3-path svg { width: 100%; height: 100%; }
 
@@ -4313,6 +4408,37 @@ h3, h4 {
 .i5-drop-slot.is-filled .i5-drop-slot__silhouette {
   filter: none; opacity: 1;
 }
+.i5-drop-slot.is-rejecting {
+  animation: i5-rejectShake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  border-color: #e84a4a !important;
+  background: linear-gradient(135deg, rgba(255, 122, 122, 0.35), rgba(255, 80, 80, 0.22)) !important;
+  box-shadow: 0 0 0 6px rgba(232, 74, 74, 0.18), 0 14px 26px rgba(232, 74, 74, 0.28) !important;
+}
+@keyframes i5-rejectShake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-7px); }
+  40%, 60% { transform: translateX(7px); }
+}
+.i5-drop-slot__cross {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(2rem, 4vw, 3rem);
+  color: #fff;
+  text-shadow: 0 4px 10px rgba(180, 30, 30, 0.6);
+  pointer-events: none;
+  animation: i5-crossPop 0.45s ease-out both;
+}
+@keyframes i5-crossPop {
+  0%   { opacity: 0; transform: scale(0.6); }
+  60%  { opacity: 1; transform: scale(1.2); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.i5-drop-slot { position: relative; }
 
 /* ---- Level 4 virtual desktop ---- */
 .i5-desktop {
@@ -4716,6 +4842,14 @@ h3, h4 {
   text-align: center;
 }
 .i5-l2-prompt strong { color: #5a2cb6; }
+.i5-l2-hint {
+  margin: -0.4rem 0 clamp(0.6rem, 1.6vh, 1rem);
+  text-align: center;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #5a6f9b;
+}
 
 /* Level 3 — image-based drag & drop */
 .i5-drag-item {
@@ -4771,22 +4905,123 @@ h3, h4 {
   box-shadow: 0 4px 10px rgba(50, 70, 140, 0.18);
 }
 
-/* Level 4 — virtual OS scene */
-.i5-desktop {
+/* Level 4 — virtual OS scene (clean rewrite — no uploaded-image bodies) */
+.i5-desktop.i5-desktop--clean {
   position: relative;
   width: min(1100px, 98%);
-  min-height: clamp(15rem, 38vh, 22rem);
   display: grid;
-  gap: clamp(0.6rem, 1.4vh, 0.9rem);
-  grid-template-columns: repeat(12, 1fr);
-  align-items: start;
-  padding: clamp(0.6rem, 1.4vh, 1rem);
+  gap: clamp(0.7rem, 1.6vh, 1.1rem);
+  grid-template-columns: 1fr;
+  padding: clamp(0.7rem, 1.6vh, 1.1rem);
   border-radius: 1.6rem;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(225, 220, 255, 0.55));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(225, 220, 255, 0.6));
   border: 1px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 22px 50px rgba(60, 60, 140, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(12px);
 }
+.i5-desktop__task {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.65rem 1.05rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(91, 232, 186, 0.95), rgba(83, 107, 255, 0.95));
+  color: #fff;
+  font-family: var(--font-display);
+  box-shadow: 0 12px 24px rgba(80, 100, 180, 0.28);
+}
+.i5-desktop__task-kicker {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  opacity: 0.85;
+}
+.i5-desktop__task strong {
+  font-size: clamp(0.95rem, 1.6vw, 1.15rem);
+  line-height: 1.25;
+}
+.i5-desktop__grid {
+  display: grid;
+  gap: clamp(0.6rem, 1.4vw, 1rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+}
+.i5-window__tabstrip {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.i5-window__lights {
+  display: inline-flex;
+  gap: 0.3rem;
+  margin-left: auto;
+  margin-right: 0.4rem;
+}
+.i5-window__lights i {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+}
+.i5-fake-browser, .i5-fake-paint, .i5-fake-notes {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem;
+  font-family: var(--font-display);
+  color: #2c2666;
+}
+.i5-fake-browser__url {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(120, 130, 200, 0.25);
+  font-size: 0.78rem;
+  color: #6a7a9b;
+}
+.i5-fake-browser__dot {
+  width: 0.5rem; height: 0.5rem; border-radius: 50%;
+  background: #5be8ba;
+}
+.i5-fake-browser__hero {
+  font-size: clamp(2.4rem, 6vw, 3.6rem);
+  text-align: center;
+  filter: drop-shadow(0 8px 14px rgba(83, 107, 255, 0.28));
+}
+.i5-fake-browser p { margin: 0; text-align: center; font-weight: 700; color: #41547f; }
+.i5-fake-paint__toolbar {
+  display: inline-flex;
+  gap: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 0.6rem;
+  align-self: start;
+}
+.i5-fake-paint__toolbar span {
+  width: 1rem; height: 1rem; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 4px rgba(60, 60, 140, 0.2);
+}
+.i5-fake-paint__canvas {
+  display: grid; place-items: center;
+  background: repeating-linear-gradient(45deg, #fff, #fff 8px, #f1f0ff 8px, #f1f0ff 16px);
+  border: 1px dashed rgba(120, 130, 200, 0.45);
+  border-radius: 0.6rem;
+  font-size: clamp(2rem, 5vw, 3rem);
+  min-height: 5.4rem;
+}
+.i5-fake-notes {
+  background: linear-gradient(180deg, #fff8c4, #ffeb8a);
+  border-radius: 0.6rem;
+  color: #5a4400;
+}
+.i5-fake-notes p { margin: 0 0 0.2rem; font-weight: 800; }
+.i5-fake-notes ul { margin: 0; padding-left: 1.1rem; font-size: 0.88rem; line-height: 1.4; }
 .i5-dock {
   grid-column: 1 / -1;
   display: grid;
@@ -4815,9 +5050,9 @@ h3, h4 {
   from { opacity: 0; transform: translateY(10px) scale(0.96); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-.i5-window--browser  { grid-column: 1 / span 7; min-height: clamp(10rem, 24vh, 14rem); }
-.i5-window--drawings { grid-column: 8 / span 5; min-height: clamp(8rem, 20vh, 12rem); }
-.i5-window--notes    { grid-column: 4 / span 6; min-height: clamp(6rem, 16vh, 10rem); }
+.i5-window--browser  { grid-column: auto; min-height: clamp(10rem, 24vh, 14rem); }
+.i5-window--drawings { grid-column: auto; min-height: clamp(8rem, 20vh, 12rem); }
+.i5-window--notes    { grid-column: auto; min-height: clamp(8rem, 20vh, 12rem); }
 .i5-window__controls {
   display: inline-flex; align-items: center;
   margin-left: auto; margin-right: 0.4rem;
@@ -4857,7 +5092,345 @@ h3, h4 {
   .i5-desktop__message, .i5-desktop__media { display: none; }
 }
 
-/* Level 5 — mouse / castles / zoom */
+/* ---- Level 6 — Double click folders ---- */
+.i5-l6-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: clamp(0.8rem, 2.4vw, 1.6rem);
+  width: min(820px, 96%);
+  max-height: 100%;
+  align-items: center;
+}
+.i5-folder {
+  position: relative;
+  display: grid;
+  grid-template-rows: 0.5rem 1fr auto;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  user-select: none;
+  text-align: center;
+  font-family: var(--font-display);
+  transition: transform 180ms ease;
+}
+.i5-folder:hover { transform: translateY(-4px); }
+.i5-folder__tab {
+  width: 40%;
+  height: 0.9rem;
+  margin: 0 auto -0.45rem;
+  border-radius: 0.5rem 0.5rem 0 0;
+  background: linear-gradient(180deg, #ffd552, #f4a83a);
+  border: 1px solid rgba(255,255,255,0.85);
+  box-shadow: 0 -2px 6px rgba(80,60,0,0.18) inset;
+}
+.i5-folder__body {
+  display: grid; place-items: center;
+  width: 100%;
+  aspect-ratio: 5 / 4;
+  padding: 0.6rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(180deg, #ffe689, #f4c33a);
+  border: 1px solid rgba(255,255,255,0.9);
+  box-shadow: 0 14px 24px rgba(120, 85, 0, 0.28), inset 0 1px 0 rgba(255,255,255,0.95);
+  overflow: hidden;
+}
+.i5-folder__body img { width: 70%; height: 70%; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(60,40,0,0.3)); transition: transform 260ms ease; }
+.i5-folder.is-open .i5-folder__body { background: linear-gradient(180deg, #ffffff, #e0f4ff); }
+.i5-folder__reward {
+  font-size: clamp(2.6rem, 5vw, 3.6rem);
+  animation: i5-rewardPop 0.6s cubic-bezier(0.22, 1.3, 0.36, 1) both;
+}
+@keyframes i5-rewardPop {
+  0% { opacity: 0; transform: scale(0.4); }
+  60% { opacity: 1; transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.i5-folder__label {
+  margin-top: 0.45rem;
+  font-weight: 800;
+  color: #1c2c5e;
+  font-size: 0.95rem;
+}
+.i5-folder__hint {
+  position: absolute;
+  bottom: -1.4rem; left: 50%;
+  transform: translateX(-50%);
+  padding: 0.18rem 0.7rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #54e8c6, #536bff);
+  color: #fff;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  box-shadow: 0 6px 12px rgba(83, 107, 255, 0.28);
+}
+
+/* ---- Level 7 — Keyboard shortcuts ---- */
+.i5-l7-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: clamp(0.8rem, 2vw, 1.4rem);
+  width: min(820px, 96%);
+  align-items: stretch;
+}
+@media (max-width: 720px) { .i5-l7-grid { grid-template-columns: 1fr; } }
+.i5-l7-prompt {
+  display: grid; gap: 0.7rem;
+  padding: 1.2rem;
+  border-radius: 1.2rem;
+  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(220,228,255,0.7));
+  border: 1px solid rgba(255,255,255,0.92);
+  box-shadow: 0 16px 32px rgba(60,60,140,0.22);
+  text-align: center;
+}
+.i5-l7-prompt__kicker {
+  font-family: var(--font-display); font-weight: 800;
+  font-size: 0.78rem; letter-spacing: 0.16em; color: #5a6f9b;
+  text-transform: uppercase;
+}
+.i5-l7-prompt__combo {
+  display: inline-flex; justify-content: center; align-items: center; gap: 0.45rem;
+}
+.i5-l7-key {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  font-family: var(--font-display);
+}
+.i5-l7-key kbd {
+  padding: 0.55rem 0.9rem;
+  border-radius: 0.7rem;
+  background: linear-gradient(180deg, #fff, #e2eaff);
+  border: 1px solid rgba(120,130,200,0.4);
+  color: #1c2c5e;
+  font-weight: 900;
+  font-size: clamp(1.1rem, 2vw, 1.4rem);
+  box-shadow: 0 4px 0 rgba(80,100,180,0.25), 0 8px 14px rgba(60,60,140,0.18);
+}
+.i5-l7-plus {
+  font-weight: 900; color: #6c4ae6; opacity: 0.75;
+}
+.i5-l7-prompt__hint {
+  margin: 0;
+  color: #2c2666;
+  font-weight: 700;
+}
+.i5-l7-echo {
+  display: grid; place-items: center; gap: 0.35rem;
+  padding: 1.2rem;
+  border-radius: 1.2rem;
+  background: linear-gradient(135deg, #1c2c5e, #4a2bbf);
+  color: #fff;
+  font-family: var(--font-display);
+  text-align: center;
+}
+.i5-l7-echo span { opacity: 0.7; letter-spacing: 0.14em; font-size: 0.78rem; text-transform: uppercase; }
+.i5-l7-echo strong { font-size: clamp(1.4rem, 2.8vw, 2rem); letter-spacing: 0.04em; }
+
+/* Level 5 — cleaned-up scroll + zoom layout. We bias the grid wider so
+   each card has real breathing room on a laptop screen, and we cap
+   vertical size so the entire level fits inside .i5-shell__stage. */
+.i5-l5-grid--clean {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.05fr) minmax(260px, 1fr);
+  gap: clamp(0.7rem, 1.6vw, 1.3rem);
+  width: min(1180px, 98vw);
+  max-height: 100%;
+  padding: 0;
+}
+@media (max-width: 760px) {
+  .i5-l5-grid--clean { grid-template-columns: 1fr; }
+}
+.i5-l5-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0.6rem;
+  padding: clamp(0.7rem, 1.4vh, 1rem);
+  border-radius: 1.4rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(220, 226, 255, 0.65));
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 36px rgba(60, 60, 140, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+.i5-l5-card__head {
+  display: flex; align-items: center; gap: 0.6rem;
+  font-family: var(--font-display);
+  color: #2c2666;
+}
+.i5-l5-card__head h3 { margin: 0; font-size: clamp(1rem, 1.6vw, 1.2rem); }
+.i5-l5-card__chip {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #54e8c6, #536bff);
+  color: #fff;
+  font-weight: 800;
+}
+.i5-l5-card__body--scroll {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.7rem;
+  align-items: center;
+}
+.i5-l5-mouse {
+  display: grid; place-items: center; gap: 0.25rem;
+  padding: 0.5rem 0.4rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+}
+.i5-l5-mouse img {
+  width: clamp(3rem, 5vw, 4.6rem);
+  filter: drop-shadow(0 8px 12px rgba(60, 60, 140, 0.28));
+  animation: i5-mouseBob 3.4s ease-in-out infinite;
+}
+.i5-l5-mouse__arrow {
+  font-family: var(--font-display); font-weight: 900;
+  color: #6c4ae6; font-size: 1rem;
+  animation: i5-bobArrow 1.8s ease-in-out infinite;
+}
+.i5-l5-mouse__arrow--down { animation-direction: reverse; }
+.i5-l5-scrollview {
+  position: relative;
+  height: clamp(14rem, 50vh, 26rem);
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  border-radius: 1rem;
+  border: 1px solid rgba(120, 130, 200, 0.25);
+  background: linear-gradient(180deg, #eef6ff, #d4dcff);
+  scrollbar-width: thin;
+  scrollbar-color: #6c4ae6 #efeaff;
+  box-shadow: inset 0 12px 18px -12px rgba(60, 60, 140, 0.35),
+              inset 0 -12px 18px -12px rgba(60, 60, 140, 0.35);
+}
+.i5-l5-scrollview__reveal {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  padding: 0;
+}
+.i5-l5-scrollview__art {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  /* The vertical castle is much taller than the viewport on purpose —
+     scrolling reveals each layer of the painted artwork. */
+  object-fit: contain;
+  filter: drop-shadow(0 12px 18px rgba(60, 60, 140, 0.18));
+}
+.i5-l5-scrollview__topflag,
+.i5-l5-scrollview__endflag {
+  display: inline-block;
+  margin: 0.6rem auto;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #54e8c6, #536bff);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 10px 18px rgba(83, 107, 255, 0.32);
+}
+.i5-l5-scrollview__topflag {
+  background: linear-gradient(135deg, #ffd552, #f59f2e);
+  color: #5a2d00;
+  margin-top: 0.5rem;
+}
+.i5-l5-scrollview::-webkit-scrollbar { width: 10px; }
+.i5-l5-scrollview::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #9b7cff, #6c4ae6);
+  border-radius: 6px;
+}
+.i5-l5-scrollview__content {
+  display: grid; gap: 0.55rem;
+  padding: 0.6rem;
+}
+.i5-l5-page {
+  padding: 0.85rem 0.9rem;
+  border-radius: 0.8rem;
+  background: linear-gradient(135deg, #eaf2ff, #d6e2ff);
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: #1c2c5e;
+  text-align: center;
+  font-size: clamp(0.9rem, 1.4vw, 1rem);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+.i5-l5-page--alt {
+  background: linear-gradient(135deg, #fff3d6, #ffe28a);
+  color: #5a4400;
+}
+.i5-l5-page--end {
+  background: linear-gradient(135deg, #5be8ba, #536bff);
+  color: #fff;
+  box-shadow: 0 10px 20px rgba(83, 107, 255, 0.32);
+}
+.i5-l5-card__body--zoom {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 0.6rem;
+}
+.i5-l5-zoomstage {
+  position: relative;
+  border-radius: 1rem;
+  background:
+    radial-gradient(120% 80% at 50% 100%, rgba(255, 255, 255, 0.6), transparent 70%),
+    linear-gradient(180deg, #f1f4ff, #d8d8ff);
+  display: grid; place-items: center;
+  padding: 0.6rem;
+  overflow: hidden;
+  min-height: clamp(8rem, 18vh, 11rem);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+}
+.i5-l5-zoomart {
+  max-width: 78%;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 14px rgba(60, 60, 140, 0.28));
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: center;
+}
+.i5-l5-zoom-pct {
+  position: absolute;
+  top: 0.5rem; right: 0.6rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(28, 44, 94, 0.78);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+.i5-l5-zoom-controls {
+  display: flex; gap: 0.6rem;
+  justify-content: center;
+}
+.i5-l5-zoom-btn {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 130, 200, 0.25);
+  background: #fff;
+  color: #2c2666;
+  font-family: var(--font-display);
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 14px rgba(60, 60, 140, 0.18);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+.i5-l5-zoom-btn strong { font-size: 1.2rem; line-height: 1; }
+.i5-l5-zoom-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 20px rgba(60, 60, 140, 0.22); }
+.i5-l5-zoom-btn--primary {
+  background: linear-gradient(135deg, #54e8c6, #536bff);
+  color: #fff;
+  border: 0;
+}
+
 .i5-l5-grid {
   display: grid;
   grid-template-columns: clamp(7rem, 14vw, 11rem) 1fr 1fr;

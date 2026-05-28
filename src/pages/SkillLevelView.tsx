@@ -26,6 +26,10 @@ export function SkillLevelView({ activity }: SkillLevelViewProps) {
       return <WindowsLevel activity={activity} />;
     case 5:
       return <ScrollLevel activity={activity} />;
+    case 6:
+      return <DoubleClickLevel activity={activity} />;
+    case 7:
+      return <ShortcutsLevel activity={activity} />;
     default:
       return <FallbackLevel activity={activity} />;
   }
@@ -110,9 +114,9 @@ function Island5Shell({
       </div>
 
       <section className="i5-shell__stage" aria-label="Escena">
-        <img className="i5-mascot i5-mascot--left" src={assets.mascotFemaleWave} alt="" />
+        <img className="i5-mascot i5-mascot--left" src={assets.mascotFemaleWave} alt=""  decoding="async" />
         <span className="i5-bubble i5-bubble--left">¡Vos podés!</span>
-        <img className="i5-mascot i5-mascot--right" src={assets.mascotMaleProud} alt="" />
+        <img className="i5-mascot i5-mascot--right" src={assets.mascotMaleProud} alt=""  decoding="async" />
         <span className="i5-bubble i5-bubble--right">¡Sos un crack!</span>
 
         <div className="i5-scene">{children}</div>
@@ -306,7 +310,7 @@ function LeftClickLevel({ activity }: { activity: Activity }) {
               aria-label={`Hacer clic en ${o.label}`}
             >
               <span className="i5-clickable__aura" />
-              <img className="i5-clickable__art" src={o.art} alt="" draggable={false} />
+              <img className="i5-clickable__art" src={o.art} alt="" draggable={false}  decoding="async" />
               <span className="i5-clickable__pedestal" />
             </button>
           ))}
@@ -328,50 +332,48 @@ function LeftClickLevel({ activity }: { activity: Activity }) {
 /* Level 2 — Right Click                                              */
 /* ------------------------------------------------------------------ */
 
+const LEVEL2_OBJECTS = [
+  { id: "penguin", art: assets.i5Penguin, label: "Pingüino" },
+  { id: "bag",     art: assets.i5Bag,     label: "Mochila"  },
+  { id: "chest",   art: assets.i5Chest,   label: "Cofre"    },
+  { id: "potion",  art: assets.i5Potion,  label: "Poción"   },
+];
+
 const LEVEL2_ROUNDS = [
   {
-    objects: [
-      { id: "penguin", art: assets.i5Penguin, label: "Pingüino" },
-      { id: "bag",     art: assets.i5Bag,     label: "Mochila"  },
-      { id: "chest",   art: assets.i5Chest,   label: "Cofre"    },
-      { id: "potion",  art: assets.i5Potion,  label: "Poción"   },
-    ],
+    objects: LEVEL2_OBJECTS,
     target: "chest",
     targetLabel: "Cofre",
+    prompt: "Hacé click derecho y abrí el cofre",
+    hint: "El cofre esconde un tesoro 🪙",
     menu: [
-      { id: "open", label: "Abrir",    emoji: "📦", correct: true  },
-      { id: "look", label: "Mirar",    emoji: "👁",  correct: false },
-      { id: "save", label: "Guardar",  emoji: "💾", correct: false },
+      { id: "open", label: "Abrir cofre",  emoji: "📦", correct: true  },
+      { id: "look", label: "Mirar",        emoji: "👁",  correct: false },
+      { id: "save", label: "Guardar",      emoji: "💾", correct: false },
     ],
   },
   {
-    objects: [
-      { id: "penguin", art: assets.i5Penguin, label: "Pingüino" },
-      { id: "bag",     art: assets.i5Bag,     label: "Mochila"  },
-      { id: "chest",   art: assets.i5Chest,   label: "Cofre"    },
-      { id: "potion",  art: assets.i5Potion,  label: "Poción"   },
-    ],
+    objects: LEVEL2_OBJECTS,
     target: "potion",
     targetLabel: "Poción",
+    prompt: "Hacé click derecho y tomate la poción",
+    hint: "Una pocioncita mágica para seguir aventurando 🧪",
     menu: [
-      { id: "drink", label: "Beber",   emoji: "🧪", correct: true  },
-      { id: "throw", label: "Tirar",   emoji: "🗑",  correct: false },
-      { id: "hide",  label: "Esconder",emoji: "🙈", correct: false },
+      { id: "drink", label: "Tomar poción", emoji: "🧪", correct: true  },
+      { id: "throw", label: "Tirar",        emoji: "🗑",  correct: false },
+      { id: "hide",  label: "Esconder",     emoji: "🙈", correct: false },
     ],
   },
   {
-    objects: [
-      { id: "penguin", art: assets.i5Penguin, label: "Pingüino" },
-      { id: "bag",     art: assets.i5Bag,     label: "Mochila"  },
-      { id: "chest",   art: assets.i5Chest,   label: "Cofre"    },
-      { id: "potion",  art: assets.i5Potion,  label: "Poción"   },
-    ],
+    objects: LEVEL2_OBJECTS,
     target: "bag",
     targetLabel: "Mochila",
+    prompt: "Hacé click derecho y abrí la mochila",
+    hint: "Adentro hay cosas para tu próxima misión 🎒",
     menu: [
-      { id: "open", label: "Abrir",   emoji: "📂", correct: true  },
-      { id: "tie",  label: "Atar",    emoji: "🪢", correct: false },
-      { id: "burn", label: "Quemar",  emoji: "🔥", correct: false },
+      { id: "open", label: "Abrir mochila", emoji: "📂", correct: true  },
+      { id: "tie",  label: "Atar",          emoji: "🪢", correct: false },
+      { id: "burn", label: "Quemar",        emoji: "🔥", correct: false },
     ],
   },
 ];
@@ -441,8 +443,8 @@ function RightClickLevel({ activity }: { activity: Activity }) {
       kicker="NIVEL 2"
       title="Menú secreto"
       subtitle="CLICK DERECHO"
-      instruction="Hacé clic derecho sobre el objeto correcto."
-      goal="Hacé click derecho sobre el objeto correcto"
+      instruction={round.prompt}
+      goal={round.prompt}
       progress={prog.progress}
       total={total}
       metrics={{
@@ -458,8 +460,9 @@ function RightClickLevel({ activity }: { activity: Activity }) {
     >
       <div className="i5-l2-floor">
         <p className="i5-l2-prompt">
-          Hacé <strong>clic derecho</strong> sobre la <strong>{round.targetLabel}</strong>
+          ✨ {round.prompt}
         </p>
+        <p className="i5-l2-hint">{round.hint}</p>
         <div className="i5-l2-row">
           {round.objects.map((o) => {
             const isTarget = o.id === round.target;
@@ -473,10 +476,10 @@ function RightClickLevel({ activity }: { activity: Activity }) {
                 aria-label={o.label}
               >
                 <span className="i5-clickable__aura" />
-                <img className="i5-clickable__art" src={o.art} alt="" draggable={false} />
+                <img className="i5-clickable__art" src={o.art} alt="" draggable={false}  decoding="async" />
                 <span className="i5-clickable__pedestal" />
                 <span className="i5-clickable__label">{o.label}</span>
-                {isTarget && <span className="i5-clickable__hint">click derecho</span>}
+                {isTarget && <span className="i5-clickable__hint">↳ click derecho aquí</span>}
               </button>
             );
           })}
@@ -522,6 +525,22 @@ function DragDropLevel({ activity }: { activity: Activity }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | undefined>();
   const [moves, setMoves] = useState(0);
+  const [rejectingSlot, setRejectingSlot] = useState<string | null>(null);
+
+  /* Slot order is randomised per mount so the matching isn't a trivial
+     "row 1 → row 1" pairing. Stable per session via useState initializer. */
+  const [slotOrder] = useState<typeof LEVEL3_ITEMS>(() => {
+    const arr = [...LEVEL3_ITEMS];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    // If the shuffle happens to match the source order, swap two slots.
+    if (arr.every((s, i) => s.id === LEVEL3_ITEMS[i].id)) {
+      [arr[0], arr[1]] = [arr[1], arr[0]];
+    }
+    return arr;
+  });
 
   function onDragStart(ev: React.DragEvent, id: string) {
     ev.dataTransfer.setData("text/plain", id);
@@ -552,8 +571,24 @@ function DragDropLevel({ activity }: { activity: Activity }) {
       setTimeout(() => setFeedback(undefined), 1200);
     } else {
       prog.tickWrong();
-      setFeedback("Esa silueta no coincide. Probá otra.");
-      setTimeout(() => setFeedback(undefined), 1400);
+      setFeedback("✗ Esa silueta no coincide. Probá otra ranura.");
+      setRejectingSlot(slotId);
+      // Quick beep via WebAudio (no external asset).
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "square";
+        osc.frequency.value = 180;
+        gain.gain.value = 0.05;
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.18);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.2);
+        osc.stop(ctx.currentTime + 0.2);
+      } catch { /* audio not available — visual feedback is enough */ }
+      setTimeout(() => setRejectingSlot(null), 520);
+      setTimeout(() => setFeedback(undefined), 1600);
     }
   }
 
@@ -561,6 +596,8 @@ function DragDropLevel({ activity }: { activity: Activity }) {
     prog.reset();
     setPlaced({});
     setMoves(0);
+    setRejectingSlot(null);
+    setFeedback(undefined);
   }
 
   return (
@@ -596,7 +633,7 @@ function DragDropLevel({ activity }: { activity: Activity }) {
               aria-label={`Arrastrar ${it.label}`}
             >
               <span className="i5-drag-item__aura" />
-              <img className="i5-drag-item__art" src={it.art} alt="" draggable={false} />
+              <img className="i5-drag-item__art" src={it.art} alt="" draggable={false}  decoding="async" />
             </div>
           ))}
         </div>
@@ -607,10 +644,10 @@ function DragDropLevel({ activity }: { activity: Activity }) {
           </svg>
         </div>
         <div className="i5-l3-col i5-l3-col--slots">
-          {LEVEL3_ITEMS.map((it) => (
+          {slotOrder.map((it) => (
             <div
               key={it.id}
-              className={`i5-drop-slot ${hovered === it.id ? "is-hover" : ""} ${placed[it.id] ? "is-filled" : ""}`}
+              className={`i5-drop-slot ${hovered === it.id ? "is-hover" : ""} ${placed[it.id] ? "is-filled" : ""} ${rejectingSlot === it.id ? "is-rejecting" : ""}`}
               onDragOver={(e) => onDragOver(e, it.id)}
               onDragLeave={onDragLeave}
               onDrop={(e) => onDrop(e, it.id)}
@@ -620,8 +657,9 @@ function DragDropLevel({ activity }: { activity: Activity }) {
                 src={it.art}
                 alt=""
                 draggable={false}
-              />
+               decoding="async" />
               <span className="i5-drop-slot__label">{it.label}</span>
+              {rejectingSlot === it.id && <span className="i5-drop-slot__cross" aria-hidden="true">✕</span>}
             </div>
           ))}
         </div>
@@ -758,93 +796,102 @@ function WindowsLevel({ activity }: { activity: Activity }) {
       onRetry={retry}
       feedback={feedback}
     >
-      <div className="i5-desktop">
-        {/* App dock — decorative, shows the icons available in the fantasy OS. */}
-        <div className="i5-dock" aria-hidden="true">
-          <img src={assets.i5Apps} alt="" />
+      <div className="i5-desktop i5-desktop--clean">
+        {/* Inline task pill — the spoken consigna duplicated as a readable
+            cue right above the windows so kids always know what to do. */}
+        <div className="i5-desktop__task" role="status">
+          <span className="i5-desktop__task-kicker">Tarea</span>
+          <strong>{task.text}</strong>
         </div>
 
-        {/* Stacked windows — each uses real artwork from /island5/ as its body. */}
-        {windows.filter((w) => w.open).map((w, idx) => (
-          <div
-            key={w.id}
-            className={`i5-window i5-window--${w.id}`}
-            style={{ ["--stack" as never]: idx }}
-          >
-            <div className="i5-window__bar">
-              {w.tabs ? (
-                <>
-                  {w.tabs.filter((t) => t.open).map((t) => (
-                    <div key={t.id} className="i5-tab">
-                      <span>{t.emoji}</span> {t.title}
-                      <button
-                        type="button"
-                        className="i5-tab__close"
-                        onClick={() => onCloseTab(w.id, t.id)}
-                        aria-label={`Cerrar pestaña ${t.title}`}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    className="i5-tab i5-tab--add"
-                    onClick={() => onOpenTab(w.id)}
-                    aria-label="Nueva pestaña"
-                  >
-                    +
-                  </button>
-                </>
-              ) : (
-                <span className="i5-window__title">
-                  <span>{w.emoji}</span> {w.title}
+        {/* Clean, illustrated windows — bodies are CSS-only so they never
+            clash with painted artwork or stack messily. */}
+        <div className="i5-desktop__grid">
+          {windows.filter((w) => w.open).map((w, idx) => (
+            <div
+              key={w.id}
+              className={`i5-window i5-window--${w.id}`}
+              style={{ ["--stack" as never]: idx }}
+            >
+              <div className="i5-window__bar">
+                {w.tabs ? (
+                  <div className="i5-window__tabstrip" role="tablist">
+                    {w.tabs.filter((t) => t.open).map((t) => (
+                      <div key={t.id} className="i5-tab">
+                        <span aria-hidden="true">{t.emoji}</span> {t.title}
+                        <button
+                          type="button"
+                          className="i5-tab__close"
+                          onClick={() => onCloseTab(w.id, t.id)}
+                          aria-label={`Cerrar pestaña ${t.title}`}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="i5-tab i5-tab--add"
+                      onClick={() => onOpenTab(w.id)}
+                      aria-label="Nueva pestaña"
+                    >
+                      +
+                    </button>
+                  </div>
+                ) : (
+                  <span className="i5-window__title">
+                    <span aria-hidden="true">{w.emoji}</span> {w.title}
+                  </span>
+                )}
+                <span className="i5-window__lights" aria-hidden="true">
+                  <i style={{ background: "#ffd552" }} />
+                  <i style={{ background: "#5be8ba" }} />
                 </span>
-              )}
-              <span className="i5-window__controls" aria-hidden="true">
-                <img src={assets.i5WindowControls} alt="" />
-              </span>
-              <button
-                type="button"
-                className="i5-window__close"
-                onClick={() => onCloseWindow(w.id)}
-                aria-label={`Cerrar ${w.title}`}
-              >
-                ×
-              </button>
+                <button
+                  type="button"
+                  className="i5-window__close"
+                  onClick={() => onCloseWindow(w.id)}
+                  aria-label={`Cerrar ${w.title}`}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="i5-window__body">
+                {w.id === "browser" && (
+                  <div className="i5-fake-browser">
+                    <div className="i5-fake-browser__url">
+                      <span className="i5-fake-browser__dot" />
+                      typely.test/aventura
+                    </div>
+                    <div className="i5-fake-browser__hero">🌐</div>
+                    <p>Página de inicio</p>
+                  </div>
+                )}
+                {w.id === "drawings" && (
+                  <div className="i5-fake-paint">
+                    <div className="i5-fake-paint__toolbar">
+                      <span style={{ background: "#ff7676" }} />
+                      <span style={{ background: "#54e8c6" }} />
+                      <span style={{ background: "#536bff" }} />
+                      <span style={{ background: "#facc15" }} />
+                    </div>
+                    <div className="i5-fake-paint__canvas">🎨</div>
+                  </div>
+                )}
+                {w.id === "notes" && (
+                  <div className="i5-fake-notes">
+                    <p>★ Mis tareas</p>
+                    <ul>
+                      <li>Estudiar mecanografía</li>
+                      <li>Explorar la isla</li>
+                      <li>Saludar al robot</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="i5-window__body">
-              {w.id === "browser" && (
-                <img
-                  className="i5-window__art"
-                  src={assets.i5BrowserTabs}
-                  alt="Explorador con pestañas"
-                  draggable={false}
-                />
-              )}
-              {w.id === "drawings" && (
-                <img
-                  className="i5-window__art"
-                  src={assets.i5DrawingsWindow}
-                  alt="Ventana de dibujos"
-                  draggable={false}
-                />
-              )}
-              {w.id === "notes" && (
-                <img
-                  className="i5-window__art"
-                  src={assets.i5Notes}
-                  alt="Notas"
-                  draggable={false}
-                />
-              )}
-            </div>
-          </div>
-        ))}
-
-        {/* Floating message + media windows for visual richness. */}
-        <img className="i5-desktop__message" src={assets.i5Message} alt="" aria-hidden="true" />
-        <img className="i5-desktop__media" src={assets.i5WindowMedia} alt="" aria-hidden="true" />
+          ))}
+        </div>
       </div>
     </Island5Shell>
   );
@@ -855,21 +902,27 @@ function WindowsLevel({ activity }: { activity: Activity }) {
 /* ------------------------------------------------------------------ */
 
 function ScrollLevel({ activity }: { activity: Activity }) {
-  const total = 3;
+  const total = 4;
   const prog = useLevelProgress(activity, total);
   const [scrolls, setScrolls] = useState(0);
   const [zooms, setZooms] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [reachedBottom, setReachedBottom] = useState(false);
   const [reachedTop, setReachedTop] = useState(true);
-  const [didZoom, setDidZoom] = useState(false);
+  const [didZoomIn, setDidZoomIn] = useState(false);
   const [feedback, setFeedback] = useState<string | undefined>();
   const objectivesDone = useRef<Set<string>>(new Set());
 
+  /* Four-step pacing forces the kid through every gesture:
+       1) scroll down to reveal the bottom of the vertical castle art,
+       2) scroll back up to the top,
+       3) tap "+" to zoom in,
+       4) tap "−" to zoom back out. */
   const objectives = [
-    { id: "scroll-down", text: "Hacé scroll hacia abajo hasta el final." },
-    { id: "scroll-up", text: "Volvé arriba con la rueda del mouse." },
-    { id: "zoom-in", text: "Acercate con el zoom +" },
+    { id: "scroll-down", text: "Hacé scroll hacia abajo hasta ver el final del castillo." },
+    { id: "scroll-up",   text: "Subí de nuevo hasta arriba con la rueda del mouse." },
+    { id: "zoom-in",     text: "Acercá la imagen tocando el botón ＋" },
+    { id: "zoom-out",    text: "Ahora alejá la imagen tocando el botón −" },
   ];
   const current = objectives[Math.min(prog.progress, total - 1)];
 
@@ -899,13 +952,19 @@ function ScrollLevel({ activity }: { activity: Activity }) {
 
   function onZoomIn() {
     setZooms((z) => z + 1);
-    setZoom((z) => Math.min(z + 0.15, 1.9));
-    setDidZoom(true);
-    if (current.id === "zoom-in") complete("zoom-in", "¡Zoom realizado!");
+    const next = Math.min(zoom + 0.18, 2);
+    setZoom(next);
+    setDidZoomIn(true);
+    if (current.id === "zoom-in" && next >= 1.3) complete("zoom-in", "¡Zoom in realizado!");
   }
   function onZoomOut() {
     setZooms((z) => z + 1);
-    setZoom((z) => Math.max(z - 0.15, 0.8));
+    const next = Math.max(zoom - 0.18, 0.7);
+    setZoom(next);
+    // Only count once the kid has zoomed in first and then back out.
+    if (current.id === "zoom-out" && didZoomIn && next <= 1.05) {
+      complete("zoom-out", "¡Zoom out realizado!");
+    }
   }
 
   function retry() {
@@ -915,7 +974,7 @@ function ScrollLevel({ activity }: { activity: Activity }) {
     setZoom(1);
     setReachedBottom(false);
     setReachedTop(true);
-    setDidZoom(false);
+    setDidZoomIn(false);
     objectivesDone.current.clear();
   }
 
@@ -940,53 +999,255 @@ function ScrollLevel({ activity }: { activity: Activity }) {
       onRetry={retry}
       feedback={feedback}
     >
-      <div className="i5-l5-grid">
-        <div className="i5-mouse-illust" aria-hidden="true">
-          <div className="i5-mouse-illust__arrow i5-mouse-illust__arrow--up">↑</div>
-          <img className="i5-mouse-illust__art" src={assets.i5Mouse} alt="" draggable={false} />
-          <div className="i5-mouse-illust__arrow i5-mouse-illust__arrow--down">↓</div>
-        </div>
-        <div className="i5-scroll-panel">
-          <div className="i5-scroll-panel__viewport" onScroll={onScroll}>
-            <div className="i5-scroll-panel__content i5-scroll-panel__content--castle">
-              <img
-                className="i5-scroll-panel__art"
-                src={assets.i5CastleVertical}
-                alt="Castillo flotante"
-                draggable={false}
-              />
-              <div className="i5-scroll-card i5-scroll-card--end">¡Llegaste al final!</div>
+      <div className="i5-l5-grid i5-l5-grid--clean">
+        {/* Scroll card — mouse illustration sits inside the same panel so
+            arrows + scroll viewport feel like one coherent unit. */}
+        <section className="i5-l5-card">
+          <header className="i5-l5-card__head">
+            <span className="i5-l5-card__chip">SCROLL</span>
+            <h3>Rueda del mouse</h3>
+          </header>
+          <div className="i5-l5-card__body i5-l5-card__body--scroll">
+            <aside className="i5-l5-mouse" aria-hidden="true">
+              <div className="i5-l5-mouse__arrow i5-l5-mouse__arrow--up">↑</div>
+              <img src={assets.i5Mouse} alt="" draggable={false}  decoding="async" />
+              <div className="i5-l5-mouse__arrow i5-l5-mouse__arrow--down">↓</div>
+            </aside>
+            <div className="i5-l5-scrollview" onScroll={onScroll}>
+              <div className="i5-l5-scrollview__reveal">
+                <img
+                  src={assets.i5CastleVertical}
+                  alt="Castillo flotante a descubrir"
+                  draggable={false}
+                  className="i5-l5-scrollview__art"
+                 decoding="async" />
+                <div className="i5-l5-scrollview__topflag">↑ arriba</div>
+                <div className="i5-l5-scrollview__endflag">🏁 ¡Llegaste al final!</div>
+              </div>
             </div>
           </div>
-          <div className="i5-scroll-panel__cues">
-            <span>↑ SCROLL ARRIBA</span>
-            <span>↓ SCROLL ABAJO</span>
+        </section>
+
+        {/* Zoom card — castle artwork lives inside a clean stage with
+            obvious + / − controls below, no overlay clash. */}
+        <section className="i5-l5-card">
+          <header className="i5-l5-card__head">
+            <span className="i5-l5-card__chip">ZOOM</span>
+            <h3>Acercá la imagen</h3>
+          </header>
+          <div className="i5-l5-card__body i5-l5-card__body--zoom">
+            <div className="i5-l5-zoomstage">
+              <img
+                className="i5-l5-zoomart"
+                src={assets.i5CastleSquare}
+                alt="Castillo de zoom"
+                draggable={false}
+                style={{ transform: `scale(${zoom})` }}
+               decoding="async" />
+              <span className="i5-l5-zoom-pct">{Math.round(zoom * 100)}%</span>
+            </div>
+            <div className="i5-l5-zoom-controls">
+              <button type="button" className="i5-l5-zoom-btn" onClick={onZoomOut} aria-label="Alejar">
+                <strong>−</strong><span>Alejar</span>
+              </button>
+              <button type="button" className="i5-l5-zoom-btn i5-l5-zoom-btn--primary" onClick={onZoomIn} aria-label="Acercar">
+                <strong>+</strong><span>Acercar</span>
+              </button>
+            </div>
           </div>
+        </section>
+      </div>
+      <span className="i5-sr-only" aria-hidden="true">{didZoomIn ? "" : ""}{reachedTop ? "" : ""}</span>
+    </Island5Shell>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Level 6 — Double click                                             */
+/* ------------------------------------------------------------------ */
+
+const LEVEL6_FOLDERS = [
+  { id: "stars",    art: assets.i5Star,   label: "Estrellas",  reward: "✨" },
+  { id: "apples",   art: assets.i5Apple,  label: "Frutas",     reward: "🍎" },
+  { id: "bunnies",  art: assets.i5Rabbit, label: "Conejitos",  reward: "🐰" },
+];
+
+function DoubleClickLevel({ activity }: { activity: Activity }) {
+  const total = LEVEL6_FOLDERS.length;
+  const prog = useLevelProgress(activity, total);
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
+  const [feedback, setFeedback] = useState<string | undefined>();
+  const lastClickRef = useRef<{ id: string; t: number } | null>(null);
+
+  function onSingleClick(id: string) {
+    if (prog.completed || opened[id]) return;
+    const now = Date.now();
+    const last = lastClickRef.current;
+    if (last && last.id === id && now - last.t < 400) {
+      // Double click!
+      setOpened((o) => ({ ...o, [id]: true }));
+      prog.tickCorrect();
+      setFeedback("¡Doble clic perfecto! Carpeta abierta.");
+      lastClickRef.current = null;
+      setTimeout(() => setFeedback(undefined), 1400);
+    } else {
+      lastClickRef.current = { id, t: now };
+      setFeedback("Un clic solo no alcanza — necesitás otro clic enseguida.");
+      prog.tickWrong();
+      setTimeout(() => setFeedback(undefined), 1400);
+    }
+  }
+
+  function retry() {
+    prog.reset();
+    setOpened({});
+    setFeedback(undefined);
+    lastClickRef.current = null;
+  }
+
+  return (
+    <Island5Shell
+      activity={activity}
+      kicker="NIVEL 6"
+      title="Doble clic"
+      subtitle="ABRÍ CARPETAS"
+      instruction="Hacé doble clic sobre cada carpeta para abrirla."
+      goal="Abrí las 3 carpetas con doble clic"
+      progress={prog.progress}
+      total={total}
+      metrics={{
+        left: "Intentos",
+        leftValue: prog.attempts,
+        mid: "Aciertos",
+        midValue: prog.progress,
+        precision: prog.precision,
+      }}
+      completed={prog.completed}
+      onRetry={retry}
+      feedback={feedback}
+    >
+      <div className="i5-l6-grid">
+        {LEVEL6_FOLDERS.map((f) => (
+          <button
+            type="button"
+            key={f.id}
+            className={`i5-folder ${opened[f.id] ? "is-open" : ""}`}
+            onClick={() => onSingleClick(f.id)}
+            disabled={opened[f.id]}
+            aria-label={`Doble clic en ${f.label}`}
+          >
+            <div className="i5-folder__tab" />
+            <div className="i5-folder__body">
+              {opened[f.id] ? (
+                <span className="i5-folder__reward">{f.reward}</span>
+              ) : (
+                <img src={f.art} alt="" draggable={false}  decoding="async" />
+              )}
+            </div>
+            <span className="i5-folder__label">{f.label}</span>
+            {!opened[f.id] && <span className="i5-folder__hint">doble clic</span>}
+          </button>
+        ))}
+      </div>
+    </Island5Shell>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Level 7 — Keyboard shortcuts                                       */
+/* ------------------------------------------------------------------ */
+
+const LEVEL7_TASKS = [
+  { id: "copy",  combo: ["Ctrl", "C"],     instruction: "Copiá el texto: usá Ctrl + C",   matcher: (k: KeyboardEvent) => k.ctrlKey && k.key.toLowerCase() === "c", success: "¡Copiado!" },
+  { id: "paste", combo: ["Ctrl", "V"],     instruction: "Pegá el texto: usá Ctrl + V",    matcher: (k: KeyboardEvent) => k.ctrlKey && k.key.toLowerCase() === "v", success: "¡Pegado!" },
+  { id: "newtab",combo: ["Ctrl", "T"],     instruction: "Abrí una pestaña: Ctrl + T",     matcher: (k: KeyboardEvent) => k.ctrlKey && k.key.toLowerCase() === "t", success: "¡Pestaña abierta!" },
+  { id: "close", combo: ["Ctrl", "W"],     instruction: "Cerrá una pestaña: Ctrl + W",    matcher: (k: KeyboardEvent) => k.ctrlKey && k.key.toLowerCase() === "w", success: "¡Pestaña cerrada!" },
+];
+
+function ShortcutsLevel({ activity }: { activity: Activity }) {
+  const total = LEVEL7_TASKS.length;
+  const prog = useLevelProgress(activity, total);
+  const [feedback, setFeedback] = useState<string | undefined>();
+  const [echo, setEcho] = useState<string>("");
+  const taskRef = useRef(0);
+  const task = LEVEL7_TASKS[Math.min(prog.progress, total - 1)];
+
+  useEffect(() => { taskRef.current = prog.progress; }, [prog.progress]);
+
+  useEffect(() => {
+    function onKey(ev: KeyboardEvent) {
+      if (prog.completed) return;
+      const idx = Math.min(taskRef.current, total - 1);
+      const t = LEVEL7_TASKS[idx];
+      if (!t) return;
+      // Only react if the user pressed a modifier — avoids spurious mismatch.
+      if (!ev.ctrlKey && !ev.metaKey) return;
+      // Cmd on macOS counts as Ctrl for this exercise.
+      const ctrlLike = ev.ctrlKey || ev.metaKey;
+      if (!ctrlLike) return;
+      // Ignore pure modifier presses.
+      if (ev.key === "Control" || ev.key === "Meta") return;
+      ev.preventDefault();
+      setEcho(`Ctrl + ${ev.key.toUpperCase()}`);
+      if (t.matcher({ ...ev, ctrlKey: true } as unknown as KeyboardEvent)) {
+        prog.tickCorrect();
+        setFeedback(t.success);
+        setTimeout(() => setFeedback(undefined), 1200);
+      } else {
+        prog.tickWrong();
+        setFeedback(`Eso fue Ctrl + ${ev.key.toUpperCase()}. Probá ${t.combo.join(" + ")}.`);
+        setTimeout(() => setFeedback(undefined), 1500);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [prog, total]);
+
+  function retry() {
+    prog.reset();
+    setFeedback(undefined);
+    setEcho("");
+  }
+
+  return (
+    <Island5Shell
+      activity={activity}
+      kicker="NIVEL 7"
+      title="Atajos del teclado"
+      subtitle="CTRL + LETRA"
+      instruction={task.instruction}
+      goal="Usá los atajos para copiar, pegar y cambiar de pestaña"
+      progress={prog.progress}
+      total={total}
+      metrics={{
+        left: "Intentos",
+        leftValue: prog.attempts,
+        mid: "Aciertos",
+        midValue: prog.progress,
+        precision: prog.precision,
+      }}
+      completed={prog.completed}
+      onRetry={retry}
+      feedback={feedback}
+    >
+      <div className="i5-l7-grid">
+        <div className="i5-l7-prompt">
+          <span className="i5-l7-prompt__kicker">Atajo a usar</span>
+          <div className="i5-l7-prompt__combo">
+            {task.combo.map((step, i) => (
+              <span key={`${step}-${i}`} className="i5-l7-key">
+                {i > 0 && <span className="i5-l7-plus">+</span>}
+                <kbd>{step}</kbd>
+              </span>
+            ))}
+          </div>
+          <p className="i5-l7-prompt__hint">{task.instruction}</p>
         </div>
-        <div className="i5-zoom-panel">
-          <div className="i5-zoom-stage">
-            <img
-              className="i5-zoom-art"
-              src={assets.i5CastleSquare}
-              alt="Castillo de zoom"
-              draggable={false}
-              style={{ transform: `scale(${zoom})` }}
-            />
-          </div>
-          <img
-            className="i5-zoom-controls"
-            src={assets.i5ZoomBtns}
-            alt=""
-            aria-hidden="true"
-            draggable={false}
-          />
-          <div className="i5-zoom-buttons">
-            <button type="button" className="i5-zoom-btn" onClick={onZoomIn} aria-label="Zoom in">＋<span>ZOOM IN</span></button>
-            <button type="button" className="i5-zoom-btn" onClick={onZoomOut} aria-label="Zoom out">−<span>ZOOM OUT</span></button>
-          </div>
+        <div className="i5-l7-echo" aria-live="polite">
+          <span>Última tecla detectada</span>
+          <strong>{echo || "—"}</strong>
         </div>
       </div>
-      <span className="i5-sr-only" aria-hidden="true">{didZoom ? "" : ""}{reachedTop ? "" : ""}</span>
     </Island5Shell>
   );
 }

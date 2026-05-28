@@ -34,8 +34,22 @@ export function LoginPage() {
 
   return (
     <main className="login-page page-fade" style={{ backgroundImage: `url("${assets.loginBg}")` }}>
-      <img className="login-mascot login-mascot--left" src={assets.mascotFemaleWave} alt="Mascota saludando" />
-      <img className="login-mascot login-mascot--right" src={assets.mascotMaleWave} alt="Mascota saludando" />
+      <img
+        className="login-mascot login-mascot--left"
+        src={assets.mascotFemaleWave}
+        alt="Mascota saludando"
+        decoding="async"
+        // @ts-expect-error — fetchPriority is supported by Chrome/Edge/Safari
+        fetchpriority="high"
+      />
+      <img
+        className="login-mascot login-mascot--right"
+        src={assets.mascotMaleWave}
+        alt="Mascota saludando"
+        decoding="async"
+        // @ts-expect-error — fetchPriority is supported by Chrome/Edge/Safari
+        fetchpriority="high"
+      />
 
       <LoginCard
         role={role}

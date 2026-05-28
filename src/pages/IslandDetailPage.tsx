@@ -98,13 +98,22 @@ export function IslandDetailPage() {
           painted platforms on every screen size. */}
       <div className="island-stage" aria-hidden="false">
         <div className="island-stage__frame">
-          <img className="island-stage__bg scene-full-image" src={world.background} alt={world.title} />
+          <img
+            className="island-stage__bg scene-full-image"
+            src={world.background}
+            alt={world.title}
+            decoding="async"
+            // @ts-expect-error — fetchPriority is supported by all modern browsers
+            fetchpriority="high"
+          />
 
           <section className="level-map" aria-label="Niveles del mundo">
             <img
               className="level-ship"
               src={shipAsset}
               alt="Nave de los estudiantes en el nivel actual"
+              decoding="async"
+              loading="lazy"
               style={{ left: `${currentPosition.x}%`, top: `${currentPosition.y - 13}%` }}
             />
 
