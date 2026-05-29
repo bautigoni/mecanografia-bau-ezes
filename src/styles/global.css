@@ -812,41 +812,79 @@ a {
   vector-effect: non-scaling-stroke;
 }
 
+/* Soft coloured aura that blooms under the whole route. */
 .world-map-path__halo {
-  stroke: rgba(218, 231, 255, 0.26);
-  stroke-width: 24;
-  filter: blur(1.35rem);
+  stroke: rgba(176, 150, 255, 0.26);
+  stroke-width: 20;
+  filter: blur(1.45rem);
 }
 
+/* The luminous ribbon — a continuous pastel gradient band with a gentle
+   glow. This is the main visible magical path (no wireframe dots). */
 .world-map-path__base {
   stroke: url(#world-route-gradient);
-  stroke-width: 3.2;
+  stroke-width: 3.4;
   filter: url(#world-route-glow);
-  opacity: 0.72;
+  opacity: 0.92;
 }
 
+/* A gentle chain of soft light beads drifting along the ribbon — magical
+   "fairy dust" that flows, rather than a uniform dotted grid. */
 .world-map-path__dots {
-  stroke: rgba(255, 250, 255, 0.92);
-  stroke-width: 6.4;
-  stroke-dasharray: 0.16 11.6;
-  stroke-dashoffset: 1.8;
+  stroke: rgba(236, 247, 255, 0.92);
+  stroke-width: 4.6;
+  stroke-linecap: round;
+  stroke-dasharray: 0.1 26.24;
   filter:
-    drop-shadow(0 0 0.2rem rgba(255, 255, 255, 0.95))
-    drop-shadow(0 0 0.7rem rgba(202, 247, 255, 0.5))
-    drop-shadow(0 0 1.05rem rgba(225, 183, 255, 0.38));
-  opacity: 0.62;
+    drop-shadow(0 0 0.5rem rgba(206, 244, 255, 0.72))
+    drop-shadow(0 0 1rem rgba(196, 170, 255, 0.46));
+  opacity: 0.82;
+  animation: routeShimmer 14s linear infinite;
 }
 
+/* A single brighter bead that races the full length of the trail, giving
+   the route a living, magical pulse. */
 .world-map-path__shimmer {
-  stroke: rgba(199, 252, 255, 0.92);
-  stroke-width: 4.4;
-  stroke-dasharray: 0.2 105;
-  stroke-dashoffset: 26;
+  stroke: rgba(255, 255, 255, 0.98);
+  stroke-width: 6.4;
+  stroke-dasharray: 0.1 157.43;
+  stroke-linecap: round;
   filter:
-    drop-shadow(0 0 0.2rem rgba(255, 255, 255, 0.9))
-    drop-shadow(0 0 0.7rem rgba(137, 245, 255, 0.52));
-  opacity: 0.42;
-  animation: routeShimmer 9.5s linear infinite;
+    drop-shadow(0 0 0.35rem rgba(255, 255, 255, 0.95))
+    drop-shadow(0 0 1rem rgba(150, 246, 255, 0.68))
+    drop-shadow(0 0 1.6rem rgba(206, 173, 255, 0.5));
+  opacity: 0.85;
+  animation: routeShimmer 7s linear infinite;
+}
+
+/* Sparkles dotted along the open-sky stretches between islands. */
+.world-route-spark {
+  position: absolute;
+  z-index: 1;
+  width: clamp(0.55rem, 0.9vw, 0.95rem);
+  height: clamp(0.55rem, 0.9vw, 0.95rem);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.98) 0 18%, rgba(214, 244, 255, 0.62) 32%, transparent 64%);
+  filter: drop-shadow(0 0 0.5rem rgba(199, 234, 255, 0.85));
+  animation: routeSparkTwinkle 3.4s ease-in-out infinite;
+}
+
+/* The little four-point twinkle cross. */
+.world-route-spark::before {
+  position: absolute;
+  inset: -55%;
+  background:
+    linear-gradient(0deg, transparent 46%, rgba(255, 255, 255, 0.92) 50%, transparent 54%),
+    linear-gradient(90deg, transparent 46%, rgba(255, 255, 255, 0.92) 50%, transparent 54%);
+  content: "";
+  opacity: 0.85;
+}
+
+@keyframes routeSparkTwinkle {
+  0%, 100% { opacity: 0.25; transform: translate(-50%, -50%) scale(0.7); }
+  50%      { opacity: 0.95; transform: translate(-50%, -50%) scale(1.1); }
 }
 
 .worlds-page.is-entering-world .worlds-scene {
@@ -905,6 +943,52 @@ a {
 .world-island.is-current::after {
   opacity: 0.72;
   animation: selectedWorldGlow 4.2s ease-in-out infinite;
+}
+
+/* ===== World lock states ===== */
+
+/* Locked worlds read as dimmed and desaturated — clearly disabled, but still
+   pretty (kept in the dreamy palette, never harsh grey). */
+.world-island--locked {
+  cursor: not-allowed;
+}
+
+.world-island.world-island--locked img {
+  filter:
+    grayscale(0.8) brightness(0.82) saturate(0.45)
+    drop-shadow(0 18px 20px rgba(45, 73, 142, 0.18));
+  opacity: 0.76;
+}
+
+/* The icon badge becomes a quiet padlock chip on locked worlds. */
+.world-island--locked .world-icon-badge {
+  color: #6f7596;
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.9), rgba(232, 234, 244, 0.74) 48%, rgba(206, 210, 226, 0.6)),
+    rgba(236, 238, 247, 0.7);
+}
+
+.world-island--locked:hover {
+  transform: translateY(-0.15rem) scale(1.015);
+}
+
+/* Completed worlds keep their colour and gain a little green tick chip. */
+.world-complete-badge {
+  position: absolute;
+  top: -3%;
+  right: 8%;
+  z-index: 3;
+  display: grid;
+  width: clamp(1.9rem, 2.6vw, 2.6rem);
+  height: clamp(1.9rem, 2.6vw, 2.6rem);
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  color: white;
+  background: linear-gradient(145deg, #95ee86, #3fba63);
+  box-shadow:
+    0 10px 18px rgba(49, 145, 89, 0.26),
+    0 0 16px rgba(113, 232, 125, 0.4);
 }
 
 .world-island img {
@@ -971,37 +1055,47 @@ a {
 }
 
 /* Slug-based placement keeps visual composition independent from data order.
-   5 islands arranged as two rows (3 on top, 2 on bottom) so nothing sits
-   below the corner mascots. No transform-based centering — that conflicts
+   The islands are positioned so the PROGRESSION order reads as a clean
+   down → up → down → up staircase, with no crossing connectors:
+     World 1 island1 (upper-left)   ↓
+     World 2 island5 (lower-left)   ↑
+     World 3 island2 (upper-middle) ↓
+     World 4 island3 (lower-right)  ↑
+     World 5 island4 (upper-right).
+   Tops are kept clear of the viewport edge so the floating icon badge above
+   each island is never clipped. No transform-based centering — that conflicts
    with the hover/selected transforms. */
 .world-island--island1 {
-  left: 4%;
-  top: 10%;
-  width: clamp(14rem, 22vw, 24rem);
+  left: 6%;
+  top: 13%;
+  width: clamp(13rem, 20vw, 22rem);
 }
 
 .world-island--island2 {
   left: 40%;
-  top: 4%;
+  top: 11%;
+  width: clamp(12.5rem, 19vw, 21rem);
+}
+
+/* World 4 — lower-middle-right (the "down" step before the final climb). */
+.world-island--island3 {
+  right: 23%;
+  top: 49%;
   width: clamp(13rem, 20vw, 22rem);
 }
 
-.world-island--island3 {
-  right: 6%;
-  top: 16%;
-  width: clamp(14rem, 22vw, 24rem);
-}
-
+/* World 5 — upper-right (the final "up" step of the staircase). */
 .world-island--island4 {
-  left: 18%;
-  top: 44%;
-  width: clamp(13rem, 21vw, 23rem);
+  right: 6%;
+  top: 13%;
+  width: clamp(12.5rem, 19vw, 21rem);
 }
 
+/* World 2 (mouse island) — bottom-left, directly after World 1. */
 .world-island--island5 {
-  right: 18%;
-  top: 44%;
-  width: clamp(13rem, 21vw, 23rem);
+  left: 23%;
+  top: 49%;
+  width: clamp(12.5rem, 19vw, 21rem);
 }
 
 .world-island--island2 img {
@@ -1699,16 +1793,17 @@ a {
 
 .level-detail-panel {
   position: absolute;
-  right: clamp(1.5rem, 3vw, 3.2rem);
-  top: 24.5%;
+  right: clamp(1rem, 1.8vw, 2.2rem);
+  top: 25%;
   z-index: 9;
   display: grid;
-  width: min(24rem, 24vw);
-  min-width: 21rem;
-  gap: 1rem;
+  /* Kept deliberately compact and hugged to the edge so it never sits over
+     the right-hand level platforms — the route has to stay readable. */
+  width: clamp(17rem, 22vw, 19.5rem);
+  gap: 0.95rem;
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 2.15rem;
-  padding: 3rem 1.55rem 1.55rem;
+  padding: 2.7rem 1.4rem 1.45rem;
   color: #1e3473;
   background:
     radial-gradient(circle at 85% 8%, rgba(255, 255, 255, 0.92), transparent 30%),
@@ -1821,23 +1916,56 @@ a {
 }
 
 .level-detail-panel__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
   min-height: 3.4rem;
-  border-radius: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 1.4rem;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.25), transparent 36%),
+    radial-gradient(circle at 28% 16%, rgba(255, 255, 255, 0.42), transparent 44%),
     linear-gradient(100deg, #b247ff, #6f63ff 48%, #27d5e0);
   font-size: 1.1rem;
+  letter-spacing: 0.01em;
   box-shadow:
-    0 16px 30px rgba(112, 89, 255, 0.28),
-    0 0 22px rgba(39, 213, 224, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.36);
+    0 18px 34px rgba(112, 89, 255, 0.32),
+    0 0 26px rgba(39, 213, 224, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition:
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 200ms ease,
+    filter 200ms ease;
 }
 
+.level-detail-panel__cta svg {
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.level-detail-panel__cta:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.04);
+  box-shadow:
+    0 24px 44px rgba(112, 89, 255, 0.36),
+    0 0 34px rgba(39, 213, 224, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.level-detail-panel__cta:hover svg {
+  transform: translateX(0.28rem);
+}
+
+.level-detail-panel__cta:active {
+  transform: translateY(0) scale(0.99);
+}
+
+/* The CTA is given clear breathing room so it never crowds the level
+   title/info block above it or the description below it. */
 .level-detail-panel .level-detail-panel__cta {
   width: 100%;
-  min-height: 3.65rem;
-  margin-top: 0.25rem;
-  font-size: clamp(1.05rem, 1.4vw, 1.18rem);
+  min-height: 3.95rem;
+  margin: 0.85rem 0 0.55rem;
+  font-size: clamp(1.08rem, 1.4vw, 1.22rem);
   animation: softHintIn 280ms ease-out both;
 }
 
@@ -3363,11 +3491,11 @@ td {
 
 @keyframes routeShimmer {
   from {
-    stroke-dashoffset: 108;
+    stroke-dashoffset: 0;
   }
 
   to {
-    stroke-dashoffset: 0;
+    stroke-dashoffset: -157.43;
   }
 }
 
@@ -3447,28 +3575,28 @@ td {
   }
 
   .world-island--island1 {
-    left: 4%;
-    top: 8%;
+    left: 3%;
+    top: 12%;
   }
 
   .world-island--island2 {
-    left: 38%;
-    top: 4%;
+    left: 36%;
+    top: 9%;
   }
 
   .world-island--island3 {
-    right: 4%;
-    top: 8%;
+    right: 11%;
+    top: 44%;
   }
 
   .world-island--island4 {
-    left: 12%;
-    top: 38%;
+    right: 3%;
+    top: 12%;
   }
 
   .world-island--island5 {
-    right: 12%;
-    top: 38%;
+    left: 11%;
+    top: 44%;
   }
 
   .world-map-path {

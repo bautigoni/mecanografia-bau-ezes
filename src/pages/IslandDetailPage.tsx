@@ -1,6 +1,6 @@
-import { ArrowLeft, Check, Gem, Lock, Star, Trophy, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Gem, Lock, Star, Trophy, UserRound } from "lucide-react";
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
@@ -98,13 +98,53 @@ export function IslandDetailPage() {
     }
   }
 
-  function openLevel() {
-    if (selectedLevel.state === "Bloqueado") {
+  /* Enters a level by index. Locked levels are blocked unless `bypassLock`
+     is set (used by the hidden rapid-click dev shortcut). */
+  function enterLevel(index: number, bypassLock = false) {
+    const level = world.levels[index];
+    if (!level) return;
+    if (level.state === "Bloqueado" && !bypassLock) {
       setMessage("Completá el nivel anterior para desbloquearlo.");
       return;
     }
+    navigate(`/gameplay/${level.activityId}`);
+  }
 
-    navigate(`/gameplay/${selectedLevel.activityId}`);
+  /* Rapid-click tracker for the hidden dev shortcut: 5 quick clicks on the
+     same level node enter it directly, even when locked. */
+  const rapidClick = useRef<{ index: number; count: number; last: number }>({ index: -1, count: 0, last: 0 });
+  const RAPID_WINDOW_MS = 450;
+  const RAPID_CLICK_COUNT = 5;
+
+  function handleNodeClick(index: number) {
+    const now = Date.now();
+    const tracker = rapidClick.current;
+    if (tracker.index === index && now - tracker.last <= RAPID_WINDOW_MS) {
+      tracker.count += 1;
+    } else {
+      tracker.count = 1;
+    }
+    tracker.index = index;
+    tracker.last = now;
+
+    if (tracker.count >= RAPID_CLICK_COUNT) {
+      tracker.count = 0;
+      tracker.index = -1;
+      enterLevel(index, true); // dev/test shortcut — bypasses the lock
+      return;
+    }
+
+    selectLevel(index);
+  }
+
+  /* Double-click is a normal shortcut into the level (respects the lock). */
+  function handleNodeDoubleClick(index: number) {
+    setSelectedIndex(index);
+    enterLevel(index, false);
+  }
+
+  function openLevel() {
+    enterLevel(safeIndex, false);
   }
 
   return (
@@ -150,7 +190,8 @@ export function IslandDetailPage() {
                   type="button"
                   className={`level-node level-node--${level.state.toLowerCase()} ${isSelected ? "is-selected" : ""}`}
                   style={{ left: `${position.x}%`, top: `${position.y}%` }}
-                  onClick={() => selectLevel(index)}
+                  onClick={() => handleNodeClick(index)}
+                  onDoubleClick={() => handleNodeDoubleClick(index)}
                   aria-label={`${level.title}: ${level.name}. ${level.state}`}
                 >
                   <span className="level-node__platform">
@@ -195,7 +236,8 @@ export function IslandDetailPage() {
         </div>
 
         <Button className="level-detail-panel__cta" onClick={openLevel}>
-          Entrar al nivel
+          <span>Entrar al nivel</span>
+          <ArrowRight size={20} strokeWidth={2.8} />
         </Button>
 
         <p>{selectedLevel.description}</p>

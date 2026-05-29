@@ -1,8 +1,9 @@
-import { BookOpen, Flag, FlaskConical, Flower2, Gem, LogOut, MousePointerClick, Medal, Menu, Star, UserRound, X, type LucideIcon } from "lucide-react";
+import { BookOpen, Check, Flag, FlaskConical, Flower2, Gem, Lock, LogOut, MousePointerClick, Medal, Menu, Star, UserRound, X, type LucideIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { worlds, type World } from "../data/worlds";
+import { getWorldStates, worlds, type World } from "../data/worlds";
+import { Toast } from "../components/common/Toast";
 import { assets } from "../utils/assets";
 
 /* Cache of `Image` objects we've already kicked off so a quick hover →
@@ -15,6 +16,28 @@ function prefetchImage(src: string) {
   img.decoding = "async";
   img.src = src;
 }
+
+/* One continuous, flowing magical trail that follows the learning PROGRESSION
+   as a clean down → up → down → up staircase, never crossing itself:
+     World 1 island1 (16,34) ↓ World 2 island5 (32,67) ↑ World 3 island2
+     (50,31) ↓ World 4 island3 (68,67) ↑ World 5 island4 (84,34).
+   Coordinates are % of the worlds-scene (viewBox 0-100,
+   preserveAspectRatio="none") and track the slug-based island placement in
+   global.css. */
+const ROUTE_D =
+  "M 16 34 C 18.7 39.5, 26.3 67.5, 32 67 " +
+  "C 37.7 66.5, 44 31, 50 31 " +
+  "C 56 31, 62.3 66.5, 68 67 " +
+  "C 73.7 67.5, 81.3 39.5, 84 34";
+
+/* Sparkles rest on the visible open-sky stretches between consecutive
+   islands, reinforcing each step of the staircase. */
+const routeSparkles = [
+  { x: 24, y: 51, delay: 0 },
+  { x: 41, y: 49, delay: 1.0 },
+  { x: 59, y: 49, delay: 2.0 },
+  { x: 76, y: 51, delay: 0.6 },
+];
 
 const worldBadges = {
   island1: Gem,
@@ -37,7 +60,10 @@ export function WorldsPage() {
   const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedWorld, setSelectedWorld] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
   const pendingNav = useRef<number | null>(null);
+  /* Live unlock/lock state per world, derived from saved progress. */
+  const worldStates = getWorldStates();
 
   function leave() {
     logout();
@@ -45,6 +71,11 @@ export function WorldsPage() {
   }
 
   function openWorld(world: World) {
+    /* Locked worlds are not enterable yet — nudge the student instead. */
+    if (worldStates[world.slug] === "locked") {
+      setMessage("Completá el mundo anterior para desbloquear este.");
+      return;
+    }
     setSelectedWorld(world.id);
     /* Begin downloading the island background immediately. Once the image is
        in cache, navigating to /worlds/:id is essentially instant — the
@@ -131,13 +162,18 @@ export function WorldsPage() {
       </div>
 
       <section className="worlds-scene" aria-label="Selección de mundos">
+        {/* A single flowing trail threads every island in progression order
+            (1 → 4 → 2 → 5 → 3). It tucks behind each island (lower z-index)
+            so it reads as a magical route emerging in the open sky between
+            them. ROUTE_D is shared by every stroke layer so glow, base,
+            dotted trail and travelling shimmer stay perfectly aligned. */}
         <svg className="world-map-path" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
           <defs>
-            <linearGradient id="world-route-gradient" x1="18%" y1="44%" x2="88%" y2="52%">
-              <stop offset="0%" stopColor="#fff8ff" stopOpacity="0.22" />
-              <stop offset="36%" stopColor="#e8ddff" stopOpacity="0.72" />
-              <stop offset="68%" stopColor="#d8fbff" stopOpacity="0.68" />
-              <stop offset="100%" stopColor="#fff5fb" stopOpacity="0.3" />
+            <linearGradient id="world-route-gradient" x1="12%" y1="35%" x2="88%" y2="40%">
+              <stop offset="0%" stopColor="#fff8ff" stopOpacity="0.28" />
+              <stop offset="32%" stopColor="#c9b8ff" stopOpacity="0.78" />
+              <stop offset="64%" stopColor="#bff3ff" stopOpacity="0.72" />
+              <stop offset="100%" stopColor="#ffd9f1" stopOpacity="0.34" />
             </linearGradient>
             <filter id="world-route-glow" x="-18%" y="-32%" width="136%" height="164%">
               <feGaussianBlur stdDeviation="1.25" result="blur" />
@@ -153,29 +189,48 @@ export function WorldsPage() {
               </feMerge>
             </filter>
           </defs>
-          <path className="world-map-path__halo" d="M 14 26 C 24 30, 32 22, 50 18 C 64 16, 76 24, 86 26 M 28 60 C 38 55, 50 50, 62 55 C 70 58, 76 60, 82 62" />
-          <path className="world-map-path__base" d="M 14 26 C 24 30, 32 22, 50 18 C 64 16, 76 24, 86 26 M 28 60 C 38 55, 50 50, 62 55 C 70 58, 76 60, 82 62" />
-          <path className="world-map-path__dots" d="M 14 26 C 24 30, 32 22, 50 18 C 64 16, 76 24, 86 26 M 28 60 C 38 55, 50 50, 62 55 C 70 58, 76 60, 82 62" />
-          <path className="world-map-path__shimmer" d="M 14 26 C 24 30, 32 22, 50 18 C 64 16, 76 24, 86 26 M 28 60 C 38 55, 50 50, 62 55 C 70 58, 76 60, 82 62" />
+          <path className="world-map-path__halo" d={ROUTE_D} />
+          <path className="world-map-path__base" d={ROUTE_D} />
+          <path className="world-map-path__dots" d={ROUTE_D} />
+          <path className="world-map-path__shimmer" d={ROUTE_D} />
         </svg>
+
+        {/* Tiny sparkles dotted along the visible stretches of the trail,
+            sitting in the open sky between islands. */}
+        {routeSparkles.map((spark, index) => (
+          <span
+            key={index}
+            className="world-route-spark"
+            style={{ left: `${spark.x}%`, top: `${spark.y}%`, animationDelay: `${spark.delay}s` }}
+            aria-hidden="true"
+          />
+        ))}
 
         {worlds.map((world) => {
           const BadgeIcon = worldBadges[world.slug];
-          const isCurrentWorld = world.slug === "island1";
+          const state = worldStates[world.slug];
+          const isLocked = state === "locked";
+          const isCompleted = state === "completed";
 
           return (
             <button
               key={world.id}
               type="button"
-              className={`world-island world-island--${world.slug} ${isCurrentWorld ? "is-current" : ""} ${selectedWorld === world.id ? "is-selected" : ""}`}
+              className={`world-island world-island--${world.slug} world-island--${state} ${state === "current" ? "is-current" : ""} ${selectedWorld === world.id ? "is-selected" : ""}`}
               onClick={() => openWorld(world)}
-              onPointerEnter={() => prefetchWorld(world)}
-              onFocus={() => prefetchWorld(world)}
-              aria-label={worldLabels[world.slug]}
+              onPointerEnter={() => !isLocked && prefetchWorld(world)}
+              onFocus={() => !isLocked && prefetchWorld(world)}
+              aria-label={`${worldLabels[world.slug]}${isLocked ? " (bloqueado)" : ""}`}
+              aria-disabled={isLocked}
             >
               <span className="world-icon-badge" aria-hidden="true">
-                <BadgeIcon size={28} strokeWidth={2.1} />
+                {isLocked ? <Lock size={24} strokeWidth={2.3} /> : <BadgeIcon size={28} strokeWidth={2.1} />}
               </span>
+              {isCompleted && (
+                <span className="world-complete-badge" aria-hidden="true">
+                  <Check size={18} strokeWidth={3.4} />
+                </span>
+              )}
               <img src={world.thumbnail} alt="" loading="eager" decoding="async" />
             </button>
           );
@@ -200,6 +255,8 @@ export function WorldsPage() {
           loading="lazy"
         />
       </div>
+
+      <Toast message={message} />
     </main>
   );
 }

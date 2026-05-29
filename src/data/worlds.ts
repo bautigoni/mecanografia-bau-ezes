@@ -1,6 +1,6 @@
 import { activitiesByWorld, type Activity } from "./activities";
 import { assets } from "../utils/assets";
-import { levelState, loadProgress, type CurriculumProgress } from "../utils/progress";
+import { isLevelCompleted, levelState, loadProgress, type CurriculumProgress } from "../utils/progress";
 
 export type LevelState = "Completado" | "Actual" | "Bloqueado";
 
@@ -45,11 +45,13 @@ const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = {
     { x: 72, y: 72 },
   ],
   // Isla de palabras (potion/lab) — 6 round pads arranged in a loose arc.
+  // Rightmost pad kept at x:72 (matching the other islands) so it never
+  // tucks under the right-hand level info panel.
   island2: [
     { x: 28, y: 70 },
     { x: 38, y: 54 },
     { x: 55, y: 42 },
-    { x: 76, y: 38 },
+    { x: 72, y: 38 },
     { x: 50, y: 58 },
     { x: 70, y: 70 },
   ],
@@ -72,14 +74,15 @@ const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = {
     { x: 72, y: 72 },
   ],
   // Isla digital — 7 platforms (winding path: bottom-left → up → right → down).
+  // Final pad kept at x:72 so the winding route stays clear of the panel.
   island5: [
     { x: 18, y: 72 },
     { x: 28, y: 58 },
     { x: 40, y: 46 },
     { x: 55, y: 38 },
-    { x: 68, y: 48 },
+    { x: 67, y: 48 },
     { x: 56, y: 64 },
-    { x: 76, y: 72 },
+    { x: 72, y: 72 },
   ],
 };
 
@@ -148,8 +151,43 @@ function buildWorld(worldId: Activity["worldId"], progress: CurriculumProgress):
   };
 }
 
+/* Progression order of the five worlds. NOTE: the digital-skills island
+   (island5) is the SECOND world in the learning path even though it sits in
+   the bottom-right of the map — its on-screen position is unchanged, only its
+   place in the sequence. Everything that needs a "Mundo N" number or an
+   unlock order derives it from this array. */
+export const WORLD_ORDER: Activity["worldId"][] = ["island1", "island5", "island2", "island3", "island4"];
+
+export type WorldLockState = "completed" | "current" | "locked";
+
+/* A world counts as complete once every one of its levels is completed. */
+export function isWorldComplete(worldId: Activity["worldId"], progress: CurriculumProgress): boolean {
+  return activitiesByWorld[worldId].every((activity) => isLevelCompleted(progress, worldId, activity.levelNumber));
+}
+
+/* Sequential unlocking: a world is "current" once all earlier worlds in
+   WORLD_ORDER are complete, "completed" when finished, and "locked" until
+   then. Only one world is ever "current". */
+export function getWorldStates(
+  progress: CurriculumProgress = loadProgress(),
+): Record<Activity["worldId"], WorldLockState> {
+  const states = {} as Record<Activity["worldId"], WorldLockState>;
+  let previousComplete = true;
+  for (const id of WORLD_ORDER) {
+    if (isWorldComplete(id, progress)) {
+      states[id] = "completed";
+    } else if (previousComplete) {
+      states[id] = "current";
+      previousComplete = false;
+    } else {
+      states[id] = "locked";
+    }
+  }
+  return states;
+}
+
 export function getWorlds(progress: CurriculumProgress = loadProgress()): World[] {
-  return (Object.keys(worldMeta) as Activity["worldId"][]).map((id) => buildWorld(id, progress));
+  return WORLD_ORDER.map((id) => buildWorld(id, progress));
 }
 
 export function getWorldBySlug(slug?: string, progress: CurriculumProgress = loadProgress()): World | undefined {
