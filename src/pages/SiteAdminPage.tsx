@@ -83,6 +83,7 @@ export function SiteAdminPage() {
       id: makeId("class"),
       name: className,
       siteId: user?.siteId ?? "sede-norte",
+      grade: "libre",
       teacherIds: [],
       studentIds: [],
     };

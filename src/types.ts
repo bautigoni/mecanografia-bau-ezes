@@ -23,10 +23,27 @@ export interface Site {
   coordinator: string;
 }
 
+/** Grade levels supported by the course-path system.
+ *  "inicial" = Pre-K / Kindergarten
+ *  "1ep"–"6ep" = Primaria 1º–6º
+ *  "sec" = Secundaria
+ *  "libre" = free-path (all worlds, teacher / admin use)       */
+export type GradeId =
+  | "inicial"
+  | "1ep"
+  | "2ep"
+  | "3ep"
+  | "4ep"
+  | "5ep"
+  | "6ep"
+  | "sec"
+  | "libre";
+
 export interface ClassRoom {
   id: string;
   name: string;
   siteId: string;
+  grade: GradeId;
   teacherIds: string[];
   studentIds: string[];
 }

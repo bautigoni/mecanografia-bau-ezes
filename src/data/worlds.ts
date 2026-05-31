@@ -1,6 +1,7 @@
 import { activitiesByWorld, type Activity } from "./activities";
-import { assets } from "../utils/assets";
+import { assets, expansionIslandThumbs, expansionWorldBackgrounds } from "../utils/assets";
 import { isLevelCompleted, levelState, loadProgress, type CurriculumProgress } from "../utils/progress";
+import { getVisibleWorldIds, type UserContext } from "../utils/userContext";
 
 export type LevelState = "Completado" | "Actual" | "Bloqueado";
 
@@ -18,15 +19,27 @@ export type LevelPosition = {
   y: number;
 };
 
+/* Position of an island on the horizontally-scrolling world map.
+   `x` is in viewport-width units (vw) measured along the whole track, so the
+   first worlds keep their original on-screen spots and later worlds continue
+   to the right. `y` is a vertical % within the viewport. */
+export type MapPosition = {
+  x: number;
+  y: number;
+};
+
 export type World = {
   id: Activity["worldId"];
   slug: Activity["worldId"];
   title: string;
   thumbnail: string;
   background: string;
+  /** Background painted behind the actual typing/shortcut gameplay screen. */
+  gameplayBg: string;
   route: string;
   levels: Level[];
   levelPositions: LevelPosition[];
+  map: MapPosition;
 };
 
 /* Per-island level layouts.
@@ -34,6 +47,31 @@ export type World = {
    are tuned by eye to the painted stone platforms in each artwork. The
    level-map container in IslandDetailPage locks to aspect-ratio 16/9 so
    these percentages map to the same platform on every viewport. */
+/* Generic winding arcs for the expansion islands. Their backgrounds are
+   open scenes (no bespoke painted platforms), so the nodes simply float
+   along a pleasant path. Two variants keep neighbouring islands from
+   looking identical. 8 points cover the longest world (8 levels). */
+const genericArcA: LevelPosition[] = [
+  { x: 14, y: 72 },
+  { x: 26, y: 58 },
+  { x: 38, y: 46 },
+  { x: 50, y: 40 },
+  { x: 62, y: 48 },
+  { x: 72, y: 62 },
+  { x: 58, y: 74 },
+  { x: 44, y: 68 },
+];
+const genericArcB: LevelPosition[] = [
+  { x: 16, y: 64 },
+  { x: 30, y: 72 },
+  { x: 42, y: 58 },
+  { x: 54, y: 44 },
+  { x: 66, y: 52 },
+  { x: 74, y: 68 },
+  { x: 60, y: 40 },
+  { x: 46, y: 56 },
+];
+
 const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = {
   // Isla de teclas (bosque) — winding stone path with 6 platforms.
   island1: [
@@ -84,39 +122,145 @@ const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = {
     { x: 56, y: 64 },
     { x: 72, y: 72 },
   ],
+  // Expansion islands reuse the generic floating arcs.
+  island6: genericArcA,
+  island7: genericArcB,
+  island8: genericArcA,
+  island9: genericArcB,
+  island10: genericArcA,
+  island11: genericArcB,
+  island12: genericArcA,
+  island13: genericArcB,
+  island14: genericArcA,
+  island15: genericArcB,
 };
 
-const worldMeta: Record<Activity["worldId"], { title: string; thumbnail: string; background: string; positions: LevelPosition[] }> = {
+type WorldMetaEntry = {
+  title: string;
+  thumbnail: string;
+  background: string;
+  gameplayBg: string;
+  positions: LevelPosition[];
+  map: MapPosition;
+};
+
+/* Titles for the 10 expansion islands, in island6 → island15 order. */
+const expansionTitles = [
+  "Isla de la escritura",
+  "Isla de palabras largas",
+  "Isla de los signos",
+  "Isla de los correos",
+  "Isla de las búsquedas",
+  "Isla de los comandos",
+  "Isla de ventanas",
+  "Isla de los mensajes",
+  "Isla de atajos",
+  "Isla del gran reto",
+];
+
+/* =====================================================================
+   Pedagogical world order (difficulty, easiest → hardest):
+     1  island1  – basic letters / home row / vowels
+     2  island6  – writing: syllables → short words
+     3  island2  – short words (3–6 letters, phrases)
+     4  island7  – long words + longer phrases
+     5  island13 – friendly messages in context
+     6  island3  – library: uppercase, ñ, accents, ¿¡
+     7  island8  – signs / punctuation
+     8  island4  – symbols / code (@ + full punctuation mix)
+     9  island9  – email writing
+    10  island10 – browser searches
+    11  island5  – digital / mouse skills
+    12  island11 – basic keyboard commands (Enter → Ctrl+F)
+    13  island12 – windows & tabs shortcuts (Ctrl+T/W/Tab)
+    14  island14 – advanced shortcuts
+    15  island15 – grand final challenge
+===================================================================== */
+
+/* Map placement: x is vw from left-edge of the track, y is % of viewport
+   height.  Islands alternate high (y≈11) and low (y≈49) to create the
+   classic staircase-path look.  Spacing is 17 vw between each island. */
+const worldMapPositions: Record<Activity["worldId"], MapPosition> = {
+  island1:  { x:  6, y: 13 },  // #1
+  island6:  { x: 23, y: 49 },  // #2
+  island2:  { x: 40, y: 13 },  // #3
+  island7:  { x: 57, y: 49 },  // #4
+  island13: { x: 74, y: 13 },  // #5
+  island3:  { x: 91, y: 49 },  // #6
+  island8:  { x: 108, y: 13 }, // #7
+  island4:  { x: 125, y: 49 }, // #8
+  island9:  { x: 142, y: 13 }, // #9
+  island10: { x: 159, y: 49 }, // #10
+  island5:  { x: 176, y: 13 }, // #11
+  island11: { x: 193, y: 49 }, // #12
+  island12: { x: 210, y: 13 }, // #13
+  island14: { x: 227, y: 49 }, // #14
+  island15: { x: 244, y: 13 }, // #15
+};
+
+/* Build the meta for an expansion island (island6 … island15). */
+function expansionMeta(worldId: Activity["worldId"], index: number): WorldMetaEntry {
+  return {
+    title: expansionTitles[index],
+    thumbnail: expansionIslandThumbs[index],
+    background: expansionWorldBackgrounds[index],
+    gameplayBg: expansionWorldBackgrounds[index],
+    positions: islandLevelLayouts[worldId],
+    map: worldMapPositions[worldId],
+  };
+}
+
+const worldMeta: Record<Activity["worldId"], WorldMetaEntry> = {
   island1: {
     title: "Isla de teclas",
     thumbnail: assets.worldsIsland1,
     background: assets.island1,
+    gameplayBg: assets.gameplayBg,
     positions: islandLevelLayouts.island1,
+    map: worldMapPositions.island1,
   },
   island2: {
     title: "Isla de palabras",
     thumbnail: assets.worldsIsland2,
     background: assets.island2,
+    gameplayBg: assets.gameplayBg,
     positions: islandLevelLayouts.island2,
+    map: worldMapPositions.island2,
   },
   island3: {
     title: "Isla de la biblioteca",
     thumbnail: assets.worldsIsland3,
     background: assets.island3,
+    gameplayBg: assets.gameplayBg,
     positions: islandLevelLayouts.island3,
+    map: worldMapPositions.island3,
   },
   island4: {
     title: "Isla del árbol",
     thumbnail: assets.worldsIsland4,
     background: assets.island4,
+    gameplayBg: assets.gameplayBg,
     positions: islandLevelLayouts.island4,
+    map: worldMapPositions.island4,
   },
   island5: {
     title: "Isla digital",
     thumbnail: assets.worldsIsland5,
     background: assets.island5,
+    gameplayBg: assets.gameplayBg,
     positions: islandLevelLayouts.island5,
+    map: worldMapPositions.island5,
   },
+  island6: expansionMeta("island6", 0),
+  island7: expansionMeta("island7", 1),
+  island8: expansionMeta("island8", 2),
+  island9: expansionMeta("island9", 3),
+  island10: expansionMeta("island10", 4),
+  island11: expansionMeta("island11", 5),
+  island12: expansionMeta("island12", 6),
+  island13: expansionMeta("island13", 7),
+  island14: expansionMeta("island14", 8),
+  island15: expansionMeta("island15", 9),
 };
 
 function buildLevels(worldId: Activity["worldId"], progress: CurriculumProgress): Level[] {
@@ -145,10 +289,18 @@ function buildWorld(worldId: Activity["worldId"], progress: CurriculumProgress):
     title: meta.title,
     thumbnail: meta.thumbnail,
     background: meta.background,
+    gameplayBg: meta.gameplayBg,
     route: `/worlds/${worldId}`,
     levels: buildLevels(worldId, progress),
     levelPositions: meta.positions,
+    map: meta.map,
   };
+}
+
+/* Background painted behind the gameplay screen for a given world. Existing
+   worlds keep the shared painted scene; expansion worlds use their own art. */
+export function getGameplayBackground(worldId: Activity["worldId"]): string {
+  return worldMeta[worldId]?.gameplayBg ?? assets.gameplayBg;
 }
 
 /* Progression order of the five worlds. NOTE: the digital-skills island
@@ -156,7 +308,26 @@ function buildWorld(worldId: Activity["worldId"], progress: CurriculumProgress):
    the bottom-right of the map — its on-screen position is unchanged, only its
    place in the sequence. Everything that needs a "Mundo N" number or an
    unlock order derives it from this array. */
-export const WORLD_ORDER: Activity["worldId"][] = ["island1", "island5", "island2", "island3", "island4"];
+/** Canonical difficulty order used for progression unlocking and the
+ *  free-path display.  See the comment above worldMapPositions for the
+ *  pedagogical rationale. */
+export const WORLD_ORDER: Activity["worldId"][] = [
+  "island1",   // 1  basic letters
+  "island6",   // 2  syllables + short words
+  "island2",   // 3  words
+  "island7",   // 4  long words + phrases
+  "island13",  // 5  friendly messages
+  "island3",   // 6  uppercase, ñ, accents
+  "island8",   // 7  punctuation & signs
+  "island4",   // 8  symbols & code
+  "island9",   // 9  email writing
+  "island10",  // 10 browser searches
+  "island5",   // 11 digital / mouse skills
+  "island11",  // 12 basic keyboard commands
+  "island12",  // 13 windows & tabs
+  "island14",  // 14 advanced shortcuts
+  "island15",  // 15 grand final challenge
+];
 
 export type WorldLockState = "completed" | "current" | "locked";
 
@@ -197,6 +368,16 @@ export function getWorldBySlug(slug?: string, progress: CurriculumProgress = loa
 }
 
 export const worlds: World[] = getWorlds();
+
+/** Returns worlds filtered to those visible for a specific user context.
+ *  Pass the result of getUserContext() from userContext.ts. */
+export function getWorldsForUser(
+  context: UserContext,
+  progress: CurriculumProgress = loadProgress(),
+): World[] {
+  const visibleIds = getVisibleWorldIds(context);
+  return visibleIds.map((id) => buildWorld(id, progress));
+}
 
 export type WorldId = World["id"];
 export type WorldSlug = World["slug"];

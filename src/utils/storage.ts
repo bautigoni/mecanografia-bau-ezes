@@ -96,6 +96,26 @@ export function authenticate(role: Role, username: string, password: string): Ac
   return activeUser;
 }
 
+/** Like `authenticate` but discovers the role automatically.
+ *  Students never need to choose their role; this function handles it. */
+export function authenticateAny(username: string, password: string): ActiveUser | null {
+  ensureSeedData();
+  const users = getDemoData().users;
+  const found = users.find(
+    (user) => user.username === username && user.password === password,
+  );
+  if (!found) return null;
+  const { password: _password, stats: _stats, ...activeUser } = found;
+  return activeUser;
+}
+
+/** Demo login that picks the default student when no role is given.
+ *  Teachers / admins can still pass an explicit role. */
+export function demoLoginAny(preferRole?: Role): ActiveUser {
+  const role = preferRole ?? "alumno";
+  return demoLogin(role);
+}
+
 export function demoLogin(role: Role): ActiveUser {
   const user = demoUsers.find((candidate) => candidate.role === role);
   if (!user) {

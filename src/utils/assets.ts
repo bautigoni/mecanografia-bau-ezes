@@ -64,3 +64,35 @@ export const assets = {
   i5CastleSquare:   "/assets/edutic-art/island5/castillo-cuadrada.webp",
   i5ZoomBtns:       "/assets/edutic-art/island5/zoom-mas-menos.webp",
 };
+
+/* Expansion islands (island6 … island15).
+   - `expansionIslandThumbs` → floating island art on the world-selection map
+     (from /typely_islands_webp).
+   - `expansionWorldBackgrounds` → zoomed scene used by the island-detail level
+     map AND the gameplay background for that world (from /typely_backgrounds_webp).
+   Mapped by order: index 0 → island6, … index 9 → island15. */
+export const expansionIslandThumbs: string[] = [
+  "/typely_islands_webp/background-island1.webp",
+  "/typely_islands_webp/background-island2.webp",
+  "/typely_islands_webp/background-island3.webp",
+  "/typely_islands_webp/background-island4.webp",
+  "/typely_islands_webp/background-island5.webp",
+  "/typely_islands_webp/background-island6.webp",
+  "/typely_islands_webp/background-island7.webp",
+  "/typely_islands_webp/background-island8.webp",
+  "/typely_islands_webp/background-island9.webp",
+  "/typely_islands_webp/background-island10.webp",
+];
+
+export const expansionWorldBackgrounds: string[] = [
+  "/typely_backgrounds_webp/bg01_crystal_portal.webp",
+  "/typely_backgrounds_webp/bg02_garden_library.webp",
+  "/typely_backgrounds_webp/bg03_frozen_clockwork.webp",
+  "/typely_backgrounds_webp/bg04_autumn_artist.webp",
+  "/typely_backgrounds_webp/bg05_jungle_ruins.webp",
+  "/typely_backgrounds_webp/bg06_candyland.webp",
+  "/typely_backgrounds_webp/bg07_desert_canyon.webp",
+  "/typely_backgrounds_webp/bg08_rainbow_playground.webp",
+  "/typely_backgrounds_webp/bg09_alchemy_lab.webp",
+  "/typely_backgrounds_webp/bg10_lagoon.webp",
+];

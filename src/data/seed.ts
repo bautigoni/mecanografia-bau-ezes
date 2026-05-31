@@ -62,6 +62,7 @@ export const seedData: DemoData = {
       id: "clase-3a",
       name: "3ro A - Turno manana",
       siteId: "sede-norte",
+      grade: "3ep" as const,
       teacherIds: ["u-profesor"],
       studentIds: ["u-sofia", "u-lucas", "u-valen"],
     },

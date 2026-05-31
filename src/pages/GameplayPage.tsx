@@ -3,8 +3,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getActivityById } from "../data/activities";
 import { assets } from "../utils/assets";
+import { getGameplayBackground } from "../data/worlds";
 import { markLevelComplete } from "../utils/progress";
 import { SkillLevelView } from "./SkillLevelView";
+import { ShortcutLevelView } from "./ShortcutLevelView";
 
 const MOTIVATION_PHRASES = [
   "¡Vamos que podés!",
@@ -195,6 +197,11 @@ export function GameplayPage() {
      state is set up so the two modes stay cleanly isolated. */
   if (activity.inputType === "skill") {
     return <SkillLevelView activity={activity} />;
+  }
+  /* Keyboard-shortcut levels (comandos, ventanas/pestañas, atajos) use the
+     generic shortcut engine. Like skill levels, return before keyboard state. */
+  if (activity.inputType === "shortcut") {
+    return <ShortcutLevelView activity={activity} />;
   }
   const [targetIndex, setTargetIndex] = useState(0);
   const [typed, setTyped] = useState("");
@@ -635,7 +642,7 @@ export function GameplayPage() {
   }
 
   return (
-    <main className={`gameplay-page gameplay-shell page-fade ${isErrorActive ? "is-error" : ""} ${isIdleHintActive ? "is-idle-hint" : ""}`} style={{ backgroundImage: `url("${assets.gameplayBg}")` }}>
+    <main className={`gameplay-page gameplay-shell page-fade ${isErrorActive ? "is-error" : ""} ${isIdleHintActive ? "is-idle-hint" : ""}`} style={{ backgroundImage: `url("${getGameplayBackground(activity.worldId)}")` }}>
       {/* Hidden capture field — drives beforeinput/composition so accented
           characters work on touch & Spanish-layout keyboards. */}
       <input

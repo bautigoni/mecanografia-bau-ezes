@@ -1,9 +1,12 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import type { ActiveUser, Role } from "../types";
-import { authenticate, demoLogin, ensureSeedData, getActiveUser, setActiveUser } from "../utils/storage";
+import { authenticate, authenticateAny, demoLogin, ensureSeedData, getActiveUser, setActiveUser } from "../utils/storage";
 
 interface AuthContextValue {
   user: ActiveUser | null;
+  /** Role-agnostic login — discovers the role from credentials automatically.
+   *  This is the preferred path for students (no role picker needed). */
+  loginAny: (username: string, password: string) => ActiveUser | null;
   login: (role: Role, username: string, password: string) => ActiveUser | null;
   loginDemo: (role: Role) => ActiveUser;
   logout: () => void;
@@ -18,6 +21,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
+      loginAny: (username, password) => {
+        const nextUser = authenticateAny(username, password);
+        if (nextUser) {
+          setActiveUser(nextUser);
+          setUser(nextUser);
+        }
+        return nextUser;
+      },
       login: (role, username, password) => {
         const nextUser = authenticate(role, username, password);
         if (nextUser) {

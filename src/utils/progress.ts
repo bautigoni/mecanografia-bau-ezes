@@ -24,6 +24,16 @@ function defaultProgress(): CurriculumProgress {
     island3: emptyWorld(),
     island4: emptyWorld(),
     island5: emptyWorld(),
+    island6: emptyWorld(),
+    island7: emptyWorld(),
+    island8: emptyWorld(),
+    island9: emptyWorld(),
+    island10: emptyWorld(),
+    island11: emptyWorld(),
+    island12: emptyWorld(),
+    island13: emptyWorld(),
+    island14: emptyWorld(),
+    island15: emptyWorld(),
   };
 }
 
