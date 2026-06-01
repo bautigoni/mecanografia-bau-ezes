@@ -1,5 +1,14 @@
 import { demoUsers, seedData, SUPERADMIN_USER } from "../data/seed";
-import type { ActiveUser, ClassRoom, DemoData, EduTicUser, Role } from "../types";
+import type {
+  ActiveUser,
+  ClassRoom,
+  DemoData,
+  EduTicUser,
+  Invitation,
+  InvitationStatus,
+  Role,
+  Site,
+} from "../types";
 
 /** Strip secrets/derived fields from a stored user record. */
 function toActiveUser(user: EduTicUser): ActiveUser {
@@ -29,6 +38,7 @@ export const storageKeys = {
   assignments: "edutic_assignments",
   attempts: "edutic_attempts",
   rewards: "edutic_rewards",
+  invitations: "edutic_invitations",
 };
 
 export function ensureSeedData() {
@@ -51,6 +61,7 @@ export function getDemoData(): DemoData {
     assignments: read(storageKeys.assignments, seedData.assignments ?? []),
     attempts: read(storageKeys.attempts, seedData.attempts ?? []),
     rewards: read(storageKeys.rewards, seedData.rewards ?? []),
+    invitations: read(storageKeys.invitations, seedData.invitations ?? []),
   };
 }
 
@@ -64,6 +75,7 @@ export function saveDemoData(data: DemoData) {
   localStorage.setItem(storageKeys.assignments, JSON.stringify(data.assignments ?? []));
   localStorage.setItem(storageKeys.attempts, JSON.stringify(data.attempts ?? []));
   localStorage.setItem(storageKeys.rewards, JSON.stringify(data.rewards ?? []));
+  localStorage.setItem(storageKeys.invitations, JSON.stringify(data.invitations ?? []));
 }
 
 export function patchDemoData(patch: Partial<DemoData>) {
@@ -202,12 +214,13 @@ export function isDemoMode(): boolean {
 
 export function routeForRole(role: Role) {
   const routes: Record<Role, string> = {
-    // Superadmin lands on the world map (full free-path access). They can
-    // reach the teacher/admin views from there.
-    superadmin: "/mundos",
+    // Superadmin lands on the GLOBAL administration dashboard — never the
+    // student game map (the game is exclusively for students).
+    superadmin: "/admin-general",
     "admin-general": "/admin-general",
     "admin-sede": "/admin-sede",
     profesor: "/profesor",
+    // Only students enter the gamified world map.
     alumno: "/mundos",
   };
 
@@ -323,6 +336,192 @@ export function addUserToClass(user: EduTicUser, classId?: string) {
     users: [...data.users, user],
     classes,
   });
+}
+
+/* ================================================================== */
+/* Ecosystem data functions (sedes, admins, teachers, students,        */
+/* classes, invitations). All persist through patchDemoData so the     */
+/* superadmin / sede-admin dashboards share one source of truth.       */
+/* ================================================================== */
+
+export function getSiteById(siteId?: string): Site | undefined {
+  if (!siteId) return undefined;
+  return getDemoData().sites.find((site) => site.id === siteId);
+}
+
+export function createSite(input: { name: string; city?: string; coordinator?: string }): Site {
+  const data = getDemoData();
+  const site: Site = {
+    id: makeId("sede"),
+    name: input.name.trim() || `Sede ${data.sites.length + 1}`,
+    city: input.city?.trim() || "Sin localidad",
+    coordinator: input.coordinator?.trim() || "Pendiente",
+  };
+  patchDemoData({ sites: [...data.sites, site] });
+  return site;
+}
+
+export function updateSite(siteId: string, patch: Partial<Omit<Site, "id">>): void {
+  const data = getDemoData();
+  patchDemoData({
+    sites: data.sites.map((site) => (site.id === siteId ? { ...site, ...patch } : site)),
+  });
+}
+
+/** Creates a sede admin (role "admin-sede") bound to a single sede. */
+export function createSedeAdmin(input: { name: string; email?: string; siteId: string }): EduTicUser {
+  const data = getDemoData();
+  const credentials = createCredentials(input.name);
+  const admin: EduTicUser = {
+    id: makeId("sede-admin"),
+    name: input.name.trim(),
+    username: credentials.username,
+    password: credentials.password,
+    email: input.email?.trim() || undefined,
+    role: "admin-sede",
+    siteId: input.siteId,
+  };
+  patchDemoData({ users: [...data.users, admin] });
+  return admin;
+}
+
+export function createTeacher(input: { name: string; email?: string; siteId?: string; classId?: string }): EduTicUser {
+  const credentials = createCredentials(input.name);
+  const teacher: EduTicUser = {
+    id: makeId("teacher"),
+    name: input.name.trim(),
+    username: credentials.username,
+    password: credentials.password,
+    email: input.email?.trim() || undefined,
+    role: "profesor",
+    siteId: input.siteId,
+    classId: input.classId,
+  };
+  addUserToClass(teacher, input.classId);
+  return teacher;
+}
+
+export function createStudent(input: { name: string; siteId?: string; classId?: string }): EduTicUser {
+  const credentials = createCredentials(input.name);
+  const student: EduTicUser = {
+    id: makeId("student"),
+    name: input.name.trim(),
+    username: credentials.username,
+    password: credentials.password,
+    role: "alumno",
+    siteId: input.siteId,
+    classId: input.classId,
+    stats: { precision: 0, speed: 0, completedLevels: 0, points: 0 },
+  };
+  addUserToClass(student, input.classId);
+  return student;
+}
+
+export function createClass(input: { name: string; siteId: string; grade?: ClassRoom["grade"] }): ClassRoom {
+  const data = getDemoData();
+  const classRoom: ClassRoom = {
+    id: makeId("class"),
+    name: input.name.trim(),
+    siteId: input.siteId,
+    grade: input.grade ?? "libre",
+    teacherIds: [],
+    studentIds: [],
+  };
+  patchDemoData({ classes: [...data.classes, classRoom] });
+  return classRoom;
+}
+
+/* ---- Sede-scoped getters ---- */
+export function getUsersBySite(siteId: string | undefined, role?: Role): EduTicUser[] {
+  const users = getDemoData().users.filter((u) => u.siteId === siteId);
+  return role ? users.filter((u) => u.role === role) : users;
+}
+
+export function getClassesBySite(siteId?: string): ClassRoom[] {
+  return getDemoData().classes.filter((c) => c.siteId === siteId);
+}
+
+export function getInvitationsBySite(siteId?: string): Invitation[] {
+  return (getDemoData().invitations ?? []).filter((i) => i.siteId === siteId);
+}
+
+/* ---- Counters for the superadmin dashboard ---- */
+export interface EcosystemCounts {
+  sedes: number;
+  sedeAdmins: number;
+  teachers: number;
+  students: number;
+  classes: number;
+}
+
+export function getEcosystemCounts(): EcosystemCounts {
+  const data = getDemoData();
+  return {
+    sedes: data.sites.length,
+    sedeAdmins: data.users.filter((u) => u.role === "admin-sede").length,
+    teachers: data.users.filter((u) => u.role === "profesor").length,
+    students: data.users.filter((u) => u.role === "alumno").length,
+    classes: data.classes.length,
+  };
+}
+
+/* ---- Invitations ---- */
+function makeToken(): string {
+  const rnd = () => Math.random().toString(36).slice(2, 10);
+  return `${rnd()}${rnd()}`.toUpperCase();
+}
+
+export function createInvitation(input: {
+  email: string;
+  name?: string;
+  role: Role;
+  siteId?: string;
+  classId?: string;
+  invitedBy?: string;
+}): Invitation {
+  const data = getDemoData();
+  const invitation: Invitation = {
+    id: makeId("invite"),
+    email: input.email.trim(),
+    name: input.name?.trim() || undefined,
+    role: input.role,
+    siteId: input.siteId,
+    classId: input.classId,
+    token: makeToken(),
+    status: "pending",
+    createdAt: new Date().toISOString(),
+    invitedBy: input.invitedBy,
+  };
+  patchDemoData({ invitations: [invitation, ...(data.invitations ?? [])] });
+  return invitation;
+}
+
+export function setInvitationStatus(id: string, status: InvitationStatus): void {
+  const data = getDemoData();
+  const now = new Date().toISOString();
+  patchDemoData({
+    invitations: (data.invitations ?? []).map((inv) =>
+      inv.id === id
+        ? {
+            ...inv,
+            status,
+            sentAt: status === "sent" ? now : inv.sentAt,
+            acceptedAt: status === "accepted" ? now : inv.acceptedAt,
+          }
+        : inv,
+    ),
+  });
+}
+
+export function getInvitationByToken(token: string): Invitation | undefined {
+  return (getDemoData().invitations ?? []).find((inv) => inv.token === token);
+}
+
+/** Builds a shareable invitation link from a token. Safe for the browser —
+ *  contains no secret, just an opaque token. */
+export function buildInvitationLink(token: string): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return `${origin}/invite/${token}`;
 }
 
 function read<T>(key: string, fallback: T): T {

@@ -16,7 +16,9 @@ export function App() {
       <Route path="/" element={<LoginPage />} />
       <Route path="/login" element={<LoginPage />} />
 
-      <Route element={<ProtectedRoute roles={["alumno"]} />}>
+      {/* Student game experience — exclusive to students. Admins/teachers
+          are redirected to their own dashboards, never the game map. */}
+      <Route element={<ProtectedRoute roles={["alumno"]} exclusive />}>
         <Route path="/mundos" element={<WorldsPage />} />
         <Route path="/worlds/:islandId" element={<IslandDetailPage />} />
         <Route path="/gameplay/:activityId" element={<GameplayPage />} />

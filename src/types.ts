@@ -89,6 +89,26 @@ export interface Reward {
   unlocked: boolean;
 }
 
+export type InvitationStatus = "pending" | "sent" | "accepted" | "expired";
+
+/** An invitation for a teacher (or sede admin) to join a sede. The token
+ *  is shareable via a link; email delivery is handled by a backend so no
+ *  secret ever touches the frontend. */
+export interface Invitation {
+  id: string;
+  email: string;
+  name?: string;
+  role: Role;
+  siteId?: string;
+  classId?: string;
+  token: string;
+  status: InvitationStatus;
+  createdAt: string;
+  sentAt?: string;
+  acceptedAt?: string;
+  invitedBy?: string;
+}
+
 export interface StudentStats {
   precision: number;
   speed: number;
@@ -110,4 +130,5 @@ export interface DemoData {
   assignments?: Assignment[];
   attempts?: Attempt[];
   rewards?: Reward[];
+  invitations?: Invitation[];
 }

@@ -1,72 +1,108 @@
-import { Clipboard, Edit3, KeyRound, LogOut, Plus, PowerOff, School, Sparkles, Users } from "lucide-react";
-import { useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import {
+  ArrowRight,
+  Building2,
+  Crown,
+  GraduationCap,
+  Home,
+  Plus,
+  School,
+  ShieldCheck,
+  UserCog,
+  Users,
+  X,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
+import { DashboardShell, KpiCard, type DashNavItem } from "../components/dashboard/DashboardShell";
 import { useAuth } from "../hooks/useAuth";
-import type { AccessCode, Site } from "../types";
-import { getDemoData, makeId, patchDemoData } from "../utils/storage";
+import type { Site } from "../types";
+import {
+  createSedeAdmin,
+  createSite,
+  getDemoData,
+  getEcosystemCounts,
+  updateSite,
+} from "../utils/storage";
+import { assets } from "../utils/assets";
+
+const NAV: DashNavItem[] = [
+  { id: "inicio", label: "Inicio", icon: Home },
+  { id: "sedes", label: "Sedes", icon: School },
+  { id: "admins", label: "Admins de sede", icon: ShieldCheck },
+];
+
+const SEDE_ART = [
+  assets.worldsIsland1,
+  assets.worldsIsland2,
+  assets.worldsIsland3,
+  assets.worldsIsland4,
+  assets.worldsIsland5,
+];
 
 export function AdminGeneralPage() {
-  const [data, setData] = useState(() => getDemoData());
-  const [message, setMessage] = useState("");
-  const [editingSiteId, setEditingSiteId] = useState("");
-  const [siteDraft, setSiteDraft] = useState({ name: "", city: "", coordinator: "" });
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  function sync(next: typeof data, toast: string) {
-    setData(next);
-    patchDemoData(next);
-    setMessage(toast);
+  const [section, setSection] = useState("inicio");
+  const [search, setSearch] = useState("");
+  const [, setVersion] = useState(0);
+  const [message, setMessage] = useState("");
+
+  const [showSiteForm, setShowSiteForm] = useState(false);
+  const [editingSiteId, setEditingSiteId] = useState("");
+  const [siteDraft, setSiteDraft] = useState({ name: "", city: "", coordinator: "" });
+
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminDraft, setAdminDraft] = useState({ name: "", email: "", siteId: "" });
+
+  const data = useMemo(() => getDemoData(), [message]);
+  const counts = useMemo(() => getEcosystemCounts(), [message]);
+
+  function refresh(toast?: string) {
+    setVersion((v) => v + 1);
+    if (toast) setMessage(toast);
   }
 
-  function createSite() {
-    const nextSite: Site = {
-      id: makeId("sede"),
-      name: `Sede ${data.sites.length + 1}`,
-      city: "Nueva localidad",
-      coordinator: "Pendiente",
-    };
-    sync({ ...data, sites: [...data.sites, nextSite] }, "Sede creada.");
+  function submitSite(event: FormEvent) {
+    event.preventDefault();
+    if (editingSiteId) {
+      updateSite(editingSiteId, siteDraft);
+      refresh("Sede actualizada.");
+    } else {
+      const site = createSite(siteDraft);
+      refresh(`Sede creada: ${site.name}`);
+    }
+    setShowSiteForm(false);
+    setEditingSiteId("");
+    setSiteDraft({ name: "", city: "", coordinator: "" });
   }
 
-  function startEdit(site: Site) {
+  function startCreateSite() {
+    setSection("sedes");
+    setEditingSiteId("");
+    setSiteDraft({ name: "", city: "", coordinator: "" });
+    setShowSiteForm(true);
+  }
+  function startEditSite(site: Site) {
     setEditingSiteId(site.id);
     setSiteDraft({ name: site.name, city: site.city, coordinator: site.coordinator });
+    setShowSiteForm(true);
   }
-
-  function saveSite() {
-    const sites = data.sites.map((site) => (site.id === editingSiteId ? { ...site, ...siteDraft } : site));
-    setEditingSiteId("");
-    sync({ ...data, sites }, "Sede actualizada.");
+  function openAdminModal() {
+    setAdminDraft({ name: "", email: "", siteId: data.sites[0]?.id ?? "" });
+    setShowAdminModal(true);
   }
-
-  function generateCode(role = "Alumno") {
-    const site = data.sites[0]?.name ?? "Sede demo";
-    const nextCode: AccessCode = {
-      id: makeId("code"),
-      role,
-      site,
-      code: `EDU-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-      status: "Activo",
-    };
-    sync({ ...data, accessCodes: [nextCode, ...data.accessCodes] }, "Código generado.");
-  }
-
-  function deactivateCode(id: string) {
-    sync(
-      {
-        ...data,
-        accessCodes: data.accessCodes.map((code) => (code.id === id ? { ...code, status: "Inactivo" } : code)),
-      },
-      "Código desactivado.",
-    );
-  }
-
-  async function copyCode(code: string) {
-    await navigator.clipboard.writeText(code);
-    setMessage(`Código copiado: ${code}`);
+  function submitAdmin(event: FormEvent) {
+    event.preventDefault();
+    if (!adminDraft.siteId) {
+      setMessage("Elegí una sede para el administrador.");
+      return;
+    }
+    const admin = createSedeAdmin(adminDraft);
+    setShowAdminModal(false);
+    refresh(`Admin de sede creado: ${admin.username} / ${admin.password}`);
   }
 
   function leave() {
@@ -74,150 +110,226 @@ export function AdminGeneralPage() {
     navigate("/login");
   }
 
-  return (
-    <main className="admin-dashboard page-fade">
-      <header className="admin-hero">
-        <div>
-          <span>
-            <Sparkles size={20} /> TYPELY
-          </span>
-          <h1>Panel de administración general</h1>
-          <p>Gestioná sedes y códigos de acceso desde un tablero claro y seguro.</p>
+  const sedeAdmins = data.users.filter((u) => u.role === "admin-sede");
+  const siteName = (id?: string) => data.sites.find((s) => s.id === id)?.name ?? "Sin sede";
+  const countFor = (siteId: string, role: "alumno" | "profesor") =>
+    data.users.filter((u) => u.siteId === siteId && u.role === role).length;
+  const classesFor = (siteId: string) => data.classes.filter((c) => c.siteId === siteId).length;
+
+  const q = search.trim().toLowerCase();
+  const filteredSites = q
+    ? data.sites.filter((s) => `${s.name} ${s.city}`.toLowerCase().includes(q))
+    : data.sites;
+  const filteredAdmins = q
+    ? sedeAdmins.filter((a) => `${a.name} ${a.email ?? ""}`.toLowerCase().includes(q))
+    : sedeAdmins;
+
+  const kpis = (
+    <div className="kpi-grid">
+      <KpiCard icon={School} label="Sedes" value={counts.sedes} tone="green" trend="↑ ecosistema" onClick={() => setSection("sedes")} />
+      <KpiCard icon={ShieldCheck} label="Admins de sede" value={counts.sedeAdmins} tone="violet" onClick={() => setSection("admins")} />
+      <KpiCard icon={GraduationCap} label="Docentes" value={counts.teachers} tone="blue" />
+      <KpiCard icon={Users} label="Alumnos" value={counts.students} tone="pink" />
+      <KpiCard icon={Building2} label="Cursos" value={counts.classes} tone="gold" />
+    </div>
+  );
+
+  function SedeCards({ sites }: { sites: Site[] }) {
+    if (sites.length === 0) {
+      return (
+        <div className="empty-state">
+          <img src={assets.mascotFemaleLaptop} alt="" decoding="async" />
+          <h3>Todavía no hay sedes</h3>
+          <p>Creá tu primera sede para empezar a construir el ecosistema Typely.</p>
+          <Button onClick={startCreateSite}>
+            <Plus size={18} /> Crear sede
+          </Button>
         </div>
-        <Button variant="ghost" onClick={leave}>
-          <LogOut size={19} />
-          Salir
-        </Button>
-      </header>
-
-      <section className="dashboard-stat-grid">
-        <article>
-          <School size={27} />
-          <span>Sedes</span>
-          <strong>{data.sites.length}</strong>
-        </article>
-        <article>
-          <KeyRound size={27} />
-          <span>Códigos activos</span>
-          <strong>{data.accessCodes.filter((code) => code.status === "Activo").length}</strong>
-        </article>
-        <article>
-          <Users size={27} />
-          <span>Usuarios</span>
-          <strong>{data.users.length}</strong>
-        </article>
-      </section>
-
-      <section className="admin-grid">
-        <article className="admin-panel">
-          <div className="admin-panel__heading">
-            <div>
-              <h2>Sedes</h2>
-              <p>Escuelas y coordinaciones disponibles.</p>
+      );
+    }
+    return (
+      <div className="sede-grid">
+        {sites.map((site, i) => (
+          <div key={site.id} className="sede-card">
+            <div className="sede-card__media">
+              <span className="sede-card__status">Activa</span>
+              <img src={SEDE_ART[i % SEDE_ART.length]} alt="" decoding="async" loading="lazy" />
             </div>
-            <Button onClick={createSite}>
-              <Plus size={18} />
-              Crear sede
-            </Button>
-          </div>
-          <div className="site-card-grid">
-            {data.sites.map((site) => (
-              <div key={site.id} className="site-card">
-                {editingSiteId === site.id ? (
-                  <div className="admin-form">
-                    <input value={siteDraft.name} onChange={(event) => setSiteDraft({ ...siteDraft, name: event.target.value })} />
-                    <input value={siteDraft.city} onChange={(event) => setSiteDraft({ ...siteDraft, city: event.target.value })} />
-                    <input
-                      value={siteDraft.coordinator}
-                      onChange={(event) => setSiteDraft({ ...siteDraft, coordinator: event.target.value })}
-                    />
-                    <Button onClick={saveSite}>Guardar cambios</Button>
-                  </div>
-                ) : (
-                  <>
-                    <School size={25} />
-                    <strong>{site.name}</strong>
-                    <span>{site.city}</span>
-                    <small>{site.coordinator}</small>
-                    <Button variant="secondary" onClick={() => startEdit(site)}>
-                      <Edit3 size={17} />
-                      Editar sede
-                    </Button>
-                  </>
-                )}
+            <div className="sede-card__body">
+              <strong>{site.name}</strong>
+              <span>{site.city}</span>
+              <div className="sede-card__stats">
+                <span><Users size={15} /> {countFor(site.id, "alumno")}</span>
+                <span><GraduationCap size={15} /> {countFor(site.id, "profesor")}</span>
+                <span><Building2 size={15} /> {classesFor(site.id)}</span>
               </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="admin-panel">
-          <div className="admin-panel__heading">
-            <div>
-              <h2>Generar código</h2>
-              <p>Creá accesos para nuevos usuarios.</p>
-            </div>
-          </div>
-          <div className="quick-code-actions">
-            {["Alumno", "Profesor", "Admin de sede"].map((role) => (
-              <Button key={role} variant="secondary" onClick={() => generateCode(role)}>
-                <KeyRound size={18} />
-                {role}
+              <Button className="sede-card__edit" variant="secondary" onClick={() => startEditSite(site)}>
+                Editar sede
               </Button>
-            ))}
-          </div>
-        </article>
-
-        <article className="admin-panel admin-panel--wide">
-          <div className="admin-panel__heading">
-            <div>
-              <h2>Códigos de acceso</h2>
-              <p>Copiá o desactivá códigos vigentes.</p>
             </div>
-            <Button onClick={() => generateCode()}>
-              <KeyRound size={18} />
-              Generar código
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function AdminCards({ admins }: { admins: typeof sedeAdmins }) {
+    if (admins.length === 0) {
+      return (
+        <div className="empty-state empty-state--compact">
+          <h3>Sin administradores de sede</h3>
+          <p>
+            {data.sites.length === 0
+              ? "Primero creá una sede, luego asignale un administrador."
+              : "Creá un administrador y asignalo a una de tus sedes."}
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="people-card-grid">
+        {admins.map((admin) => (
+          <div key={admin.id} className="people-card">
+            <span className="people-card__avatar">
+              <ShieldCheck size={20} />
+            </span>
+            <div>
+              <strong>{admin.name}</strong>
+              <span>{admin.email ?? admin.username}</span>
+              <small>{siteName(admin.siteId)}</small>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const hero = (
+    <>
+      <span className="dash-eyebrow">
+        <Crown size={18} /> ¡Bienvenido, Superadmin!
+      </span>
+      <h1>
+        Panel <span className="grad">Superadmin</span>
+      </h1>
+      <p>Gestioná todas las sedes, sus administradores y el ecosistema Typely desde un solo lugar.</p>
+      <div className="dash-hero__actions">
+        <Button onClick={startCreateSite}>
+          <Plus size={18} /> Crear sede
+        </Button>
+        <Button variant="secondary" onClick={openAdminModal} disabled={data.sites.length === 0}>
+          <UserCog size={18} /> Crear admin de sede
+        </Button>
+      </div>
+    </>
+  );
+
+  return (
+    <DashboardShell
+      accent="violet"
+      roleLabel="SUPERADMIN"
+      roleSubtitle="Acceso total"
+      roleIcon={Crown}
+      account={{ name: user?.name ?? "Superadmin", email: user?.email ?? "superadmin@typely.com", initial: "S" }}
+      sidebarMascot={assets.mascotMaleProud}
+      nav={NAV}
+      activeId={section}
+      onNavigate={setSection}
+      onLogout={leave}
+      search={{ value: search, onChange: setSearch, placeholder: "Buscar sedes, admins…" }}
+      onBell={() => setMessage("No tenés notificaciones nuevas.")}
+      bellCount={0}
+      hero={hero}
+      heroArt={{ mascot: assets.mascotMaleProud, island: assets.worldsIsland1 }}
+    >
+      {section === "inicio" && (
+        <>
+          {kpis}
+          <section className="dash-section">
+            <div className="dash-section__head">
+              <h2><School size={22} /> Sedes activas</h2>
+              <button type="button" className="link-arrow" onClick={() => setSection("sedes")}>
+                Ver todas <ArrowRight size={16} />
+              </button>
+            </div>
+            <SedeCards sites={data.sites.slice(0, 4)} />
+          </section>
+          <section className="dash-section">
+            <div className="dash-section__head">
+              <h2><ShieldCheck size={22} /> Administradores de sede</h2>
+              <button type="button" className="link-arrow" onClick={() => setSection("admins")}>
+                Ver todos <ArrowRight size={16} />
+              </button>
+            </div>
+            <AdminCards admins={sedeAdmins.slice(0, 6)} />
+          </section>
+        </>
+      )}
+
+      {section === "sedes" && (
+        <section className="dash-section">
+          <div className="dash-section__head">
+            <div>
+              <h2><School size={22} /> Sedes</h2>
+              <p>Escuelas y coordinaciones del ecosistema.</p>
+            </div>
+            <Button onClick={startCreateSite}>
+              <Plus size={18} /> Crear sede
             </Button>
           </div>
-          <div className="modern-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Rol</th>
-                  <th>Sede</th>
-                  <th>Código</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.accessCodes.map((code) => (
-                  <tr key={code.id}>
-                    <td>{code.role}</td>
-                    <td>{code.site}</td>
-                    <td>
-                      <b>{code.code}</b>
-                    </td>
-                    <td>
-                      <span className={code.status === "Activo" ? "table-status is-active" : "table-status"}>{code.status}</span>
-                    </td>
-                    <td className="table-actions">
-                      <Button variant="secondary" onClick={() => copyCode(code.code)}>
-                        <Clipboard size={17} />
-                        Copiar código
-                      </Button>
-                      <Button variant="danger" onClick={() => deactivateCode(code.id)}>
-                        <PowerOff size={17} />
-                        Desactivar
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {showSiteForm && (
+            <form className="admin-form admin-form--inline" onSubmit={submitSite}>
+              <input required placeholder="Nombre de la sede" value={siteDraft.name} onChange={(e) => setSiteDraft({ ...siteDraft, name: e.target.value })} />
+              <input placeholder="Ciudad" value={siteDraft.city} onChange={(e) => setSiteDraft({ ...siteDraft, city: e.target.value })} />
+              <input placeholder="Coordinación" value={siteDraft.coordinator} onChange={(e) => setSiteDraft({ ...siteDraft, coordinator: e.target.value })} />
+              <div className="admin-form__actions">
+                <Button type="submit">{editingSiteId ? "Guardar" : "Crear sede"}</Button>
+                <Button type="button" variant="ghost" onClick={() => setShowSiteForm(false)}>Cancelar</Button>
+              </div>
+            </form>
+          )}
+          <SedeCards sites={filteredSites} />
+        </section>
+      )}
+
+      {section === "admins" && (
+        <section className="dash-section">
+          <div className="dash-section__head">
+            <div>
+              <h2><ShieldCheck size={22} /> Administradores de sede</h2>
+              <p>Cada admin gestiona únicamente su sede asignada.</p>
+            </div>
+            <Button onClick={openAdminModal} disabled={data.sites.length === 0}>
+              <UserCog size={18} /> Crear admin de sede
+            </Button>
           </div>
-        </article>
-      </section>
+          <AdminCards admins={filteredAdmins} />
+        </section>
+      )}
+
+      {showAdminModal && (
+        <div className="demo-modal" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
+          <div className="demo-modal__backdrop" onClick={() => setShowAdminModal(false)} />
+          <div className="demo-modal__card admin-modal__card">
+            <span className="demo-modal__icon" aria-hidden="true"><UserCog size={26} /></span>
+            <h2 id="admin-modal-title">Nuevo admin de sede</h2>
+            <p>Creá un administrador y asignalo a una sede.</p>
+            <form className="admin-form" onSubmit={submitAdmin}>
+              <input required placeholder="Nombre completo" value={adminDraft.name} onChange={(e) => setAdminDraft({ ...adminDraft, name: e.target.value })} />
+              <input type="email" placeholder="Email (opcional)" value={adminDraft.email} onChange={(e) => setAdminDraft({ ...adminDraft, email: e.target.value })} />
+              <select value={adminDraft.siteId} onChange={(e) => setAdminDraft({ ...adminDraft, siteId: e.target.value })}>
+                {data.sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <Button type="submit"><Plus size={18} /> Crear admin</Button>
+            </form>
+            <button type="button" className="demo-modal__close" aria-label="Cerrar" onClick={() => setShowAdminModal(false)}>
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
       <Toast message={message} />
-    </main>
+    </DashboardShell>
   );
 }

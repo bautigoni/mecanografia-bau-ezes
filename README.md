@@ -2,6 +2,44 @@
 
 TYPELY is a Vite + React + TypeScript + Tailwind CSS demo for a gamified Primary School digital literacy and keyboard skills platform.
 
+## Roles & dashboards
+
+After login each role lands on its own experience (see `routeForRole`):
+
+| Role | Lands on | Experience |
+| --- | --- | --- |
+| `superadmin` | `/admin-general` | **Global control center** — create/edit sedes, create sede admins, ecosystem counters. |
+| `admin-sede` | `/admin-sede` | **Sede dashboard** — courses, teachers, students, invitations, progress (scoped to one sede). |
+| `profesor` | `/profesor` | Teacher panel — assigned class, students, island enablement. |
+| `alumno` | `/mundos` | The gamified world map (islands/levels). |
+
+The student game map is **exclusive to students**: the `/mundos` route group is
+marked `exclusive`, so an admin/teacher who tries to open it is redirected to
+their own dashboard.
+
+**Superadmin login (always works):** username `admin`, password `admin`. A
+defensive fallback in `authenticateAny` restores the seeded `SUPERADMIN_USER`
+even if persisted localStorage is stale/corrupt.
+
+### Email invitations (teachers)
+
+A sede admin can invite a teacher by email (Invitaciones tab). This creates an
+`Invitation` record with a token + `pending` status and a shareable link. The
+frontend calls an **internal backend endpoint** (`/api/invitations/send`,
+configurable via `VITE_INVITE_API_URL`) — it never talks to the email provider
+directly and holds no API key. If the backend isn't deployed, the invitation
+stays `pending` and the UI offers a copyable invite link.
+
+To enable real delivery, run the optional server scaffold (`server/index.mjs`):
+
+```bash
+npm i express resend
+RESEND_API_KEY=re_xxx INVITE_FROM="Typely <no-reply@typely.bauhub.online>" node server/index.mjs
+```
+
+> **Security:** `RESEND_API_KEY` lives ONLY in the server environment. Never put
+> it in a `VITE_` variable — those are inlined into the public browser bundle.
+
 ## Install
 
 ```bash

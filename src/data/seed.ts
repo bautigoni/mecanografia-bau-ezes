@@ -115,4 +115,5 @@ export const seedData: DemoData = {
     { id: "reward-sofia-1", userId: "u-sofia", name: "Medalla inicial", unlocked: true },
     { id: "reward-sofia-2", userId: "u-sofia", name: "Llave de teclas", unlocked: true },
   ],
+  invitations: [],
 };
