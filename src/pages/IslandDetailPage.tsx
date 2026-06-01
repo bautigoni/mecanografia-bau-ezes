@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
-import { getWorldBySlug, getWorlds, type LevelPosition } from "../data/worlds";
+import { getWorldBySlug, getWorlds, worldStarProgress, type LevelPosition } from "../data/worlds";
 import { assets } from "../utils/assets";
 
 
@@ -88,6 +88,9 @@ export function IslandDetailPage() {
   const currentPosition = world.levelPositions[currentIndex] ?? world.levelPositions[0];
   const nextPosition = world.levelPositions[currentIndex + 1];
   const shipAsset = getShipAsset(currentPosition, nextPosition);
+  /* Star progress toward unlocking the next world (70% gate). */
+  const starProgress = worldStarProgress(world.slug);
+  const isLastWorld = worldNumber >= allWorlds.length;
 
   function selectLevel(index: number) {
     const level = world.levels[index];
@@ -201,7 +204,7 @@ export function IslandDetailPage() {
                   </span>
                   <span className="level-node__rating" aria-hidden="true">
                     {Array.from({ length: 3 }).map((_, ratingIndex) => (
-                      <Star key={ratingIndex} size={16} fill={isCompleted ? "currentColor" : "none"} />
+                      <Star key={ratingIndex} size={16} fill={ratingIndex < level.stars ? "currentColor" : "none"} />
                     ))}
                   </span>
                 </button>
@@ -223,6 +226,14 @@ export function IslandDetailPage() {
         </span>
         <h1>{world.title}</h1>
         <p>Elegí un nivel para continuar tu aventura.</p>
+        <p className="world-star-progress">
+          <Star size={15} fill="currentColor" />
+          {isLastWorld
+            ? `Progreso: ${starProgress.earnedStars} / ${starProgress.totalStars} estrellas`
+            : starProgress.isUnlockedNext
+              ? `Siguiente mundo desbloqueado · ${starProgress.earnedStars} / ${starProgress.totalStars} estrellas`
+              : `Necesitás ${starProgress.requiredStars} de ${starProgress.totalStars} estrellas para desbloquear el siguiente mundo (tenés ${starProgress.earnedStars}).`}
+        </p>
       </div>
 
       <aside className="level-detail-panel" aria-label="Detalle del nivel seleccionado">

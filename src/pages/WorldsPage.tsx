@@ -9,6 +9,7 @@ import {
   FlaskConical,
   Flower2,
   Gem,
+  GraduationCap,
   Lock,
   LogOut,
   MessageSquare,
@@ -28,7 +29,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { getWorldStates, getWorldsForUser, type World } from "../data/worlds";
+import { getWorldStatesForUser, getWorldsForUser, type World } from "../data/worlds";
 import { Toast } from "../components/common/Toast";
 import { assets } from "../utils/assets";
 import { getUserContext, makeRapidClickDetector } from "../utils/userContext";
@@ -128,7 +129,7 @@ export function WorldsPage() {
   const context = getUserContext(user);
   const progress = loadProgress();
   const visibleWorlds = getWorldsForUser(context, progress);
-  const worldStates = getWorldStates(progress);
+  const worldStates = getWorldStatesForUser(context, progress);
 
   /* Track widths and SVG path — recomputed whenever visible set changes. */
   const trackWidthVw = trackWidth(visibleWorlds);
@@ -167,7 +168,7 @@ export function WorldsPage() {
 
   function enterWorld(world: World, bypassLock = false) {
     if (worldStates[world.slug] === "locked" && !bypassLock) {
-      setMessage("Completá el mundo anterior para desbloquear este.");
+      setMessage("Conseguí el 70% de estrellas del mundo anterior para desbloquear este mundo.");
       return;
     }
     setSelectedWorld(world.id);
@@ -197,9 +198,12 @@ export function WorldsPage() {
   }
 
   function handleIslandClick(world: World) {
-    /* Normal click: honour the lock. */
     const isLocked = worldStates[world.slug] === "locked";
-    /* Dev bypass: 5 quick clicks on the same island bypass the lock. */
+
+    /* Hidden dev bypass: 5 quick clicks on the same island open it even when
+       locked (for testing / presenting the full product). Everyone else —
+       including the admin/superadmin player — must earn 70% of the previous
+       world's stars first, so the unlock gate actually blocks during play. */
     const devBypass = devClickRef.current(world.id);
     if (devBypass && isLocked) {
       enterWorld(world, true);
@@ -251,6 +255,13 @@ export function WorldsPage() {
               <Star size={19} />
               <span>1280 estrellas</span>
             </button>
+            {/* Superadmin-only shortcut to the teacher/admin panel. */}
+            {context.isSuperAdmin && (
+              <button type="button" onClick={() => navigate("/profesor")}>
+                <GraduationCap size={19} />
+                <span>Panel docente</span>
+              </button>
+            )}
             <button type="button" onClick={leave}>
               <LogOut size={19} />
               <span>Salir</span>

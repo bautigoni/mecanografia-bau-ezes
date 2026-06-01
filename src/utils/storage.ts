@@ -96,8 +96,9 @@ export function authenticate(role: Role, username: string, password: string): Ac
   return activeUser;
 }
 
-/** Like `authenticate` but discovers the role automatically.
- *  Students never need to choose their role; this function handles it. */
+/** Role-agnostic login.  In this build ONLY the superadmin (admin/admin)
+ *  is a valid login — the sample student records are data-only and never
+ *  authenticate.  Role is discovered automatically; no role picker needed. */
 export function authenticateAny(username: string, password: string): ActiveUser | null {
   ensureSeedData();
   const users = getDemoData().users;
@@ -105,19 +106,14 @@ export function authenticateAny(username: string, password: string): ActiveUser 
     (user) => user.username === username && user.password === password,
   );
   if (!found) return null;
+  // Hard rule: only the superadmin account may sign in via the UI.
+  if (found.role !== "superadmin") return null;
   const { password: _password, stats: _stats, ...activeUser } = found;
   return activeUser;
 }
 
-/** Demo login that picks the default student when no role is given.
- *  Teachers / admins can still pass an explicit role. */
-export function demoLoginAny(preferRole?: Role): ActiveUser {
-  const role = preferRole ?? "alumno";
-  return demoLogin(role);
-}
-
 export function demoLogin(role: Role): ActiveUser {
-  const user = demoUsers.find((candidate) => candidate.role === role);
+  const user = demoUsers.find((candidate) => candidate.role === role) ?? demoUsers[0];
   if (!user) {
     throw new Error(`No demo user configured for role ${role}`);
   }
@@ -126,8 +122,27 @@ export function demoLogin(role: Role): ActiveUser {
   return activeUser;
 }
 
+/* ------------------------------------------------------------------ */
+/* Demo-mode flag                                                      */
+/* ------------------------------------------------------------------ */
+/** Demo mode = full free-path preview (all worlds, no course filter).
+ *  Set when entering via the "Entrar en modo demo" button. */
+const DEMO_MODE_KEY = "edutic_demo_mode";
+
+export function setDemoMode(on: boolean) {
+  if (on) localStorage.setItem(DEMO_MODE_KEY, "true");
+  else localStorage.removeItem(DEMO_MODE_KEY);
+}
+
+export function isDemoMode(): boolean {
+  return localStorage.getItem(DEMO_MODE_KEY) === "true";
+}
+
 export function routeForRole(role: Role) {
   const routes: Record<Role, string> = {
+    // Superadmin lands on the world map (full free-path access). They can
+    // reach the teacher/admin views from there.
+    superadmin: "/mundos",
     "admin-general": "/admin-general",
     "admin-sede": "/admin-sede",
     profesor: "/profesor",
@@ -139,6 +154,7 @@ export function routeForRole(role: Role) {
 
 export function roleLabel(role: Role) {
   const labels: Record<Role, string> = {
+    superadmin: "Superadmin",
     "admin-general": "Admin general",
     "admin-sede": "Admin de sede",
     profesor: "Profesor",
@@ -146,6 +162,53 @@ export function roleLabel(role: Role) {
   };
 
   return labels[role];
+}
+
+/* ------------------------------------------------------------------ */
+/* Teacher → enabled-worlds-per-class selection                        */
+/* ------------------------------------------------------------------ */
+/* A class can have a saved set of worldIds the teacher enabled for it.
+   Stored as a string[] under `edutic_class_worlds_<classId>`.
+   `null` (no key) means "no restriction" → all course worlds enabled. */
+function classWorldsKey(classId: string) {
+  return `edutic_class_worlds_${classId}`;
+}
+
+/** Returns the teacher-enabled worldIds for a class, or null if the
+ *  teacher has never customised this class (→ all worlds enabled). */
+export function getEnabledWorldsForClass(classId?: string): string[] | null {
+  if (!classId) return null;
+  const raw = localStorage.getItem(classWorldsKey(classId));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as string[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Persists the full set of enabled worldIds for a class. */
+export function setEnabledWorldsForClass(classId: string, worldIds: string[]) {
+  localStorage.setItem(classWorldsKey(classId), JSON.stringify(worldIds));
+}
+
+/** Enables/disables a single world for a class and persists.
+ *  `allWorldIds` is used to seed the initial set the first time a teacher
+ *  customises (so toggling one world off keeps the rest enabled). */
+export function updateTeacherWorldSelection(
+  classId: string,
+  worldId: string,
+  enabled: boolean,
+  allWorldIds: string[],
+): string[] {
+  const current = getEnabledWorldsForClass(classId) ?? allWorldIds;
+  const set = new Set(current);
+  if (enabled) set.add(worldId);
+  else set.delete(worldId);
+  const next = allWorldIds.filter((id) => set.has(id)); // keep canonical order
+  setEnabledWorldsForClass(classId, next);
+  return next;
 }
 
 export function makeId(prefix: string) {

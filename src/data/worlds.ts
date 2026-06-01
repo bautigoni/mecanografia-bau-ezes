@@ -1,7 +1,44 @@
 import { activitiesByWorld, type Activity } from "./activities";
-import { assets, expansionIslandThumbs, expansionWorldBackgrounds } from "../utils/assets";
-import { isLevelCompleted, levelState, loadProgress, type CurriculumProgress } from "../utils/progress";
+import { assets, expansionIslandThumbs, islandDetailBackgrounds, gameplayBackgrounds } from "../utils/assets";
+import {
+  getBestStarsForLevel,
+  getWorldStarProgress,
+  isLevelCompleted,
+  levelState,
+  loadProgress,
+  type CurriculumProgress,
+  type WorldStarProgress,
+} from "../utils/progress";
 import { getVisibleWorldIds, type UserContext } from "../utils/userContext";
+
+/* =====================================================================
+   GAMEPLAY BACKGROUND MAPPING.
+   - Original worlds 1-5 KEEP their single original painted gameplay scene
+     (assets.gameplayBg). They are NOT remapped to the new folder.
+   - New worlds 6-15 each get their theme-matched gameplay scene from
+     /typely_gameplay_background_webp, by expansion index (0→island6 …
+     9→island15), which lines up 1:1 with their thumbnail + detail theme.
+   worldId -> gameplay background file
+===================================================================== */
+const GAMEPLAY_BACKGROUND_BY_WORLD: Record<Activity["worldId"], string> = {
+  // Originals — preserved.
+  island1: assets.gameplayBg,
+  island2: assets.gameplayBg,
+  island3: assets.gameplayBg,
+  island4: assets.gameplayBg,
+  island5: assets.gameplayBg,
+  // New worlds — theme-matched (expansion index → gameplayBackgrounds index).
+  island6:  gameplayBackgrounds[0], // crystal portal
+  island7:  gameplayBackgrounds[1], // garden library
+  island8:  gameplayBackgrounds[2], // frozen clockwork
+  island9:  gameplayBackgrounds[3], // autumn artist
+  island10: gameplayBackgrounds[4], // jungle ruins
+  island11: gameplayBackgrounds[5], // candyland
+  island12: gameplayBackgrounds[6], // desert canyon
+  island13: gameplayBackgrounds[7], // rainbow playground
+  island14: gameplayBackgrounds[8], // alchemy lab
+  island15: gameplayBackgrounds[9], // lagoon
+};
 
 export type LevelState = "Completado" | "Actual" | "Bloqueado";
 
@@ -12,6 +49,8 @@ export type Level = {
   description: string;
   activityId: string;
   levelNumber: number;
+  /** Best stars earned in this level (0-3), derived from best accuracy. */
+  stars: number;
 };
 
 export type LevelPosition = {
@@ -32,6 +71,10 @@ export type World = {
   id: Activity["worldId"];
   slug: Activity["worldId"];
   title: string;
+  /** Short topic/theme label shown to teachers (e.g. "Atajos de teclado"). */
+  topic: string;
+  /** 1-based difficulty order (position in WORLD_ORDER). */
+  order: number;
   thumbnail: string;
   background: string;
   /** Background painted behind the actual typing/shortcut gameplay screen. */
@@ -40,6 +83,25 @@ export type World = {
   levels: Level[];
   levelPositions: LevelPosition[];
   map: MapPosition;
+};
+
+/* Teacher-facing topic/theme per world. */
+export const WORLD_TOPICS: Record<Activity["worldId"], string> = {
+  island1: "Escritura — primeras teclas",
+  island6: "Escritura",
+  island2: "Palabras",
+  island7: "Palabras largas",
+  island13: "Mensajes",
+  island3: "Signos y tildes",
+  island8: "Signos",
+  island4: "Símbolos y código",
+  island9: "Mails",
+  island10: "Búsquedas en navegador",
+  island5: "Mouse y habilidades digitales",
+  island11: "Comandos básicos",
+  island12: "Ventanas y pestañas",
+  island14: "Comandos avanzados",
+  island15: "Reto final",
 };
 
 /* Per-island level layouts.
@@ -198,13 +260,17 @@ const worldMapPositions: Record<Activity["worldId"], MapPosition> = {
   island15: { x: 244, y: 13 }, // #15
 };
 
-/* Build the meta for an expansion island (island6 … island15). */
+/* Build the meta for an expansion island (island6 … island15).
+   - thumbnail (world map)        → floating island art
+   - background (island detail)   → scene WITH platforms (typely_backgrounds_webp)
+   - gameplayBg (gameplay screen) → central-stage scene (gameplay folder)
+   All three share the same theme via the expansion index. */
 function expansionMeta(worldId: Activity["worldId"], index: number): WorldMetaEntry {
   return {
     title: expansionTitles[index],
     thumbnail: expansionIslandThumbs[index],
-    background: expansionWorldBackgrounds[index],
-    gameplayBg: expansionWorldBackgrounds[index],
+    background: islandDetailBackgrounds[index],
+    gameplayBg: GAMEPLAY_BACKGROUND_BY_WORLD[worldId],
     positions: islandLevelLayouts[worldId],
     map: worldMapPositions[worldId],
   };
@@ -215,7 +281,7 @@ const worldMeta: Record<Activity["worldId"], WorldMetaEntry> = {
     title: "Isla de teclas",
     thumbnail: assets.worldsIsland1,
     background: assets.island1,
-    gameplayBg: assets.gameplayBg,
+    gameplayBg: GAMEPLAY_BACKGROUND_BY_WORLD.island1,
     positions: islandLevelLayouts.island1,
     map: worldMapPositions.island1,
   },
@@ -223,7 +289,7 @@ const worldMeta: Record<Activity["worldId"], WorldMetaEntry> = {
     title: "Isla de palabras",
     thumbnail: assets.worldsIsland2,
     background: assets.island2,
-    gameplayBg: assets.gameplayBg,
+    gameplayBg: GAMEPLAY_BACKGROUND_BY_WORLD.island2,
     positions: islandLevelLayouts.island2,
     map: worldMapPositions.island2,
   },
@@ -231,7 +297,7 @@ const worldMeta: Record<Activity["worldId"], WorldMetaEntry> = {
     title: "Isla de la biblioteca",
     thumbnail: assets.worldsIsland3,
     background: assets.island3,
-    gameplayBg: assets.gameplayBg,
+    gameplayBg: GAMEPLAY_BACKGROUND_BY_WORLD.island3,
     positions: islandLevelLayouts.island3,
     map: worldMapPositions.island3,
   },
@@ -239,7 +305,7 @@ const worldMeta: Record<Activity["worldId"], WorldMetaEntry> = {
     title: "Isla del árbol",
     thumbnail: assets.worldsIsland4,
     background: assets.island4,
-    gameplayBg: assets.gameplayBg,
+    gameplayBg: GAMEPLAY_BACKGROUND_BY_WORLD.island4,
     positions: islandLevelLayouts.island4,
     map: worldMapPositions.island4,
   },
@@ -247,7 +313,7 @@ const worldMeta: Record<Activity["worldId"], WorldMetaEntry> = {
     title: "Isla digital",
     thumbnail: assets.worldsIsland5,
     background: assets.island5,
-    gameplayBg: assets.gameplayBg,
+    gameplayBg: GAMEPLAY_BACKGROUND_BY_WORLD.island5,
     positions: islandLevelLayouts.island5,
     map: worldMapPositions.island5,
   },
@@ -277,6 +343,7 @@ function buildLevels(worldId: Activity["worldId"], progress: CurriculumProgress)
       description,
       activityId: activity.id,
       levelNumber: activity.levelNumber,
+      stars: getBestStarsForLevel(progress, worldId, activity.levelNumber),
     };
   });
 }
@@ -287,6 +354,8 @@ function buildWorld(worldId: Activity["worldId"], progress: CurriculumProgress):
     id: worldId,
     slug: worldId,
     title: meta.title,
+    topic: WORLD_TOPICS[worldId],
+    order: WORLD_ORDER.indexOf(worldId) + 1,
     thumbnail: meta.thumbnail,
     background: meta.background,
     gameplayBg: meta.gameplayBg,
@@ -297,11 +366,15 @@ function buildWorld(worldId: Activity["worldId"], progress: CurriculumProgress):
   };
 }
 
-/* Background painted behind the gameplay screen for a given world. Existing
-   worlds keep the shared painted scene; expansion worlds use their own art. */
+/* Background painted behind the gameplay screen for a given world.
+   ALWAYS resolves to a scene in /typely_gameplay_background_webp — never the
+   island thumbnail, the old backgrounds set, or the fallback gameplay-bg. */
 export function getGameplayBackground(worldId: Activity["worldId"]): string {
-  return worldMeta[worldId]?.gameplayBg ?? assets.gameplayBg;
+  return GAMEPLAY_BACKGROUND_BY_WORLD[worldId] ?? gameplayBackgrounds[0];
 }
+
+/** Alias with the descriptive name used elsewhere in the codebase. */
+export const getGameplayBackgroundForWorld = getGameplayBackground;
 
 /* Progression order of the five worlds. NOTE: the digital-skills island
    (island5) is the SECOND world in the learning path even though it sits in
@@ -331,30 +404,71 @@ export const WORLD_ORDER: Activity["worldId"][] = [
 
 export type WorldLockState = "completed" | "current" | "locked";
 
-/* A world counts as complete once every one of its levels is completed. */
+/* A world counts as fully complete once every level is completed (all levels
+   done). Kept for callers that need the strict "all levels done" check. */
 export function isWorldComplete(worldId: Activity["worldId"], progress: CurriculumProgress): boolean {
   return activitiesByWorld[worldId].every((activity) => isLevelCompleted(progress, worldId, activity.levelNumber));
 }
 
-/* Sequential unlocking: a world is "current" once all earlier worlds in
-   WORLD_ORDER are complete, "completed" when finished, and "locked" until
-   then. Only one world is ever "current". */
+/** Star progress for a world (re-exported for UI). */
+export function worldStarProgress(
+  worldId: Activity["worldId"],
+  progress: CurriculumProgress = loadProgress(),
+): WorldStarProgress {
+  return getWorldStarProgress(progress, worldId);
+}
+
+/* Build lock states over an ORDERED list of worldIds using the 70%-stars
+   rule: the first world is unlocked; each next world unlocks only once the
+   previous one has earned ≥70% of its possible stars.
+     - "completed" → this world has already reached the 70% star gate.
+     - "current"   → unlocked and being worked on (first world below 70%).
+     - "locked"    → previous world has not reached 70% yet.
+   When `unlockAll` is true (free path: demo / superadmin / teacher) nothing
+   is ever locked. */
+function buildStarStates(
+  orderedIds: Activity["worldId"][],
+  progress: CurriculumProgress,
+  unlockAll: boolean,
+): Record<string, WorldLockState> {
+  const states: Record<string, WorldLockState> = {};
+  let previousUnlocksNext = true; // the first world is always available
+  for (const id of orderedIds) {
+    const reached = getWorldStarProgress(progress, id).isUnlockedNext;
+    if (unlockAll) {
+      states[id] = reached ? "completed" : "current";
+      continue;
+    }
+    if (!previousUnlocksNext) {
+      states[id] = "locked";
+      continue;
+    }
+    states[id] = reached ? "completed" : "current";
+    previousUnlocksNext = reached;
+  }
+  return states;
+}
+
+/* Sequential unlocking over the full WORLD_ORDER (no user context).
+   Uses the 70%-stars rule. */
 export function getWorldStates(
   progress: CurriculumProgress = loadProgress(),
 ): Record<Activity["worldId"], WorldLockState> {
-  const states = {} as Record<Activity["worldId"], WorldLockState>;
-  let previousComplete = true;
-  for (const id of WORLD_ORDER) {
-    if (isWorldComplete(id, progress)) {
-      states[id] = "completed";
-    } else if (previousComplete) {
-      states[id] = "current";
-      previousComplete = false;
-    } else {
-      states[id] = "locked";
-    }
-  }
-  return states;
+  return buildStarStates(WORLD_ORDER, progress, false) as Record<Activity["worldId"], WorldLockState>;
+}
+
+/* Context-aware lock states. The 70%-stars chain is applied to EVERY user
+   over their ordered worlds, so the unlock gate is real while playing — you
+   must earn 70% of a world's stars to open the next one. Demo / superadmin
+   still SEE every world (visibility is handled by getWorldsForUser); locked
+   ones simply appear greyed and can be opened with the hidden 5-click dev
+   bypass for testing. */
+export function getWorldStatesForUser(
+  context: UserContext,
+  progress: CurriculumProgress = loadProgress(),
+): Record<string, WorldLockState> {
+  const orderedIds = getWorldsForUser(context, progress).map((w) => w.id);
+  return buildStarStates(orderedIds, progress, false);
 }
 
 export function getWorlds(progress: CurriculumProgress = loadProgress()): World[] {
@@ -369,14 +483,34 @@ export function getWorldBySlug(slug?: string, progress: CurriculumProgress = loa
 
 export const worlds: World[] = getWorlds();
 
-/** Returns worlds filtered to those visible for a specific user context.
+/** Returns worlds visible for a specific user context.
+ *
+ *  - Demo mode / superadmin / teacher / admin (free path) → EVERY world in
+ *    difficulty order, taken directly from WORLD_ORDER. This is independent
+ *    of any course/grade list, so it can never be accidentally filtered down
+ *    (this is what previously cut demo mode to a 3EP-sized 7 worlds).
+ *  - Real students (course path) → only the worlds for their grade, further
+ *    narrowed by the teacher's per-class island selection.
+ *
  *  Pass the result of getUserContext() from userContext.ts. */
 export function getWorldsForUser(
   context: UserContext,
   progress: CurriculumProgress = loadProgress(),
 ): World[] {
+  // Free path: all worlds, always complete, ordered by difficulty.
+  if (!context.isCoursePath) {
+    return WORLD_ORDER.map((id) => buildWorld(id, progress));
+  }
+  // Course path: grade + teacher selection (handled in getVisibleWorldIds).
   const visibleIds = getVisibleWorldIds(context);
   return visibleIds.map((id) => buildWorld(id, progress));
+}
+
+/** All worlds ordered by difficulty (the canonical free-path list). */
+export function getAllWorldsOrderedByDifficulty(
+  progress: CurriculumProgress = loadProgress(),
+): World[] {
+  return WORLD_ORDER.map((id) => buildWorld(id, progress));
 }
 
 export type WorldId = World["id"];

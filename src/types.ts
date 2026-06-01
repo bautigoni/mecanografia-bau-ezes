@@ -1,4 +1,4 @@
-export type Role = "admin-general" | "admin-sede" | "profesor" | "alumno";
+export type Role = "superadmin" | "admin-general" | "admin-sede" | "profesor" | "alumno";
 
 export type AccessStatus = "Activo" | "Inactivo";
 

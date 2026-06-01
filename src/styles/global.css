@@ -207,14 +207,8 @@ a {
   animation: cardIn 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.login-card::before {
-  position: absolute;
-  inset: 0.3rem 0.45rem auto;
-  height: 0.28rem;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent-teal), var(--accent-sky), var(--accent-pink));
-  content: "";
-}
+/* The thin teal→sky→pink accent line that used to sit at the very top of the
+   login card was removed — it looked like a stray stripe. */
 
 .login-card::after {
   position: absolute;
@@ -315,6 +309,122 @@ a {
   z-index: 2;
   display: grid;
   gap: 0.72rem;
+}
+
+/* Google sign-in button — clean white pill consistent with the glass UI. */
+.google-login-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.85rem 1.2rem;
+  border: 1.5px solid rgba(120, 130, 170, 0.28);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #3c4257;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(54, 86, 134, 0.14);
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+.google-login-btn:hover {
+  transform: translateY(-1px);
+  background: #ffffff;
+  box-shadow: 0 14px 30px rgba(54, 86, 134, 0.2);
+}
+.google-login-btn:active {
+  transform: translateY(0);
+}
+.google-login-btn__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Demo-mode "continuar / empezar de cero" dialog. */
+.demo-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+.demo-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(35, 45, 90, 0.42);
+  backdrop-filter: blur(4px);
+}
+.demo-modal__card {
+  position: relative;
+  z-index: 1;
+  width: min(26rem, 92vw);
+  padding: 1.8rem 1.6rem 1.5rem;
+  border-radius: 26px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 24px 60px rgba(54, 86, 134, 0.28);
+  animation: softHintIn 240ms ease-out both;
+}
+.demo-modal__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, #54e8c6, #536bff);
+  box-shadow: 0 10px 22px rgba(83, 107, 255, 0.34);
+}
+.demo-modal__card h2 {
+  margin: 0.7rem 0 0.3rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: #17355f;
+}
+.demo-modal__card p {
+  margin: 0 0 1.2rem;
+  color: rgba(33, 54, 96, 0.78);
+  font-weight: 700;
+}
+.demo-modal__actions {
+  display: grid;
+  gap: 0.6rem;
+}
+.demo-modal__btn {
+  padding: 0.8rem 1.2rem;
+  border: 0;
+  border-radius: 16px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+.demo-modal__btn:hover { transform: translateY(-1px); }
+.demo-modal__btn--primary {
+  color: #fff;
+  background: linear-gradient(135deg, #54e8c6, #25c8df, #536bff);
+  box-shadow: 0 12px 26px rgba(83, 107, 255, 0.3);
+}
+.demo-modal__btn--ghost {
+  color: #44558a;
+  background: rgba(120, 130, 170, 0.14);
+}
+.demo-modal__close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.9rem;
+  border: 0;
+  background: transparent;
+  font-size: 1.05rem;
+  color: #8a93b4;
+  cursor: pointer;
 }
 
 .login-field,
@@ -1570,6 +1680,23 @@ a {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.38);
 }
 
+/* Brief star-unlock progress line under the world title. */
+.island-title-panel p.world-star-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+  font-size: 0.92rem;
+  color: #8a5b00;
+  background: rgba(255, 225, 124, 0.5);
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+}
+.island-title-panel p.world-star-progress svg {
+  color: #facc15;
+  flex: 0 0 auto;
+}
+
 .island-detail__chrome {
   position: relative;
   z-index: 4;
@@ -2220,15 +2347,21 @@ a {
 .target-card.target--phrase strong {
   font-size: clamp(1.8rem, 3.6vw, 2.6rem);
   line-height: 1.05;
-  /* Single horizontal line — no row break. Long phrases scroll inside. */
+  /* Single horizontal line — no row break. Long phrases auto-scroll inside
+     (driven by JS to follow the current character). No visible scrollbar. */
   display: block;
   white-space: nowrap;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
   word-spacing: 0.08em;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-behavior: smooth;
   text-align: center;
   padding: 0 0.4rem;
+}
+.target-card.target--phrase strong::-webkit-scrollbar {
+  display: none;
 }
 .target-card.target--symbol strong {
   font-size: clamp(5rem, 12vw, 8rem);
@@ -3048,6 +3181,108 @@ a {
   grid-column: 1 / -1;
 }
 
+/* ===== Teacher island-selection grid ===== */
+.island-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.9rem;
+}
+.island-toggle-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "thumb body"
+    "switch switch";
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  padding: 0.8rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1.5px solid rgba(120, 130, 170, 0.18);
+  box-shadow: 0 10px 22px rgba(54, 86, 134, 0.1);
+  transition: border-color 160ms ease, opacity 160ms ease;
+}
+.island-toggle-card.is-off {
+  opacity: 0.66;
+  border-color: rgba(120, 130, 170, 0.14);
+}
+.island-toggle-card.is-on {
+  border-color: rgba(38, 190, 180, 0.5);
+}
+.island-toggle-card__thumb {
+  grid-area: thumb;
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+}
+.island-toggle-card__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 10px rgba(45, 73, 142, 0.2));
+}
+.island-toggle-card.is-off .island-toggle-card__thumb img {
+  filter: grayscale(0.7) brightness(0.9);
+}
+.island-toggle-card__order {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  background: linear-gradient(135deg, #54e8c6, #536bff);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  box-shadow: 0 4px 8px rgba(83, 107, 255, 0.3);
+}
+.island-toggle-card__body {
+  grid-area: body;
+  display: grid;
+  gap: 0.15rem;
+}
+.island-toggle-card__body strong {
+  font-family: var(--font-display);
+  color: #17355f;
+  font-size: 0.98rem;
+}
+.island-toggle-card__topic {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #536bff;
+}
+.island-toggle-card__meta {
+  font-size: 0.76rem;
+  color: #75809e;
+}
+.island-toggle-card__switch {
+  grid-area: switch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: background 160ms ease, transform 120ms ease;
+}
+.island-toggle-card__switch:hover { transform: translateY(-1px); }
+.island-toggle-card__switch.is-on {
+  background: linear-gradient(135deg, #5be8ba, #22c7b8);
+  color: #08484a;
+}
+.island-toggle-card__switch.is-off {
+  background: rgba(120, 130, 170, 0.18);
+  color: #5a6485;
+}
+
 .admin-panel__heading {
   display: flex;
   align-items: center;
@@ -3846,14 +4081,19 @@ h3, h4 {
   font-size: clamp(1.6rem, 3.6vw, 2.6rem);
   letter-spacing: 0.02em;
   line-height: 1.1;
-  /* Single horizontal line — long input scrolls instead of wrapping. */
+  /* Single horizontal line — long input auto-scrolls (JS keeps the caret in
+     view) instead of wrapping. No visible scrollbar. */
   white-space: nowrap;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   scroll-behavior: smooth;
   direction: ltr;
   text-align: left;
+}
+.typed-preview__value::-webkit-scrollbar {
+  display: none;
 }
 
 /* Anchor scroll to the right edge so the most recent character is in view. */
@@ -4430,9 +4670,13 @@ h3, h4 {
    No scrim or overlay is applied so the artwork reads clearly. */
 .i5-shell__bg {
   position: absolute; inset: 0; z-index: -2;
-  background:
-    url("/assets/edutic-art/gameplay-bg.webp") center / cover no-repeat,
-    linear-gradient(180deg, #cfeeff 0%, #b8dcff 45%, #d6c7ff 100%);
+  /* The real scene image is injected inline from getGameplayBackground();
+     this gradient is only a soft fallback while the image decodes. */
+  background-color: #cfeeff;
+  background-image: linear-gradient(180deg, #cfeeff 0%, #b8dcff 45%, #d6c7ff 100%);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 
 /* ===== Shortcut engine (reuses the i5-shell chrome) ===== */
@@ -4464,6 +4708,15 @@ h3, h4 {
   font-family: var(--font-display); font-weight: 600;
   font-size: clamp(0.85rem, 1.7vw, 1.05rem);
   box-shadow: 0 10px 22px rgba(60, 80, 150, 0.16);
+}
+.sc-hint--sub {
+  margin-top: 0.3rem;
+  background: transparent;
+  box-shadow: none;
+  color: #6a7baa;
+  font-weight: 600;
+  font-size: clamp(0.74rem, 1.4vw, 0.9rem);
+  padding: 0.1rem 0.4rem;
 }
 .sc-combo {
   display: flex; align-items: center; justify-content: center;
@@ -4650,17 +4903,26 @@ h3, h4 {
 .sc-texteditor__text {
   padding: 0.65rem 0.9rem; border-radius: 0.75rem;
   background: #fff; border: 1.5px solid #d0d8ff;
-  font-size: 0.9rem; color: #333; cursor: pointer;
-  user-select: text;
-  transition: background 200ms;
+  font-size: 0.9rem; color: #333;
+  /* Never let the browser select this text — selection is simulated. */
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 200ms, border-color 200ms;
 }
-.sc-texteditor__text.is-selected { background: #d4edff; border-color: #88b8ff; }
+/* Simulated "selected all" highlight — lives only inside the box. */
+.sc-texteditor__text.is-selected {
+  background: #3a7bff;
+  border-color: #2b5fd0;
+  color: #fff;
+}
 .sc-texteditor__area {
   padding: 0.65rem 0.9rem; border-radius: 0.75rem;
-  border: 1.5px solid #d0d8ff; resize: none; min-height: 3.5rem;
+  border: 1.5px solid #d0d8ff; min-height: 3.5rem;
   font-family: var(--font-body); font-size: 0.9rem; color: #333;
   background: #fffdf5;
+  white-space: pre-wrap; word-break: break-word;
 }
+.sc-texteditor__placeholder { color: #b6bad6; }
 .sc-texteditor__undo { font-size: 0.8rem; color: #f07a2e; font-weight: 700; }
 
 /* ── Generic virtual action button ── */
@@ -5528,6 +5790,10 @@ h3, h4 {
 }
 .i5-modal__stars span {
   animation: i5-starPop 1s ease both;
+}
+.i5-modal__stars span.is-empty {
+  color: rgba(120, 130, 170, 0.4);
+  filter: none;
 }
 .i5-modal__stars span:nth-child(2) { animation-delay: 0.15s; }
 .i5-modal__stars span:nth-child(3) { animation-delay: 0.3s; }

@@ -25,7 +25,7 @@ import { useNavigate } from "react-router-dom";
 import type { Activity } from "../data/activities";
 import { assets } from "../utils/assets";
 import { getGameplayBackground } from "../data/worlds";
-import { markLevelComplete } from "../utils/progress";
+import { getStarsFromAccuracy, markLevelComplete } from "../utils/progress";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -64,6 +64,28 @@ function comboEnv(mods: string[], key: string): VirtualEnvKind {
   return "text-editor";
 }
 
+/* Clear, simulator-safe copy per combo (§6) — never just "hacé el atajo". */
+function comboActionHint(combo: Combo): string {
+  const k = combo.key.toLowerCase();
+  if (combo.mods.includes("Alt") && k === "tab") return "Cambiá de ventana en el simulador (o tocá las teclas).";
+  if (combo.mods.includes("Ctrl")) {
+    if (k === "t") return "Creá una pestaña dentro del simulador.";
+    if (k === "w") return "Cerrá la pestaña del simulador.";
+    if (k === "tab") return combo.mods.includes("Shift") ? "Volvé a la pestaña anterior del simulador." : "Cambiá de pestaña en el simulador.";
+    if (k === "a") return "Seleccioná todo el texto del cuadro.";
+    if (k === "c") return "Copiá el texto seleccionado.";
+    if (k === "v") return "Pegá el texto en el área de trabajo.";
+    if (k === "z") return "Deshacé el último cambio.";
+    if (k === "y") return "Rehacé el cambio en el simulador.";
+    if (k === "f") return "Abrí el buscador del simulador.";
+    if (k === "s") return "Guardá el documento del simulador.";
+    if (k === "n") return "Abrí una ventana nueva en el simulador.";
+  }
+  if (k === "enter") return "Aceptá con Enter en el simulador.";
+  if (k === "escape") return "Cerrá con Escape en el simulador.";
+  return "Hacé el atajo dentro del simulador.";
+}
+
 function parseCombo(raw: string): Combo {
   const tokens = raw.split("+").map((t) => t.trim()).filter(Boolean);
   const mods: string[] = [];
@@ -86,6 +108,48 @@ function eventMatchesCombo(ev: KeyboardEvent, combo: Combo): boolean {
   if (combo.mods.includes("Shift") !== ev.shiftKey) return false;
   if (combo.mods.includes("Alt") !== ev.altKey) return false;
   return ev.key.toLowerCase() === combo.key.toLowerCase();
+}
+
+/* A keydown whose key is *only* a modifier (Ctrl / Shift / Alt / Meta). These
+   must never count as an attempt — a shortcut isn't formed until the action
+   key is pressed. */
+function isModifierOnly(ev: KeyboardEvent): boolean {
+  return ev.key === "Control" || ev.key === "Shift" || ev.key === "Alt" || ev.key === "Meta" || ev.key === "OS";
+}
+
+/* Returns a normalized combo string ("ctrl+a", "alt+tab", "enter"…) when the
+   keydown forms a FULL shortcut attempt, or null when it should be ignored for
+   scoring (a lone modifier, or a plain key with no modifier that isn't
+   Enter/Escape). */
+function normalizeShortcut(ev: KeyboardEvent): string | null {
+  if (isModifierOnly(ev)) return null;
+  const hasMod = ev.ctrlKey || ev.metaKey || ev.altKey;
+  const key = ev.key;
+  const isStandalone = key === "Enter" || key === "Escape";
+  if (!hasMod && !isStandalone) return null; // plain key → not a shortcut attempt
+  const parts: string[] = [];
+  if (ev.ctrlKey || ev.metaKey) parts.push("ctrl");
+  if (ev.shiftKey) parts.push("shift");
+  if (ev.altKey) parts.push("alt");
+  parts.push(key.toLowerCase());
+  return parts.join("+");
+}
+
+/* Runs the simulator's visual action when the parent signals a correct combo
+   was performed via the real keyboard or the on-screen keycaps — so those
+   paths update the simulation exactly like clicking the action button does.
+   The env remounts per combo, so we baseline the signal on mount and only fire
+   when it next increments. */
+function useKeyboardTrigger(signal: number, act: () => void) {
+  const baseline = useRef(signal);
+  useEffect(() => {
+    if (signal > baseline.current) {
+      baseline.current = signal;
+      act();
+    }
+    // act is captured from the latest render; deps intentionally only [signal].
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signal]);
 }
 
 /* ------------------------------------------------------------------ */
@@ -148,7 +212,11 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
 
   const [clicked, setClicked] = useState<Record<string, boolean>>({});
   const [feedback, setFeedback] = useState<string | undefined>();
+  const [kbTrigger, setKbTrigger] = useState(0);
   const feedbackTimer = useRef<number | null>(null);
+  /* Set while the just-performed action is being shown before advancing, so a
+     single combo can't be scored twice during the short pause. */
+  const advancingRef = useRef(false);
 
   function flash(msg: string) {
     if (feedbackTimer.current) window.clearTimeout(feedbackTimer.current);
@@ -156,38 +224,64 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
     feedbackTimer.current = window.setTimeout(() => setFeedback(undefined), 1800);
   }
 
-  /* Advance to next combo, resetting per-combo clicked state. */
+  /* Called by the simulator's act() once it has performed the visual action.
+     We hold ~450 ms so the result (selected text, new tab…) is visible, then
+     advance. The guard makes ONE combo = ONE scored attempt. */
   function succeed() {
+    if (advancingRef.current) return;
+    advancingRef.current = true;
     flash("¡Muy bien!");
-    setClicked({});
-    prog.tickCorrect();
+    window.setTimeout(() => {
+      setClicked({});
+      prog.tickCorrect();
+      advancingRef.current = false;
+    }, 450);
   }
   function fail() {
+    if (advancingRef.current) return;
     flash("Casi… probá el atajo que se muestra.");
     prog.tickWrong();
   }
 
-  /* ---- Physical keyboard handler ---- */
+  /* A correct combo (keyboard or keycaps) tells the live simulator to perform
+     its visual action; the simulator then calls succeed(). This keeps ONE
+     code path for visual + scoring. */
+  function triggerVirtualAction() {
+    if (advancingRef.current) return;
+    setKbTrigger((t) => t + 1);
+  }
+
+  /* ---- Physical keyboard handler ----
+     Captures shortcuts INSIDE the game so the browser/OS never runs them:
+       - Ctrl+T won't open a tab, Ctrl+W won't close it, Ctrl+A won't select
+         the page, Alt+Tab won't switch apps (best effort — see §5).
+     Scoring rule: ONE full combo = ONE attempt. Lone modifiers never count. */
   useEffect(() => {
     function onKey(ev: KeyboardEvent) {
       if (prog.completed) return;
       const current = combos[progressRef.current];
       if (!current) return;
 
-      /* Always prevent default for any combo/special key while the shortcut
-         level is active — this keeps the browser from acting on Ctrl+W etc. */
-      const isSpecial =
-        ev.ctrlKey || ev.metaKey || ev.altKey ||
+      const modifierOnly = isModifierOnly(ev);
+      const hasMod = ev.ctrlKey || ev.metaKey || ev.altKey;
+      const blockable =
+        hasMod || modifierOnly ||
         ["Tab", "Enter", "Escape", "F1", "F2", "F3", "F4", "F5", "F6",
           "F7", "F8", "F9", "F10", "F11", "F12"].includes(ev.key);
-      if (isSpecial) {
+      // Block the browser/OS default for anything shortcut-like.
+      if (blockable) {
         ev.preventDefault();
         ev.stopPropagation();
       }
 
+      // Only EVALUATE a full combo. Lone Ctrl/Shift/Alt, or a plain key with
+      // no modifier (other than Enter/Escape), are ignored for scoring.
+      const combo = normalizeShortcut(ev);
+      if (!combo) return;
+
       if (eventMatchesCombo(ev, current)) {
-        succeed();
-      } else if (isSpecial) {
+        triggerVirtualAction(); // visual action → succeed()
+      } else {
         fail();
       }
     }
@@ -196,7 +290,8 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prog.completed, combos]);
 
-  /* ---- On-screen keycap clicking (always works, even when OS intercepts) ---- */
+  /* ---- On-screen keycap clicking (always works, even when OS intercepts) ----
+     Completing the keycap combo also drives the visual simulator action. */
   function onKeycapClick(capIdx: number, label: string) {
     if (prog.completed) return;
     const current = combos[prog.progress];
@@ -205,7 +300,7 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
     const next = { ...clicked, [key]: true };
     const allDone = current.caps.every((c, i) => next[`${i}:${c}`]);
     if (allDone) {
-      succeed();
+      triggerVirtualAction(); // visual action → succeed()
     } else {
       setClicked(next);
     }
@@ -278,6 +373,7 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
             combo={current}
             progress={prog.progress}
             completed={prog.completed}
+            triggerSignal={kbTrigger}
             onVirtualAction={succeed}
           />
 
@@ -285,8 +381,9 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
           <div className="sc-keycap-area">
             <span className="sc-hint">
               <Monitor size={16} />
-              Hacé el atajo en el teclado o tocá las teclas de abajo
+              {current ? comboActionHint(current) : "Hacé el atajo dentro del simulador."}
             </span>
+            <span className="sc-hint sc-hint--sub">Usá las teclas del juego o el teclado.</span>
             <div className="sc-combo" aria-label={`Atajo: ${current?.raw ?? ""}`}>
               {current?.caps.map((cap, i) => (
                 <span key={`${i}:${cap}`} className="sc-combo__group">
@@ -347,7 +444,10 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
             <h3 className="i5-modal__title">¡Muy bien!</h3>
             <p className="i5-modal__sub">Completaste el nivel</p>
             <div className="i5-modal__stars" aria-hidden="true">
-              <span>★</span><span>★</span><span>★</span>
+              {[1, 2, 3].map((i) => {
+                const earned = getStarsFromAccuracy(prog.precision);
+                return <span key={i} className={earned >= i ? "" : "is-empty"}>{earned >= i ? "★" : "☆"}</span>;
+              })}
             </div>
             <div className="i5-modal__actions">
               <button
@@ -376,34 +476,39 @@ interface VirtualEnvProps {
   combo: Combo | undefined;
   progress: number;
   completed: boolean;
+  triggerSignal: number;
   onVirtualAction: () => void;
 }
 
-function VirtualEnv({ combo, completed, onVirtualAction }: VirtualEnvProps) {
+type EnvProps = { combo: Combo; completed: boolean; triggerSignal: number; onAction: () => void };
+
+function VirtualEnv({ combo, completed, triggerSignal, onVirtualAction }: VirtualEnvProps) {
   if (!combo) return null;
+  const props: EnvProps = { combo, completed, triggerSignal, onAction: onVirtualAction };
   switch (combo.env) {
     case "browser-tabs":
-      return <VirtualBrowser combo={combo} completed={completed} onAction={onVirtualAction} />;
+      return <VirtualBrowser {...props} />;
     case "find-box":
-      return <VirtualFindBox combo={combo} completed={completed} onAction={onVirtualAction} />;
+      return <VirtualFindBox {...props} />;
     case "app-switcher":
-      return <VirtualAppSwitcher combo={combo} completed={completed} onAction={onVirtualAction} />;
+      return <VirtualAppSwitcher {...props} />;
     case "doc-editor":
-      return <VirtualDocEditor combo={combo} completed={completed} onAction={onVirtualAction} />;
+      return <VirtualDocEditor {...props} />;
     case "dialog":
-      return <VirtualDialog combo={combo} completed={completed} onAction={onVirtualAction} />;
+      return <VirtualDialog {...props} />;
     default:
-      return <VirtualTextEditor combo={combo} completed={completed} onAction={onVirtualAction} />;
+      return <VirtualTextEditor {...props} />;
   }
 }
 
 /* ------------------------------------------------------------------ */
 /* Virtual Browser (Ctrl+T, Ctrl+W, Ctrl+Tab, Ctrl+Shift+Tab)         */
 /* ------------------------------------------------------------------ */
-function VirtualBrowser({ combo, completed, onAction }: { combo: Combo; completed: boolean; onAction: () => void }) {
+function VirtualBrowser({ combo, completed, triggerSignal, onAction }: EnvProps) {
   const [tabs, setTabs] = useState(["Inicio", "Música", "Juegos"]);
   const [active, setActive] = useState(0);
   const [justActed, setJustActed] = useState(false);
+  useKeyboardTrigger(triggerSignal, () => act("kbd"));
 
   function act(label: string) {
     if (completed || justActed) return;
@@ -496,10 +601,11 @@ function VirtualBrowser({ combo, completed, onAction }: { combo: Combo; complete
 /* ------------------------------------------------------------------ */
 /* Virtual Find Box (Ctrl+F, Escape)                                   */
 /* ------------------------------------------------------------------ */
-function VirtualFindBox({ combo, completed, onAction }: { combo: Combo; completed: boolean; onAction: () => void }) {
+function VirtualFindBox({ combo, completed, triggerSignal, onAction }: EnvProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  useKeyboardTrigger(triggerSignal, () => act());
 
   function act() {
     if (completed) return;
@@ -551,9 +657,10 @@ function VirtualFindBox({ combo, completed, onAction }: { combo: Combo; complete
 /* ------------------------------------------------------------------ */
 const VIRT_APPS = ["TYPELY", "Música", "Notas", "Dibujo"];
 
-function VirtualAppSwitcher({ completed, onAction }: { combo: Combo; completed: boolean; onAction: () => void }) {
+function VirtualAppSwitcher({ completed, triggerSignal, onAction }: EnvProps) {
   const [focused, setFocused] = useState(0);
   const [switching, setSwitching] = useState(false);
+  useKeyboardTrigger(triggerSignal, () => act());
 
   function act() {
     if (completed) return;
@@ -591,10 +698,11 @@ function VirtualAppSwitcher({ completed, onAction }: { combo: Combo; completed: 
 /* ------------------------------------------------------------------ */
 /* Virtual Document Editor (Ctrl+S save, Ctrl+Y redo)                 */
 /* ------------------------------------------------------------------ */
-function VirtualDocEditor({ combo, completed, onAction }: { combo: Combo; completed: boolean; onAction: () => void }) {
+function VirtualDocEditor({ combo, completed, triggerSignal, onAction }: EnvProps) {
   const [saved, setSaved] = useState(false);
-  const [history, setHistory] = useState(["Hola mundo", "Hola, ¡mundo!"]);
+  const [history] = useState(["Hola mundo", "Hola, ¡mundo!"]);
   const [histIdx, setHistIdx] = useState(1);
+  useKeyboardTrigger(triggerSignal, () => act());
 
   function act() {
     if (completed) return;
@@ -625,8 +733,9 @@ function VirtualDocEditor({ combo, completed, onAction }: { combo: Combo; comple
 /* ------------------------------------------------------------------ */
 /* Virtual Dialog (Enter / Escape)                                     */
 /* ------------------------------------------------------------------ */
-function VirtualDialog({ combo, completed, onAction }: { combo: Combo; completed: boolean; onAction: () => void }) {
+function VirtualDialog({ combo, completed, triggerSignal, onAction }: EnvProps) {
   const [state, setState] = useState<"idle" | "open" | "done">("open");
+  useKeyboardTrigger(triggerSignal, () => act());
 
   function act() {
     if (completed || state === "done") return;
@@ -673,33 +782,39 @@ function VirtualDialog({ combo, completed, onAction }: { combo: Combo; completed
 /* ------------------------------------------------------------------ */
 const SOURCE_TEXT = "¡Hola! Soy un texto para copiar.";
 
-function VirtualTextEditor({ combo, completed, onAction }: { combo: Combo; completed: boolean; onAction: () => void }) {
-  const [selected, setSelected] = useState(false);
+function VirtualTextEditor({ combo, completed, triggerSignal, onAction }: EnvProps) {
+  /* Selection is SIMULATED with internal state — we never touch the real DOM
+     selection, so Ctrl+A can never select the whole page. The source starts
+     UNSELECTED; only performing Ctrl+A (keyboard, keycaps or button) selects
+     it inside the box. */
+  const [selectedAll, setSelectedAll] = useState(false);
   const [clipboard, setClipboard] = useState("");
   const [pasted, setPasted] = useState("");
   const [undone, setUndone] = useState(false);
-  const textRef = useRef<HTMLParagraphElement>(null);
-  const pasteRef = useRef<HTMLTextAreaElement>(null);
-
-  function selectAll() {
-    const node = textRef.current;
-    if (!node) return;
-    const range = document.createRange();
-    range.selectNodeContents(node);
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-    setSelected(true);
-  }
+  useKeyboardTrigger(triggerSignal, () => act());
 
   function act() {
     if (completed) return;
     const k = combo.key.toLowerCase();
-    if (k === "a") { selectAll(); onAction(); }
-    else if (k === "c") { setClipboard(SOURCE_TEXT); onAction(); }
-    else if (k === "v") { setPasted(clipboard || SOURCE_TEXT); onAction(); }
-    else if (k === "z") { setPasted(""); setUndone(true); window.setTimeout(() => setUndone(false), 1200); onAction(); }
-    else onAction();
+    if (k === "a") {
+      setSelectedAll(true);            // visual select inside the simulator only
+      onAction();
+    } else if (k === "c") {
+      // Copy the (simulated) selected text into internal game clipboard.
+      setSelectedAll(true);
+      setClipboard(SOURCE_TEXT);
+      onAction();
+    } else if (k === "v") {
+      setPasted(clipboard || SOURCE_TEXT);
+      onAction();
+    } else if (k === "z") {
+      setPasted("");
+      setUndone(true);
+      window.setTimeout(() => setUndone(false), 1200);
+      onAction();
+    } else {
+      onAction();
+    }
   }
 
   const label =
@@ -712,23 +827,17 @@ function VirtualTextEditor({ combo, completed, onAction }: { combo: Combo; compl
     <div className="sc-venv sc-texteditor">
       <div className="sc-texteditor__source">
         <span className="sc-texteditor__label">Texto fuente</span>
-        <p
-          ref={textRef}
-          className={`sc-texteditor__text ${selected ? "is-selected" : ""}`}
-          onClick={selectAll}
-        >
+        {/* user-select:none in CSS keeps the browser from ever selecting it;
+            the .is-selected class draws the simulated selection highlight. */}
+        <p className={`sc-texteditor__text ${selectedAll ? "is-selected" : ""}`}>
           {SOURCE_TEXT}
         </p>
       </div>
       <div className="sc-texteditor__dest">
         <span className="sc-texteditor__label">Área de trabajo</span>
-        <textarea
-          ref={pasteRef}
-          className="sc-texteditor__area"
-          value={pasted}
-          onChange={(e) => setPasted(e.target.value)}
-          placeholder="Acá aparecerá lo que pegues…"
-        />
+        <div className="sc-texteditor__area" aria-label="Área de trabajo">
+          {pasted ? pasted : <span className="sc-texteditor__placeholder">Acá aparecerá lo que pegues…</span>}
+        </div>
         {undone && <span className="sc-texteditor__undo">↩ deshecho</span>}
       </div>
       <button type="button" className="sc-venv-btn" onClick={act}>

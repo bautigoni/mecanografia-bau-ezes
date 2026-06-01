@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Activity } from "../data/activities";
 import { assets } from "../utils/assets";
-import { markLevelComplete } from "../utils/progress";
+import { getGameplayBackground } from "../data/worlds";
+import { getStarsFromAccuracy, markLevelComplete } from "../utils/progress";
 
 interface SkillLevelViewProps {
   activity: Activity;
@@ -82,7 +83,11 @@ function Island5Shell({
 
   return (
     <main className={`i5-shell i5-shell--level-${activity.levelNumber} page-fade`}>
-      <div className="i5-shell__bg" aria-hidden="true" />
+      <div
+        className="i5-shell__bg"
+        aria-hidden="true"
+        style={{ backgroundImage: `url("${getGameplayBackground(activity.worldId)}")` }}
+      />
       <div className="i5-shell__sparkles" aria-hidden="true">
         {Array.from({ length: 14 }).map((_, i) => (
           <span key={i} className={`i5-sparkle i5-sparkle--${i % 5}`} />
@@ -149,6 +154,7 @@ function Island5Shell({
         <CompletionModal
           activity={activity}
           onRetry={onRetry}
+          stars={getStarsFromAccuracy(metrics.precision)}
         />
       )}
     </main>
@@ -159,7 +165,7 @@ function Island5Shell({
 /* Completion modal                                                   */
 /* ------------------------------------------------------------------ */
 
-function CompletionModal({ activity, onRetry }: { activity: Activity; onRetry: () => void }) {
+function CompletionModal({ activity, onRetry, stars = 3 }: { activity: Activity; onRetry: () => void; stars?: number }) {
   const navigate = useNavigate();
   return (
     <div className="i5-modal" role="dialog" aria-modal="true">
@@ -174,7 +180,9 @@ function CompletionModal({ activity, onRetry }: { activity: Activity; onRetry: (
         <h3 className="i5-modal__title">¡Muy bien!</h3>
         <p className="i5-modal__sub">Completaste el nivel</p>
         <div className="i5-modal__stars" aria-hidden="true">
-          <span>★</span><span>★</span><span>★</span>
+          {[1, 2, 3].map((i) => (
+            <span key={i} className={stars >= i ? "" : "is-empty"}>{stars >= i ? "★" : "☆"}</span>
+          ))}
         </div>
         <div className="i5-modal__actions">
           <button
@@ -459,12 +467,10 @@ function RightClickLevel({ activity }: { activity: Activity }) {
       feedback={feedback}
     >
       <div className="i5-l2-floor">
-        <p className="i5-l2-prompt">
-          ✨ {round.prompt}
-        </p>
-        <p className="i5-l2-hint">{round.hint}</p>
+        {/* The main task already shows in the top goal card — only a small,
+            secondary device tip lives here to avoid repeating the instruction. */}
         <p className="i5-l2-hint i5-l2-hint--touchpad">
-          💻 En notebook podés hacer click derecho tocando con <strong>dos dedos</strong> en el touchpad.
+          💻 En notebook: click derecho tocando con <strong>dos dedos</strong> en el touchpad.
         </p>
         <div className="i5-l2-row">
           {round.objects.map((o) => {

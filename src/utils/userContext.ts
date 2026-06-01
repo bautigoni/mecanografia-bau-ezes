@@ -12,7 +12,7 @@
  */
 
 import type { ActiveUser, GradeId, Role } from "../types";
-import { getDemoData, getActiveUser } from "./storage";
+import { getDemoData, getActiveUser, getEnabledWorldsForClass, isDemoMode } from "./storage";
 import type { Activity } from "../data/activities";
 
 /* ------------------------------------------------------------------ */
@@ -24,8 +24,16 @@ export interface UserContext {
   role: Role | "guest";
   grade: GradeId;
   /** true  → show only worlds that belong to the student's course
-   *  false → show all worlds (teacher / admin / free exploration)  */
+   *  false → show all worlds (teacher / admin / superadmin / demo / free)  */
   isCoursePath: boolean;
+  /** Superadmin (admin/admin) — sees everything. */
+  isSuperAdmin: boolean;
+  /** Demo mode — full free-path preview of every world. */
+  isDemo: boolean;
+}
+
+export function isSuperAdmin(user: ActiveUser | null): boolean {
+  return user?.role === "superadmin";
 }
 
 /* ------------------------------------------------------------------ */
@@ -70,9 +78,22 @@ export function getGradeForUser(user: ActiveUser | null): GradeId {
 export function getUserContext(user?: ActiveUser | null): UserContext {
   const activeUser = user ?? getActiveUser();
   const role: Role | "guest" = activeUser?.role ?? "guest";
-  const grade = getGradeForUser(activeUser);
-  const isCoursePath = role === "alumno";
-  return { user: activeUser, role, grade, isCoursePath };
+  const superAdmin = isSuperAdmin(activeUser);
+  const demo = isDemoMode();
+
+  // Superadmin and demo mode both get the FULL free path (all worlds).
+  const freePath = superAdmin || demo || (role !== "alumno");
+  const grade = freePath ? "libre" : getGradeForUser(activeUser);
+  const isCoursePath = !freePath;
+
+  return {
+    user: activeUser,
+    role,
+    grade,
+    isCoursePath,
+    isSuperAdmin: superAdmin,
+    isDemo: demo,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -131,10 +152,20 @@ export const GRADE_WORLDS: Record<GradeId, Activity["worldId"][]> = {
 };
 
 /** Returns the ordered list of worldIds visible to a user.
- *  Students on the course path only see worlds for their grade.
- *  Teachers / admins / free path see every world. */
+ *  - Superadmin / demo / teacher / free-path  → every world (libre).
+ *  - Students on the course path → worlds for their grade, further
+ *    narrowed by any island selection their teacher saved for the class. */
 export function getVisibleWorldIds(context: UserContext): Activity["worldId"][] {
-  return GRADE_WORLDS[context.grade] ?? GRADE_WORLDS.libre;
+  const base = GRADE_WORLDS[context.grade] ?? GRADE_WORLDS.libre;
+
+  // Free-path roles (superadmin / demo / teacher / admin) ignore the
+  // per-class teacher selection — they always see everything.
+  if (!context.isCoursePath) return base;
+
+  // Course-path student: respect the teacher's enabled-islands selection.
+  const enabled = getEnabledWorldsForClass(context.user?.classId);
+  if (!enabled) return base; // teacher never customised → all grade worlds
+  return base.filter((id) => enabled.includes(id));
 }
 
 /** Returns true if the given world is accessible at all for this user.

@@ -1,44 +1,54 @@
 import type { DemoData, DemoUser } from "../types";
 
-export const demoUsers: DemoUser[] = [
-  {
-    id: "u-admin-general",
-    name: "Admin General",
-    username: "admin",
-    password: "admin123",
-    role: "admin-general",
-  },
-  {
-    id: "u-admin-sede",
-    name: "Coordinacion TIC",
-    username: "sede",
-    password: "sede123",
-    role: "admin-sede",
-    siteId: "sede-norte",
-  },
-  {
-    id: "u-profesor",
-    name: "Profe Martin",
-    username: "profe",
-    password: "profe123",
-    role: "profesor",
-    siteId: "sede-norte",
-    classId: "clase-3a",
-  },
+/* The ONLY login account in this build.
+   Superadmin has full access to everything: all worlds, all islands,
+   all levels, teacher/admin views and the free path.
+   Login:  username "admin"  /  password "admin". */
+export const SUPERADMIN_USER: DemoUser = {
+  id: "u-superadmin",
+  name: "Super Admin",
+  username: "admin",
+  password: "admin",
+  role: "superadmin",
+  siteId: "sede-norte",
+  classId: "clase-3a",
+};
+
+export const demoUsers: DemoUser[] = [SUPERADMIN_USER];
+
+/* Sample student records — kept ONLY as data for the teacher view
+   (names / progress columns).  They are NOT valid login accounts:
+   `authenticateAny` only authenticates the superadmin. */
+const sampleStudents: DemoUser[] = [
   {
     id: "u-sofia",
     name: "Sofia",
     username: "sofia",
-    password: "alumno123",
+    password: "—",
     role: "alumno",
     siteId: "sede-norte",
     classId: "clase-3a",
-    stats: {
-      precision: 94,
-      speed: 18,
-      completedLevels: 1,
-      points: 1280,
-    },
+    stats: { precision: 94, speed: 18, completedLevels: 1, points: 1280 },
+  },
+  {
+    id: "u-lucas",
+    name: "Lucas",
+    username: "lucas",
+    password: "—",
+    role: "alumno",
+    siteId: "sede-norte",
+    classId: "clase-3a",
+    stats: { precision: 87, speed: 14, completedLevels: 1, points: 930 },
+  },
+  {
+    id: "u-valen",
+    name: "Valentina",
+    username: "valen",
+    password: "—",
+    role: "alumno",
+    siteId: "sede-norte",
+    classId: "clase-3a",
+    stats: { precision: 91, speed: 16, completedLevels: 2, points: 1140 },
   },
 ];
 
@@ -63,43 +73,11 @@ export const seedData: DemoData = {
       name: "3ro A - Turno manana",
       siteId: "sede-norte",
       grade: "3ep" as const,
-      teacherIds: ["u-profesor"],
+      teacherIds: ["u-superadmin"],
       studentIds: ["u-sofia", "u-lucas", "u-valen"],
     },
   ],
-  users: [
-    ...demoUsers,
-    {
-      id: "u-lucas",
-      name: "Lucas",
-      username: "lucas",
-      password: "lucas123",
-      role: "alumno",
-      siteId: "sede-norte",
-      classId: "clase-3a",
-      stats: {
-        precision: 87,
-        speed: 14,
-        completedLevels: 1,
-        points: 930,
-      },
-    },
-    {
-      id: "u-valen",
-      name: "Valentina",
-      username: "valen",
-      password: "valen123",
-      role: "alumno",
-      siteId: "sede-norte",
-      classId: "clase-3a",
-      stats: {
-        precision: 91,
-        speed: 16,
-        completedLevels: 2,
-        points: 1140,
-      },
-    },
-  ],
+  users: [...demoUsers, ...sampleStudents],
   accessCodes: [
     {
       id: "code-admin-sede",

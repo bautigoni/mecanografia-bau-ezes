@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { getActivityById } from "../data/activities";
 import { assets } from "../utils/assets";
 import { getGameplayBackground } from "../data/worlds";
-import { markLevelComplete } from "../utils/progress";
+import { getStarsFromAccuracy, markLevelComplete } from "../utils/progress";
 import { SkillLevelView } from "./SkillLevelView";
 import { ShortcutLevelView } from "./ShortcutLevelView";
 
@@ -146,11 +146,34 @@ function comboFor(character: string): string[] | null {
   return null;
 }
 
-function objectivePrompt(activity: ReturnType<typeof getActivityById>, target: string): string {
+function objectivePrompt(activity: ReturnType<typeof getActivityById>, target: string, index = 0): string {
   if (!target) return "Prepará tus dedos.";
+  // Correction levels start with a wrong prefilled word and tell the kid what
+  // to fix, so they read as a real "borrá y corregí" task, not blank typing.
+  if (activity.inputType === "correction") {
+    return activity.correctionHints?.[index] ?? "Usá Backspace para borrar el error y escribí lo correcto.";
+  }
   if (activity.inputType === "letter") return `Tocá la letra ${target.toUpperCase()}.`;
   if (activity.inputType === "symbol") return `Escribí el símbolo ${target}.`;
   return `Escribí "${target}".`;
+}
+
+/* A short, specific hint for an exact-character mismatch (case / accent / ñ).
+   `expected` is the single character the target wants next; `typedChar` is
+   what the student actually pressed. */
+function exactCharHint(expected: string, typedChar: string): string {
+  if (!expected) return "Usá Backspace para corregir.";
+  // Same letter, only the case differs → they need Shift.
+  if (typedChar.toLowerCase() === expected.toLowerCase()) {
+    if (/[A-ZÑ]/.test(expected)) return "Usá Shift para la mayúscula.";
+    return `Esperaba "${expected}".`;
+  }
+  // Same base letter, the accent/tilde differs.
+  if (stripAccents(typedChar.toLowerCase()) === stripAccents(expected.toLowerCase())) {
+    return "Te falta la tilde. Usá ´ y después la vocal.";
+  }
+  if (expected === "ñ" || expected === "Ñ") return "Buscá la tecla Ñ.";
+  return `Esperaba "${expected}". Probá de nuevo.`;
 }
 
 function keyLocationHint(character: string): string {
@@ -218,6 +241,7 @@ export function GameplayPage() {
   const advanceTimeoutRef = useRef<number | null>(null);
   const errorTimeoutRef = useRef<number | null>(null);
   const typedScrollRef = useRef<HTMLSpanElement | null>(null);
+  const targetScrollRef = useRef<HTMLElement | null>(null);
   const captureInputRef = useRef<HTMLInputElement | null>(null);
 
   /* Latest state lives in refs so the beforeinput handler can read up-to-date
@@ -239,19 +263,32 @@ export function GameplayPage() {
   const target = activity.targets[currentTargetIndex] ?? "";
   const visibleObjective = isCompleted ? totalObjectives : Math.min(currentTargetIndex + 1, totalObjectives);
 
+  /* For word/phrase/correction levels the typed text must stay an exact prefix
+     of the target. If it isn't (e.g. a correction level's prefilled mistake,
+     or a wrong char left in), the player must Backspace before continuing. */
+  const typedIsValidPrefix = typed === target.slice(0, typed.length);
+  const mustBackspace =
+    activity.inputType !== "letter" &&
+    activity.inputType !== "symbol" &&
+    typed.length > 0 &&
+    !typedIsValidPrefix;
+
   const expectedChar = useMemo(() => {
     if (activity.inputType === "letter" || activity.inputType === "symbol") {
       return target;
     }
+    if (!typedIsValidPrefix) return ""; // must backspace first
     return target[typed.length] ?? "";
-  }, [activity.inputType, target, typed]);
+  }, [activity.inputType, target, typed, typedIsValidPrefix]);
 
   /* Every keyboard cap that should glow for the current character.
-     Multi-key combos (Shift + 1, Shift + ¿) light up *both* caps. */
+     Multi-key combos (Shift + 1, Shift + ¿) light up *both* caps.
+     While a mistake needs deleting, the Backspace cap glows instead. */
   const expectedKeys = useMemo(() => {
+    if (mustBackspace) return new Set<string>(["Backspace"]);
     if (!expectedChar) return new Set<string>();
     return new Set(expectedKeysForActivity(expectedChar, activity));
-  }, [activity, expectedChar]);
+  }, [activity, expectedChar, mustBackspace]);
 
   const locationHint = keyLocationHint(expectedChar);
   const commaHint = target.includes(",");
@@ -315,12 +352,16 @@ export function GameplayPage() {
       return;
     }
 
+    const seeded =
+      currentActivity.inputType === "correction"
+        ? currentActivity.initialTexts?.[nextIndex] ?? ""
+        : "";
     stateRef.current.targetIndex = nextIndex;
-    stateRef.current.typed = "";
+    stateRef.current.typed = seeded;
     stateRef.current.isAdvancing = false;
     setTargetIndex(nextIndex);
-    setTyped("");
-    setFeedback(objectivePrompt(currentActivity, targetAt(nextIndex)));
+    setTyped(seeded);
+    setFeedback(objectivePrompt(currentActivity, targetAt(nextIndex), nextIndex));
   }
 
   function recordAttempt(isError: boolean) {
@@ -349,19 +390,21 @@ export function GameplayPage() {
       window.clearTimeout(advanceTimeoutRef.current);
       advanceTimeoutRef.current = null;
     }
+    const firstSeeded =
+      activity.inputType === "correction" ? activity.initialTexts?.[0] ?? "" : "";
     stateRef.current = {
       targetIndex: 0,
-      typed: "",
+      typed: firstSeeded,
       isCompleted: false,
       attempts: 0,
       errors: 0,
       isAdvancing: false,
     };
     setTargetIndex(0);
-    setTyped("");
+    setTyped(firstSeeded);
     setAttempts(0);
     setErrors(0);
-    setFeedback(objectivePrompt(activity, activity.targets[0] ?? ""));
+    setFeedback(objectivePrompt(activity, activity.targets[0] ?? "", 0));
     setIsCompleted(false);
     setIsErrorActive(false);
     setIsIdleHintActive(false);
@@ -401,6 +444,21 @@ export function GameplayPage() {
     if (node) node.scrollLeft = node.scrollWidth;
   }, [typed]);
 
+  /* Auto-scroll the TARGET phrase so the character the student is currently on
+     stays centred in view. No visible scrollbar — we drive scrollLeft directly
+     (works even with overflow:hidden). */
+  useEffect(() => {
+    const node = targetScrollRef.current;
+    if (!node) return;
+    if (node.scrollWidth <= node.clientWidth) {
+      node.scrollLeft = 0;
+      return;
+    }
+    const ratio = target.length ? Math.min(1, typed.length / target.length) : 0;
+    const desired = ratio * node.scrollWidth - node.clientWidth / 2;
+    node.scrollLeft = Math.max(0, Math.min(desired, node.scrollWidth - node.clientWidth));
+  }, [typed, target]);
+
   /* Process one logical character (with accent, ñ, mayúscula already
      composed by the OS). Reused by both the physical-keyboard fallback and
      the beforeinput / composition pipeline used by touch keyboards. */
@@ -439,23 +497,32 @@ export function GameplayPage() {
     }
 
     const currentTyped = stateRef.current.typed;
-    const nextTyped = currentTyped + character;
+    const validPrefix = currentTarget.slice(0, currentTyped.length);
+    const typedIsValid = currentTyped === validPrefix;
 
-    const targetSoFar = currentTarget.slice(0, nextTyped.length);
-    const matches = nextTyped === targetSoFar;
-    const matchesLoose =
-      !matches &&
-      nextTyped.toLowerCase() === targetSoFar.toLowerCase() &&
-      stripAccents(nextTyped.toLowerCase()) === stripAccents(targetSoFar.toLowerCase());
-
-    if (!matches && !matchesLoose) {
+    /* Existing text already holds an uncorrected mistake (correction prefill,
+       or a wrong char the kid left in). Block new input until they Backspace. */
+    if (!typedIsValid) {
       recordAttempt(true);
+      showMistake("Usá Backspace para borrar el error y seguí.");
+      return;
+    }
+
+    const nextTyped = currentTyped + character;
+    const targetSoFar = currentTarget.slice(0, nextTyped.length);
+    // EXACT match — case, accents (tildes) and ñ must all match. A lowercase
+    // letter for an uppercase target, or a missing tilde, counts as an error.
+    const isExact = nextTyped === targetSoFar;
+
+    if (!isExact) {
+      const expected = currentTarget[currentTyped.length] ?? "";
+      recordAttempt(true);
+      showMistake(exactCharHint(expected, character));
+      // Correction levels LET the wrong char land so the kid sees it and
+      // practises deleting it; normal levels simply block the wrong key.
       if (currentActivity.inputType === "correction") {
-        showMistake("Usá Backspace para corregir.");
         stateRef.current.typed = nextTyped;
         setTyped(nextTyped);
-      } else {
-        showMistake(`Esperaba "${targetSoFar}". Intentá de nuevo.`);
       }
       return;
     }
@@ -471,8 +538,6 @@ export function GameplayPage() {
         advanceTimeoutRef.current = null;
         advance();
       }, 350);
-    } else if (matchesLoose && !matches) {
-      setFeedback("Ojo con la tilde o la mayúscula. Seguí.");
     } else {
       setFeedback("Vas muy bien.");
     }
@@ -489,6 +554,19 @@ export function GameplayPage() {
     const next = stateRef.current.typed.slice(0, -1);
     stateRef.current.typed = next;
     setTyped(next);
+    /* Correction levels can be finished purely by deleting extra characters
+       (e.g. "holaa" → "hola"). Complete the objective when the cleaned-up text
+       exactly matches the target. */
+    const currentTarget = targetAt(stateRef.current.targetIndex);
+    if (next === currentTarget) {
+      setFeedback("¡Excelente!");
+      stateRef.current.isAdvancing = true;
+      if (advanceTimeoutRef.current !== null) window.clearTimeout(advanceTimeoutRef.current);
+      advanceTimeoutRef.current = window.setTimeout(() => {
+        advanceTimeoutRef.current = null;
+        advance();
+      }, 350);
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -700,7 +778,7 @@ export function GameplayPage() {
             <>
               <div className={`target-card target--${variant} ${isLongTarget ? "target--long" : ""} ${isErrorActive ? "is-error" : ""} ${isIdleHintActive ? "is-idle-hint" : ""}`}>
                 <span>Objetivo {visibleObjective} / {totalObjectives}</span>
-                <strong>{target}</strong>
+                <strong ref={targetScrollRef}>{target}</strong>
                 {locationHint && !isCompleted && (
                   <small className="key-location-hint">{locationHint}</small>
                 )}
@@ -837,7 +915,7 @@ export function GameplayPage() {
               {[1, 2, 3].map((index) => (
                 <span
                   key={index}
-                  className={`level-complete-star ${accuracy >= index * 33 ? "is-on" : ""}`}
+                  className={`level-complete-star ${getStarsFromAccuracy(accuracy) >= index ? "is-on" : ""}`}
                   style={{ animationDelay: `${0.18 + index * 0.18}s` }}
                 >
                   ★

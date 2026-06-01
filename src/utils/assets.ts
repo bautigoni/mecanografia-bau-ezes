@@ -65,26 +65,33 @@ export const assets = {
   i5ZoomBtns:       "/assets/edutic-art/island5/zoom-mas-menos.webp",
 };
 
-/* Expansion islands (island6 … island15).
-   - `expansionIslandThumbs` → floating island art on the world-selection map
-     (from /typely_islands_webp).
-   - `expansionWorldBackgrounds` → zoomed scene used by the island-detail level
-     map AND the gameplay background for that world (from /typely_backgrounds_webp).
-   Mapped by order: index 0 → island6, … index 9 → island15. */
+/* =====================================================================
+   Expansion islands (island6 … island15) — THREE separate image families.
+   They must NEVER be mixed. Index 0 → island6 … index 9 → island15, and
+   all three share the SAME theme order (crystal, garden, frozen, autumn,
+   jungle, candyland, desert, rainbow, alchemy, lagoon) so a single world's
+   thumbnail + detail map + gameplay scene always match thematically.
+===================================================================== */
+
+/* 1) WORLD MAP IMAGE — the floating island art on the worlds-selection map.
+      Transparent islands shown small in the sky (from /typely_islands_webp). */
 export const expansionIslandThumbs: string[] = [
-  "/typely_islands_webp/background-island1.webp",
-  "/typely_islands_webp/background-island2.webp",
-  "/typely_islands_webp/background-island3.webp",
-  "/typely_islands_webp/background-island4.webp",
-  "/typely_islands_webp/background-island5.webp",
-  "/typely_islands_webp/background-island6.webp",
-  "/typely_islands_webp/background-island7.webp",
-  "/typely_islands_webp/background-island8.webp",
-  "/typely_islands_webp/background-island9.webp",
-  "/typely_islands_webp/background-island10.webp",
+  "/typely_islands_webp/background-island1.webp",  // crystal
+  "/typely_islands_webp/background-island2.webp",  // garden / library
+  "/typely_islands_webp/background-island3.webp",  // frozen / clockwork
+  "/typely_islands_webp/background-island4.webp",  // autumn / artist
+  "/typely_islands_webp/background-island5.webp",  // jungle / ruins
+  "/typely_islands_webp/background-island6.webp",  // candyland
+  "/typely_islands_webp/background-island7.webp",  // desert / canyon
+  "/typely_islands_webp/background-island8.webp",  // rainbow / playground
+  "/typely_islands_webp/background-island9.webp",  // alchemy / lab
+  "/typely_islands_webp/background-island10.webp", // lagoon
 ];
 
-export const expansionWorldBackgrounds: string[] = [
+/* 2) ISLAND DETAIL BACKGROUND — the full 16:9 scene WITH painted platforms,
+      shown behind the level-selection nodes (from /typely_backgrounds_webp).
+      These are NOT gameplay backgrounds — they contain platforms. */
+export const islandDetailBackgrounds: string[] = [
   "/typely_backgrounds_webp/bg01_crystal_portal.webp",
   "/typely_backgrounds_webp/bg02_garden_library.webp",
   "/typely_backgrounds_webp/bg03_frozen_clockwork.webp",
@@ -95,4 +102,20 @@ export const expansionWorldBackgrounds: string[] = [
   "/typely_backgrounds_webp/bg08_rainbow_playground.webp",
   "/typely_backgrounds_webp/bg09_alchemy_lab.webp",
   "/typely_backgrounds_webp/bg10_lagoon.webp",
+];
+
+/* 3) GAMEPLAY BACKGROUND — the single central-stage scene painted behind the
+      keyboard/game UI (from /typely_gameplay_background_webp). Used ONLY by
+      the actual gameplay screen, never by the world map or detail map. */
+export const gameplayBackgrounds: string[] = [
+  "/typely_gameplay_background_webp/gameplaybg-01-crystal-portal.webp",
+  "/typely_gameplay_background_webp/gameplaybg-02-garden-library.webp",
+  "/typely_gameplay_background_webp/gameplaybg-03-frozen-clockwork.webp",
+  "/typely_gameplay_background_webp/gameplaybg-04-autumn-artist.webp",
+  "/typely_gameplay_background_webp/gameplaybg-05-jungle-ruins.webp",
+  "/typely_gameplay_background_webp/gameplaybg-06-candyland.webp",
+  "/typely_gameplay_background_webp/gameplaybg-07-desert-canyon.webp",
+  "/typely_gameplay_background_webp/gameplaybg-08-rainbow-playground.webp",
+  "/typely_gameplay_background_webp/gameplaybg-09-alchemy-lab.webp",
+  "/typely_gameplay_background_webp/gameplaybg-10-lagoon.webp",
 ];

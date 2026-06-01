@@ -47,6 +47,11 @@ export interface Activity {
   requiresAccent?: boolean;
   /** Set when inputType === "skill" — points at an entry in digitalSkillsCatalog. */
   skillChallengeId?: string;
+  /** Correction levels only: text prefilled WITH a mistake, parallel to `targets`.
+   *  The student must Backspace the wrong part and type the correct text. */
+  initialTexts?: string[];
+  /** Correction levels only: per-objective task hint, parallel to `targets`. */
+  correctionHints?: string[];
 }
 
 type ActivityDraft = Omit<Activity, "id" | "level" | "type" | "inputType" | "difficulty"> & {
@@ -215,13 +220,21 @@ const world2: Activity[] = [
     levelNumber: 6,
     title: "Borro y corrijo",
     subtitle: "Usá retroceso",
-    instruction: "Si te equivocás, usá Backspace para corregir.",
-    listenText: "Si te equivocás, usá retroceso para corregir.",
+    instruction: "Borrá la letra de más con Backspace y dejá la palabra correcta.",
+    listenText: "Borrá la letra de más con retroceso y dejá la palabra correcta.",
     targets: ["escuela", "estrella", "tablero", "ventana", "mochila"],
+    initialTexts: ["escuella", "estrellla", "tablerro", "ventanna", "mochilla"],
+    correctionHints: [
+      "Sobra una L en «escuella». Borrá hasta el error y escribí «escuela».",
+      "Sobra una L en «estrellla». Corregí hasta «estrella».",
+      "Sobra una R en «tablerro». Corregí hasta «tablero».",
+      "Sobra una N en «ventanna». Corregí hasta «ventana».",
+      "Sobra una L en «mochilla». Corregí hasta «mochila».",
+    ],
     mode: "independent",
     inputType: "correction",
     difficulty: 4,
-    description: "Corregí mientras escribís usando Backspace.",
+    description: "Corregí la palabra borrando la letra de más con Backspace.",
   }),
 ];
 
@@ -951,9 +964,15 @@ const world10: Activity[] = [
     levelNumber: 4,
     title: "Corregir la búsqueda",
     subtitle: "Usá Backspace",
-    instruction: "Si te equivocás, borrá con Backspace y seguí.",
-    listenText: "Si te equivocás, borrá con retroceso y seguí.",
+    instruction: "Borrá la letra equivocada con Backspace y escribí la correcta.",
+    listenText: "Borrá la letra equivocada con retroceso y escribí la correcta.",
     targets: ["recetas faciles", "cuentos cortos", "musica para bailar"],
+    initialTexts: ["recetaz", "cuentoz", "musika"],
+    correctionHints: [
+      "Borrá la Z y escribí S; después completá «recetas faciles».",
+      "Borrá la Z y escribí S; después completá «cuentos cortos».",
+      "Borrá la K y escribí C; después completá «musica para bailar».",
+    ],
     mode: "independent",
     inputType: "correction",
     difficulty: 4,

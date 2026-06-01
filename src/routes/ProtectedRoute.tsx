@@ -11,6 +11,11 @@ export function ProtectedRoute({ roles }: { roles: Role[] }) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
+  // Superadmin has full access to every protected route.
+  if (user.role === "superadmin") {
+    return <Outlet />;
+  }
+
   if (!roles.includes(user.role)) {
     return <Navigate to={routeForRole(user.role)} replace />;
   }
