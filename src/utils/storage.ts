@@ -77,6 +77,7 @@ export function setActiveUser(user: ActiveUser | null) {
       id: user.id,
       name: user.name,
       username: user.username,
+      email: user.email,
       role: user.role,
       siteId: user.siteId,
       classId: user.classId,
@@ -93,6 +94,32 @@ export function authenticate(role: Role, username: string, password: string): Ac
 
   if (!found) return null;
   const { password: _password, stats: _stats, ...activeUser } = found;
+  return activeUser;
+}
+
+/** Find a real (non-demo) user by email — used to match the address
+ *  returned by Google after a successful sign-in. Case-insensitive,
+ *  ignores whitespace. Returns `null` if no user has that email. */
+export function findUserByEmail(email: string): EduTicUser | null {
+  if (!email) return null;
+  ensureSeedData();
+  const needle = email.trim().toLowerCase();
+  if (!needle) return null;
+  const users = getDemoData().users;
+  const found = users.find(
+    (user) => typeof user.email === "string" && user.email.toLowerCase() === needle,
+  );
+  return found ?? null;
+}
+
+/** Resolves a Typely user from a Google email and returns a sanitised
+ *  `ActiveUser` (password/stats stripped). The caller is responsible for
+ *  showing a friendly error if this returns null. NEVER auto-promotes an
+ *  unknown email to admin or any role — unknown means rejected. */
+export function loginByGoogleEmail(email: string): ActiveUser | null {
+  const user = findUserByEmail(email);
+  if (!user) return null;
+  const { password: _password, stats: _stats, ...activeUser } = user;
   return activeUser;
 }
 

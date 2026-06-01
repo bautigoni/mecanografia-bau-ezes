@@ -1,6 +1,23 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import type { ActiveUser, Role } from "../types";
-import { authenticate, authenticateAny, demoLogin, ensureSeedData, getActiveUser, setActiveUser, setDemoMode } from "../utils/storage";
+import {
+  authenticate,
+  authenticateAny,
+  demoLogin,
+  ensureSeedData,
+  getActiveUser,
+  loginByGoogleEmail,
+  setActiveUser,
+  setDemoMode,
+} from "../utils/storage";
+import { isEmailDomainAllowed, parseJwtCredential } from "../utils/googleAuth";
+
+/** Result of a Google sign-in attempt. Always returns a structured value
+ *  so the UI can render a friendly Spanish message — `null` would lose
+ *  the reason. */
+export type GoogleLoginResult =
+  | { ok: true; user: ActiveUser }
+  | { ok: false; reason: "INVALID_TOKEN" | "DOMAIN_NOT_ALLOWED" | "USER_NOT_FOUND" };
 
 interface AuthContextValue {
   user: ActiveUser | null;
@@ -9,8 +26,11 @@ interface AuthContextValue {
   loginAny: (username: string, password: string) => ActiveUser | null;
   login: (role: Role, username: string, password: string) => ActiveUser | null;
   loginDemo: (role: Role) => ActiveUser;
-  /** Placeholder Google sign-in. Hook up real OAuth here later. */
-  loginGoogle: () => ActiveUser | null;
+  /** Sign in with a Google Identity Services ID-token credential.
+   *  - Decodes the token (client-side, untrusted) to read the email.
+   *  - Rejects unknown emails — never auto-creates admin accounts.
+   *  - Optionally enforces the institutional domain allowlist. */
+  loginGoogle: (credential: string) => GoogleLoginResult;
   logout: () => void;
 }
 
@@ -49,16 +69,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(nextUser);
         return nextUser;
       },
-      loginGoogle: () => {
-        /* TODO: integrate real Google OAuth (Google Identity Services).
-           For now this is a safe placeholder that signs in as the
-           superadmin so the button is fully functional during demos.
-           Replace the body with a real token exchange when available. */
-        const nextUser = demoLogin("superadmin");
+      loginGoogle: (credential) => {
+        /* The credential is the ID-token JWT returned by GIS. We decode
+           it on the client only to read the email + display fields. The
+           authorisation decision (which Typely user this maps to, and
+           which role they get) comes from our own user store — never
+           from the JWT claims. */
+        const payload = parseJwtCredential(credential);
+        if (!payload || !payload.email) {
+          return { ok: false, reason: "INVALID_TOKEN" };
+        }
+        if (!isEmailDomainAllowed(payload.email)) {
+          return { ok: false, reason: "DOMAIN_NOT_ALLOWED" };
+        }
+        const nextUser = loginByGoogleEmail(payload.email);
+        if (!nextUser) {
+          return { ok: false, reason: "USER_NOT_FOUND" };
+        }
         setDemoMode(false);
         setActiveUser(nextUser);
         setUser(nextUser);
-        return nextUser;
+        return { ok: true, user: nextUser };
       },
       logout: () => {
         setDemoMode(false);

@@ -1,0 +1,35 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+*.tsbuildinfo
+
+# Local env — NEVER commit real secrets / API keys.
+# Only .env.example is allowed in git.
+.env
+.env.local
+.env.*.local
+
+# Editor / OS clutter
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Caches
+.cache
+.tmp
+
+# Claude/agent scratch
+.claude

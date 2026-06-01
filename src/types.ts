@@ -6,6 +6,8 @@ export interface ActiveUser {
   id: string;
   name: string;
   username: string;
+  /** Optional institutional email — used to match Google sign-ins. */
+  email?: string;
   role: Role;
   siteId?: string;
   classId?: string;

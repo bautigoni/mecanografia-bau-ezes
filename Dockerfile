@@ -5,6 +5,15 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+# Vite-time env vars: these MUST be present at build time because Vite
+# inlines them into the static bundle. Only the public Client ID and
+# the (also public) domain allowlist live here — NEVER the OAuth
+# client secret.
+ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_GOOGLE_ALLOWED_DOMAINS
+ENV VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
+ENV VITE_GOOGLE_ALLOWED_DOMAINS=${VITE_GOOGLE_ALLOWED_DOMAINS}
+
 # Install dependencies using the lockfile for reproducible builds.
 COPY package.json package-lock.json ./
 RUN npm ci

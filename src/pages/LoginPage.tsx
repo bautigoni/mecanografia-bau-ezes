@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GlassInput } from "../components/auth/GlassInput";
 import { AnimatedButton } from "../components/auth/AnimatedButton";
@@ -7,6 +7,7 @@ import { useAuth } from "../hooks/useAuth";
 import { assets } from "../utils/assets";
 import { routeForRole } from "../utils/storage";
 import { clearDemoProgressOnly } from "../utils/progress";
+import { getGoogleClientId, promptGoogleSignIn } from "../utils/googleAuth";
 import {
   ArrowRight,
   Eye,
@@ -66,10 +67,40 @@ export function LoginPage() {
     navigate(routeForRole(nextUser.role));
   }
 
-  /** Placeholder Google sign-in (see useAuth.loginGoogle TODO). */
+  /** Google sign-in via Google Identity Services. Opens the GIS popup,
+   *  then matches the returned email against Typely's user store. */
+  const googleFallbackRef = useRef<HTMLDivElement>(null);
   function googleLogin() {
-    const nextUser = loginGoogle();
-    if (nextUser) navigate(routeForRole(nextUser.role));
+    if (!getGoogleClientId()) {
+      setMessage("Google Login no está configurado.");
+      return;
+    }
+    promptGoogleSignIn({
+      onCredential: (credential) => {
+        const result = loginGoogle(credential);
+        if (result.ok) {
+          navigate(routeForRole(result.user.role));
+          return;
+        }
+        if (result.reason === "DOMAIN_NOT_ALLOWED") {
+          setMessage("Tu dominio de correo no está habilitado para Typely.");
+        } else if (result.reason === "USER_NOT_FOUND") {
+          setMessage("Tu cuenta todavía no está habilitada en Typely.");
+        } else {
+          setMessage("No pudimos validar tu cuenta de Google. Probá de nuevo.");
+        }
+      },
+      onError: (reason) => {
+        if (reason === "MISSING_CLIENT_ID") {
+          setMessage("Google Login no está configurado.");
+        } else if (reason === "GIS_LOAD_FAILED") {
+          setMessage("No se pudo cargar Google. Revisá tu conexión.");
+        } else {
+          setMessage("Cancelaste el inicio con Google.");
+        }
+      },
+      fallbackAnchor: googleFallbackRef.current,
+    });
   }
 
   return (
@@ -154,6 +185,10 @@ export function LoginPage() {
             </span>
             Login with Google
           </button>
+          {/* Fallback anchor: GIS renders its official button here when
+              the one-tap prompt is suppressed (FedCM / third-party cookies). */}
+          <div ref={googleFallbackRef} className="google-login-fallback" aria-live="polite" />
+
 
           <AnimatedButton
             type="button"

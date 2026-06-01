@@ -3,6 +3,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Vite inlines these at build time. Provide them on the host
+        # (e.g. via a sibling .env file or `VITE_GOOGLE_CLIENT_ID=… docker
+        # compose up -d --build`). Only the public Client ID and the
+        # public domain allowlist — NEVER the OAuth client secret.
+        VITE_GOOGLE_CLIENT_ID: "${VITE_GOOGLE_CLIENT_ID:-}"
+        VITE_GOOGLE_ALLOWED_DOMAINS: "${VITE_GOOGLE_ALLOWED_DOMAINS:-}"
     container_name: mecanografia
     restart: unless-stopped
     ports:

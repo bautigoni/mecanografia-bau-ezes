@@ -8,6 +8,10 @@ export const SUPERADMIN_USER: DemoUser = {
   id: "u-superadmin",
   name: "Super Admin",
   username: "admin",
+  /* Real email used to match a Google sign-in. The actual production
+     superadmin email is configured per-deployment; this seed value is
+     only meaningful during local demos. */
+  email: "gonibauti@gmail.com",
   password: "admin",
   role: "superadmin",
   siteId: "sede-norte",
