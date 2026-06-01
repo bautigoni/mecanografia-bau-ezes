@@ -1,5 +1,22 @@
-import { demoUsers, seedData } from "../data/seed";
+import { demoUsers, seedData, SUPERADMIN_USER } from "../data/seed";
 import type { ActiveUser, ClassRoom, DemoData, EduTicUser, Role } from "../types";
+
+/** Strip secrets/derived fields from a stored user record. */
+function toActiveUser(user: EduTicUser): ActiveUser {
+  const { password: _password, stats: _stats, ...activeUser } = user;
+  return activeUser;
+}
+
+/** Guarantees the canonical superadmin is always present and correct in a
+ *  user list, regardless of what stale data localStorage may hold. Any
+ *  existing record matching the superadmin id or username is dropped and
+ *  replaced by the seed definition, so credentials can never drift. */
+function ensureSuperadmin(users: EduTicUser[]): EduTicUser[] {
+  const others = (users ?? []).filter(
+    (u) => u.id !== SUPERADMIN_USER.id && u.username !== SUPERADMIN_USER.username,
+  );
+  return [SUPERADMIN_USER, ...others];
+}
 
 export const storageKeys = {
   activeUser: "edutic_active_user",
@@ -26,7 +43,9 @@ export function getDemoData(): DemoData {
   return {
     sites: read(storageKeys.sites, seedData.sites),
     classes: read(storageKeys.classes, seedData.classes),
-    users: read(storageKeys.users, seedData.users),
+    // Self-healing: even if persisted users are missing/stale, the canonical
+    // superadmin (admin/admin) is always merged back in.
+    users: ensureSuperadmin(read(storageKeys.users, seedData.users)),
     accessCodes: read(storageKeys.accessCodes, seedData.accessCodes),
     activities: read(storageKeys.activities, seedData.activities ?? []),
     assignments: read(storageKeys.assignments, seedData.assignments ?? []),
@@ -128,15 +147,31 @@ export function loginByGoogleEmail(email: string): ActiveUser | null {
  *  authenticate.  Role is discovered automatically; no role picker needed. */
 export function authenticateAny(username: string, password: string): ActiveUser | null {
   ensureSeedData();
+  const trimmedUser = (username ?? "").trim();
+
+  /* Defensive fallback — the seeded superadmin must ALWAYS work, even if
+     persisted storage is missing, stale, or corrupted. This is checked
+     before touching localStorage so a broken store can never lock admin out. */
+  if (
+    trimmedUser === SUPERADMIN_USER.username &&
+    password === SUPERADMIN_USER.password
+  ) {
+    return toActiveUser(SUPERADMIN_USER);
+  }
+
   const users = getDemoData().users;
-  const found = users.find(
-    (user) => user.username === username && user.password === password,
-  );
+  const found = users.find((user) => {
+    if (user.password !== password) return false;
+    const byUsername = user.username === trimmedUser;
+    const byEmail =
+      typeof user.email === "string" &&
+      user.email.toLowerCase() === trimmedUser.toLowerCase();
+    return byUsername || byEmail;
+  });
   if (!found) return null;
   // Hard rule: only the superadmin account may sign in via the UI.
   if (found.role !== "superadmin") return null;
-  const { password: _password, stats: _stats, ...activeUser } = found;
-  return activeUser;
+  return toActiveUser(found);
 }
 
 export function demoLogin(role: Role): ActiveUser {
