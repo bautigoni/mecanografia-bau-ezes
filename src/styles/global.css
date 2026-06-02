@@ -2040,7 +2040,8 @@ a {
 }
 .level-popover__stars { display: inline-flex; gap: 0.15rem; color: #facc15; }
 .level-popover__stars svg { filter: drop-shadow(0 2px 3px rgba(214, 170, 30, 0.4)); }
-.level-popover__cta { width: 100%; justify-content: center; gap: 0.4rem; }
+.level-popover__cta { width: 100%; justify-content: center; gap: 0.4rem; white-space: nowrap; flex-wrap: nowrap; }
+.level-popover__cta span { white-space: nowrap; }
 .level-popover[data-place="above"] .level-popover__card { transform-origin: bottom center; }
 
 @media (max-width: 560px) {
@@ -2079,6 +2080,40 @@ a {
 .level-node:hover {
   transform: translate(-50%, -55%) scale(1.045);
   filter: brightness(1.05);
+}
+
+/* ---- Image level badges (replace the old CSS number platform) ---- */
+.level-node__icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(5.6rem, 7vw, 7.6rem);
+  height: auto;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 10px 16px rgba(44, 63, 130, 0.34));
+}
+/* Completed badges bake a star row UNDER the disc, so they are taller —
+   anchor a touch higher + scale up so the numbered disc still sits centred
+   on the painted platform (same spot the old number badge occupied). */
+.level-node__icon--medal {
+  width: clamp(6.8rem, 8.4vw, 9.2rem);
+  transform: translate(-50%, -42%);
+}
+.level-node--actual .level-node__icon {
+  animation: levelIconPulse 1.9s ease-in-out infinite;
+}
+@keyframes levelIconPulse {
+  0%, 100% { filter: drop-shadow(0 10px 16px rgba(44, 63, 130, 0.34)); }
+  50% {
+    filter: drop-shadow(0 0 18px rgba(99, 144, 255, 0.85)) drop-shadow(0 10px 16px rgba(44, 63, 130, 0.34));
+    transform: translate(-50%, -53%) scale(1.05);
+  }
+}
+.level-node.is-selected .level-node__icon {
+  filter: drop-shadow(0 0 18px rgba(124, 113, 255, 0.95)) drop-shadow(0 10px 16px rgba(44, 63, 130, 0.34));
 }
 
 .level-node__platform {
@@ -4614,6 +4649,33 @@ h3, h4 {
   border-radius: 2px;
   animation: caretBlink 1.05s ease-in-out infinite;
   vertical-align: middle;
+  flex: 0 0 auto;
+}
+
+/* Each typed glyph is its own flex item so a trailing/owned space is never
+   trimmed — the word separation shows the instant Space is pressed. */
+.typed-char {
+  white-space: pre;
+  flex: 0 0 auto;
+}
+/* A typed space renders as a clear gap with an underscore marker, so the
+   student sees the separation immediately and the caret moves past it. */
+.typed-space {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 0.62em;
+  align-self: stretch;
+}
+.typed-space::after {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 0.55rem;
+  height: 0.2rem;
+  border-radius: 999px;
+  background: rgba(108, 74, 230, 0.5);
 }
 
 @keyframes caretBlink {

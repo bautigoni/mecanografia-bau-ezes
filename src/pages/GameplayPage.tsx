@@ -827,7 +827,15 @@ export function GameplayPage() {
                     ref={typedScrollRef}
                     className={`typed-preview__value ${typed ? "" : "is-empty"}`}
                   >
-                    {typed || "Empezá a escribir…"}
+                    {typed
+                      ? Array.from(typed).map((ch, i) =>
+                          ch === " " ? (
+                            <span key={i} className="typed-space" aria-label="espacio" />
+                          ) : (
+                            <span key={i} className="typed-char">{ch}</span>
+                          ),
+                        )
+                      : "Empezá a escribir…"}
                     {typed && <span className="typed-preview__caret" aria-hidden="true" />}
                   </span>
                 </div>

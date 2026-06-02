@@ -1,10 +1,10 @@
-import { ArrowLeft, ArrowRight, Check, Lock, MapPin, Star, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Lock, MapPin, RotateCcw, Star, UserRound } from "lucide-react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
-import { getWorldBySlug, getWorlds, worldStarProgress, type LevelPosition } from "../data/worlds";
+import { getWorldBySlug, getWorlds, worldStarProgress, type Level, type LevelPosition } from "../data/worlds";
 import { LevelPositionEditor } from "../components/dev/LevelPositionEditor";
 import { assets } from "../utils/assets";
 
@@ -15,6 +15,31 @@ const EDITOR_AVAILABLE = import.meta.env.DEV;
 
 const clampPct = (v: number) => Math.min(100, Math.max(0, v));
 const round1 = (v: number) => Math.round(v * 10) / 10;
+
+/* ---- Level marker icon assets (served from /public) ----
+   Each state has its own high-quality WebP badge. The number in the file
+   name matches the level number shown in the icon. Completed badges bake in
+   the 1/2/3 star result (okay = 1★, good = 2★, perfect = 3★). */
+const LEVEL_ICON_DIR = {
+  available: "/typely_level_icons_webp",
+  okay: "/okay_webp_icons",
+  good: "/good_webp_icons",
+  perfect: "/perfect_webp_icons",
+} as const;
+const BLOCKED_ICON = "/typely_level_icons_webp/blocked-levels.webp";
+
+/** Resolves the badge image for a level given its state + best stars. */
+function levelIconSrc(level: Pick<Level, "levelNumber" | "state" | "stars">): string {
+  const n = Math.min(Math.max(level.levelNumber, 1), 8);
+  if (level.state === "Bloqueado") return BLOCKED_ICON;
+  if (level.state === "Completado") {
+    if (level.stars >= 3) return `${LEVEL_ICON_DIR.perfect}/${n}-perfect.webp`;
+    if (level.stars === 2) return `${LEVEL_ICON_DIR.good}/${n}-good.webp`;
+    return `${LEVEL_ICON_DIR.okay}/${n}-okay.webp`;
+  }
+  // "Actual" / available but not completed → blue numbered badge.
+  return `${LEVEL_ICON_DIR.available}/${n}.webp`;
+}
 
 
 function getShipAsset(from: LevelPosition, to?: LevelPosition) {
@@ -67,6 +92,9 @@ export function IslandDetailPage() {
      the flag and CSS transitions everything to its final state in one
      smooth fade — no more top-to-bottom paint of the JPEG/WebP. */
   const [bgReady, setBgReady] = useState(false);
+  /* The level info popover is closed by default (least intrusive) and opens
+     only when a level is tapped; tapping outside closes it again. */
+  const [popoverOpen, setPopoverOpen] = useState(false);
 
   /* ---- Dev-only level position editor state ---- */
   const mapRef = useRef<HTMLElement>(null);
@@ -103,6 +131,29 @@ export function IslandDetailPage() {
     if (!maybeWorld) return;
     setEditorPositions(maybeWorld.levelPositions.map((p) => ({ ...p })));
   }, [maybeWorld?.slug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Preload the level badge images for this island so they never flicker in.
+  useEffect(() => {
+    if (!maybeWorld) return;
+    for (const level of maybeWorld.levels) {
+      const img = new Image();
+      img.decoding = "async";
+      img.src = levelIconSrc(level);
+    }
+  }, [maybeWorld]);
+
+  // Close the level popover when tapping anywhere that isn't a level node or
+  // the popover itself.
+  useEffect(() => {
+    if (!popoverOpen) return;
+    function onDocPointerDown(event: PointerEvent) {
+      const el = event.target as HTMLElement | null;
+      if (el && (el.closest(".level-node") || el.closest(".level-popover"))) return;
+      setPopoverOpen(false);
+    }
+    document.addEventListener("pointerdown", onDocPointerDown);
+    return () => document.removeEventListener("pointerdown", onDocPointerDown);
+  }, [popoverOpen]);
 
   if (!maybeWorld) {
     return <Navigate to="/mundos" replace />;
@@ -146,6 +197,7 @@ export function IslandDetailPage() {
   function selectLevel(index: number) {
     const level = world.levels[index];
     setSelectedIndex(index);
+    setPopoverOpen(true);
 
     if (level.state === "Bloqueado") {
       setMessage("Completá el nivel anterior para desbloquearlo.");
@@ -317,9 +369,6 @@ export function IslandDetailPage() {
               const isSelected = index === selectedIndex;
               const position = activePositions[index];
               const isCompleted = level.state === "Completado";
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              const isCurrent = level.state === "Actual";
-              const isLocked = level.state === "Bloqueado";
 
               return (
                 <button
@@ -334,20 +383,16 @@ export function IslandDetailPage() {
                   onPointerUp={onNodePointerUp}
                   aria-label={`${level.title}: ${level.name}. ${level.state}`}
                 >
-                  <span className="level-node__platform">
-                    {isCompleted && <Check className="level-node__check" size={28} strokeWidth={3.4} />}
-                    {isLocked && <Lock className="level-node__lock" size={24} />}
-                    <strong className="level-node__number">{level.levelNumber}</strong>
-                  </span>
-                  {editorOn ? (
+                  <img
+                    className={`level-node__icon ${isCompleted ? "level-node__icon--medal" : ""}`}
+                    src={levelIconSrc(level)}
+                    alt=""
+                    decoding="async"
+                    draggable={false}
+                  />
+                  {editorOn && (
                     <span className="level-node__coord" aria-hidden="true">
                       {position.x} · {position.y}
-                    </span>
-                  ) : (
-                    <span className="level-node__rating" aria-hidden="true">
-                      {Array.from({ length: 3 }).map((_, ratingIndex) => (
-                        <Star key={ratingIndex} size={16} fill={ratingIndex < level.stars ? "currentColor" : "none"} />
-                      ))}
                     </span>
                   )}
                 </button>
@@ -355,8 +400,8 @@ export function IslandDetailPage() {
             })}
 
             {/* Compact selected-level popover, anchored to the selected node.
-                Hidden while the dev editor is open. */}
-            {!editorOn && (
+                Opens on tap, closes on tap-outside. Hidden while editing. */}
+            {!editorOn && popoverOpen && (
               <div
                 className="level-popover"
                 data-place={popoverRight ? "right" : "left"}
@@ -382,6 +427,8 @@ export function IslandDetailPage() {
                   <Button className="level-popover__cta" onClick={openLevel}>
                     {selectedLevel.state === "Bloqueado" ? (
                       <><Lock size={17} /> <span>Bloqueado</span></>
+                    ) : selectedLevel.state === "Completado" ? (
+                      <><RotateCcw size={17} /> <span>Reintentar</span></>
                     ) : (
                       <><span>Entrar al nivel</span> <ArrowRight size={18} strokeWidth={2.8} /></>
                     )}
