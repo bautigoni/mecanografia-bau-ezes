@@ -92,7 +92,6 @@ export function TeacherPage() {
       onLogout={leave}
       onBell={() => setMessage("No tenés notificaciones nuevas.")}
       hero={hero}
-      heroArt={{ mascot: assets.mascotMaleProud, island: assets.worldsIsland2 }}
     >
       {section === "inicio" && (
         <>

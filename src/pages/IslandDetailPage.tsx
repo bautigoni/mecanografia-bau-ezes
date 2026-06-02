@@ -1,11 +1,20 @@
-import { ArrowLeft, ArrowRight, Check, Gem, Lock, Star, Trophy, UserRound } from "lucide-react";
-import type { CSSProperties } from "react";
+import { ArrowLeft, ArrowRight, Check, Lock, MapPin, Star, UserRound } from "lucide-react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
 import { getWorldBySlug, getWorlds, worldStarProgress, type LevelPosition } from "../data/worlds";
+import { LevelPositionEditor } from "../components/dev/LevelPositionEditor";
 import { assets } from "../utils/assets";
+
+/* Dev-only level-position editor is available solely in dev builds; in a
+   production/student build this is false and the entire editor is tree-shaken
+   out, so students never see any debug UI, grid or coordinates. */
+const EDITOR_AVAILABLE = import.meta.env.DEV;
+
+const clampPct = (v: number) => Math.min(100, Math.max(0, v));
+const round1 = (v: number) => Math.round(v * 10) / 10;
 
 
 function getShipAsset(from: LevelPosition, to?: LevelPosition) {
@@ -59,6 +68,20 @@ export function IslandDetailPage() {
      smooth fade — no more top-to-bottom paint of the JPEG/WebP. */
   const [bgReady, setBgReady] = useState(false);
 
+  /* ---- Dev-only level position editor state ---- */
+  const mapRef = useRef<HTMLElement>(null);
+  const [editorOn, setEditorOn] = useState(
+    () => EDITOR_AVAILABLE && new URLSearchParams(window.location.search).has("editor"),
+  );
+  const [gridOn, setGridOn] = useState(true);
+  const [editorPositions, setEditorPositions] = useState<LevelPosition[]>([]);
+  const [dragIndex, setDragIndex] = useState(-1);
+  /* Mirror of the active drag index in a ref so pointermove never reads a
+     stale closure value between the pointerdown and the next render. */
+  const dragIndexRef = useRef(-1);
+  const [cursor, setCursor] = useState<LevelPosition | null>(null);
+  const [lastClick, setLastClick] = useState<LevelPosition | null>(null);
+
   useEffect(() => {
     setSelectedIndex(initialIndex);
   }, [initialIndex]);
@@ -75,6 +98,12 @@ export function IslandDetailPage() {
     if (img.complete && img.naturalWidth > 0) setBgReady(true);
   }, [maybeWorld]);
 
+  // Seed the editor draft from the saved config whenever the island changes.
+  useEffect(() => {
+    if (!maybeWorld) return;
+    setEditorPositions(maybeWorld.levelPositions.map((p) => ({ ...p })));
+  }, [maybeWorld?.slug]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!maybeWorld) {
     return <Navigate to="/mundos" replace />;
   }
@@ -85,12 +114,34 @@ export function IslandDetailPage() {
   const worldNumber = allWorlds.findIndex((item) => item.slug === world.slug) + 1;
   const safeIndex = Math.min(selectedIndex, world.levels.length - 1);
   const selectedLevel = world.levels[safeIndex];
-  const currentPosition = world.levelPositions[currentIndex] ?? world.levelPositions[0];
-  const nextPosition = world.levelPositions[currentIndex + 1];
+  /* While the dev editor is on, markers + ship follow the live draft so the
+     person placing them sees exactly where they'll land. Otherwise the saved
+     config (world.levelPositions) drives everything, unchanged. */
+  const activePositions =
+    editorOn && editorPositions.length === world.levelPositions.length
+      ? editorPositions
+      : world.levelPositions;
+  const currentPosition = activePositions[currentIndex] ?? activePositions[0];
+  const nextPosition = activePositions[currentIndex + 1];
   const shipAsset = getShipAsset(currentPosition, nextPosition);
   /* Star progress toward unlocking the next world (70% gate). */
   const starProgress = worldStarProgress(world.slug);
   const isLastWorld = worldNumber >= allWorlds.length;
+
+  /* Compact selected-level popover, anchored BESIDE the selected node. The
+     level paths wind mostly vertically, so opening to the side (rather than
+     above/below) keeps the popover off the neighbouring nodes. It opens to
+     the right for left-half nodes and to the left for right-half nodes, and
+     clamps vertically so it never spills off the top/bottom edge. */
+  const selectedPos = activePositions[safeIndex] ?? activePositions[0];
+  const popoverRight = selectedPos.x <= 50;
+  const popoverVBand: "top" | "center" | "bottom" =
+    selectedPos.y < 24 ? "top" : selectedPos.y > 76 ? "bottom" : "center";
+  const popoverGap = "2.6rem";
+  const popoverTx = popoverRight ? popoverGap : `calc(-100% - ${popoverGap})`;
+  const popoverTy =
+    popoverVBand === "top" ? "-0.6rem" : popoverVBand === "bottom" ? "calc(-100% + 0.6rem)" : "-50%";
+  const popoverState = selectedLevel.state.toLowerCase();
 
   function selectLevel(index: number) {
     const level = world.levels[index];
@@ -120,6 +171,8 @@ export function IslandDetailPage() {
   const RAPID_CLICK_COUNT = 5;
 
   function handleNodeClick(index: number) {
+    // In editor mode a click is part of placing the marker — never navigate.
+    if (editorOn) return;
     const now = Date.now();
     const tracker = rapidClick.current;
     if (tracker.index === index && now - tracker.last <= RAPID_WINDOW_MS) {
@@ -142,6 +195,7 @@ export function IslandDetailPage() {
 
   /* Double-click is a normal shortcut into the level (respects the lock). */
   function handleNodeDoubleClick(index: number) {
+    if (editorOn) return;
     setSelectedIndex(index);
     enterLevel(index, false);
   }
@@ -150,9 +204,72 @@ export function IslandDetailPage() {
     enterLevel(safeIndex, false);
   }
 
+  /* ---- Dev editor: convert a client point to map % (same box the markers
+     are positioned against, so what you place is exactly what renders). ---- */
+  function pctFromClient(clientX: number, clientY: number): LevelPosition | null {
+    const el = mapRef.current;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return null;
+    return {
+      x: round1(clampPct(((clientX - r.left) / r.width) * 100)),
+      y: round1(clampPct(((clientY - r.top) / r.height) * 100)),
+    };
+  }
+  function handleEditorCursor(clientX: number, clientY: number) {
+    if (clientX < -9999) {
+      setCursor(null);
+      return;
+    }
+    setCursor(pctFromClient(clientX, clientY));
+  }
+  async function handleEditorCopyAt(clientX: number, clientY: number) {
+    const p = pctFromClient(clientX, clientY);
+    if (!p) return;
+    setLastClick(p);
+    try {
+      await navigator.clipboard.writeText(`{ x: ${p.x}, y: ${p.y} }`);
+      setMessage(`Copiado · x ${p.x} · y ${p.y}`);
+    } catch {
+      setMessage(`x ${p.x} · y ${p.y}`);
+    }
+  }
+  function onNodePointerDown(event: ReactPointerEvent<HTMLButtonElement>, index: number) {
+    if (!editorOn) return;
+    event.preventDefault();
+    dragIndexRef.current = index;
+    setDragIndex(index);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      /* ignore — capture is best-effort */
+    }
+  }
+  function onNodePointerMove(event: ReactPointerEvent<HTMLButtonElement>, index: number) {
+    if (!editorOn || dragIndexRef.current !== index) return;
+    const p = pctFromClient(event.clientX, event.clientY);
+    if (!p) return;
+    setCursor(p);
+    setEditorPositions((prev) => prev.map((pos, i) => (i === index ? p : pos)));
+  }
+  function onNodePointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (dragIndexRef.current < 0) return;
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      /* ignore */
+    }
+    dragIndexRef.current = -1;
+    setDragIndex(-1);
+  }
+  function resetEditorPositions() {
+    setEditorPositions(world.levelPositions.map((p) => ({ ...p })));
+    setMessage("Posiciones restauradas a la configuración guardada.");
+  }
+
   return (
     <main
-      className={`island-detail scene-contain page-fade ${bgReady ? "is-bg-ready" : "is-bg-loading"}`}
+      className={`island-detail scene-contain page-fade ${bgReady ? "is-bg-ready" : "is-bg-loading"} ${editorOn ? "is-editing-levels" : ""}`}
       style={{ "--scene-bg": `url("${world.background}")` } as CSSProperties}
     >
       {/* Aspect-ratio-locked stage: the image and every level node share the
@@ -169,7 +286,24 @@ export function IslandDetailPage() {
             fetchpriority="high"
           />
 
-          <section className="level-map" aria-label="Niveles del mundo">
+          <section className="level-map" aria-label="Niveles del mundo" ref={mapRef}>
+            {EDITOR_AVAILABLE && editorOn && (
+              <LevelPositionEditor
+                worldSlug={world.slug}
+                positions={activePositions}
+                levels={world.levels.map((l) => ({ activityId: l.activityId, levelNumber: l.levelNumber }))}
+                cursor={cursor}
+                lastClick={lastClick}
+                gridOn={gridOn}
+                onToggleGrid={() => setGridOn((v) => !v)}
+                onReset={resetEditorPositions}
+                onClose={() => setEditorOn(false)}
+                onCursorMove={handleEditorCursor}
+                onCopyAt={handleEditorCopyAt}
+                onToast={setMessage}
+              />
+            )}
+
             <img
               className="level-ship"
               src={shipAsset}
@@ -181,7 +315,7 @@ export function IslandDetailPage() {
 
             {world.levels.map((level, index) => {
               const isSelected = index === selectedIndex;
-              const position = world.levelPositions[index];
+              const position = activePositions[index];
               const isCompleted = level.state === "Completado";
               // eslint-disable-next-line @typescript-eslint/no-unused-vars
               const isCurrent = level.state === "Actual";
@@ -191,10 +325,13 @@ export function IslandDetailPage() {
                 <button
                   key={level.title}
                   type="button"
-                  className={`level-node level-node--${level.state.toLowerCase()} ${isSelected ? "is-selected" : ""}`}
+                  className={`level-node level-node--${level.state.toLowerCase()} ${isSelected ? "is-selected" : ""} ${editorOn ? "is-editable" : ""} ${dragIndex === index ? "is-dragging" : ""}`}
                   style={{ left: `${position.x}%`, top: `${position.y}%` }}
                   onClick={() => handleNodeClick(index)}
                   onDoubleClick={() => handleNodeDoubleClick(index)}
+                  onPointerDown={(e) => onNodePointerDown(e, index)}
+                  onPointerMove={(e) => onNodePointerMove(e, index)}
+                  onPointerUp={onNodePointerUp}
                   aria-label={`${level.title}: ${level.name}. ${level.state}`}
                 >
                   <span className="level-node__platform">
@@ -202,14 +339,56 @@ export function IslandDetailPage() {
                     {isLocked && <Lock className="level-node__lock" size={24} />}
                     <strong className="level-node__number">{level.levelNumber}</strong>
                   </span>
-                  <span className="level-node__rating" aria-hidden="true">
-                    {Array.from({ length: 3 }).map((_, ratingIndex) => (
-                      <Star key={ratingIndex} size={16} fill={ratingIndex < level.stars ? "currentColor" : "none"} />
-                    ))}
-                  </span>
+                  {editorOn ? (
+                    <span className="level-node__coord" aria-hidden="true">
+                      {position.x} · {position.y}
+                    </span>
+                  ) : (
+                    <span className="level-node__rating" aria-hidden="true">
+                      {Array.from({ length: 3 }).map((_, ratingIndex) => (
+                        <Star key={ratingIndex} size={16} fill={ratingIndex < level.stars ? "currentColor" : "none"} />
+                      ))}
+                    </span>
+                  )}
                 </button>
               );
             })}
+
+            {/* Compact selected-level popover, anchored to the selected node.
+                Hidden while the dev editor is open. */}
+            {!editorOn && (
+              <div
+                className="level-popover"
+                data-place={popoverRight ? "right" : "left"}
+                data-v={popoverVBand}
+                style={{
+                  left: `${selectedPos.x}%`,
+                  top: `${selectedPos.y}%`,
+                  transform: `translate(${popoverTx}, ${popoverTy})`,
+                }}
+              >
+                <div className="level-popover__card">
+                  <span className="level-popover__tail" aria-hidden="true" />
+                  <div className="level-popover__top">
+                    <strong className="level-popover__num">{selectedLevel.title}</strong>
+                    <span className={`status-pill status-pill--${popoverState}`}>{selectedLevel.state}</span>
+                  </div>
+                  <h3 className="level-popover__name">{selectedLevel.name}</h3>
+                  <span className="level-popover__stars" aria-hidden="true">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Star key={i} size={15} fill={i < selectedLevel.stars ? "currentColor" : "none"} />
+                    ))}
+                  </span>
+                  <Button className="level-popover__cta" onClick={openLevel}>
+                    {selectedLevel.state === "Bloqueado" ? (
+                      <><Lock size={17} /> <span>Bloqueado</span></>
+                    ) : (
+                      <><span>Entrar al nivel</span> <ArrowRight size={18} strokeWidth={2.8} /></>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
           </section>
         </div>
       </div>
@@ -219,55 +398,40 @@ export function IslandDetailPage() {
         <span>Volver a mundos</span>
       </button>
 
-      <div className="island-title-panel">
-        <span className="world-badge">
-          <Star size={18} fill="currentColor" />
+      {EDITOR_AVAILABLE && (
+        <button
+          type="button"
+          className={`level-editor-toggle ${editorOn ? "is-on" : ""}`}
+          onClick={() => setEditorOn((v) => !v)}
+          title="Editor de posiciones de niveles (solo dev)"
+        >
+          <MapPin size={18} />
+          <span>{editorOn ? "Cerrar editor" : "Editar niveles"}</span>
+        </button>
+      )}
+
+      {/* Compact floating island header — sits in the top-safe area and never
+          covers the level nodes. Replaces the old large title/progress panel. */}
+      <header className="island-hud">
+        <span className="island-hud__badge">
+          <Star size={15} fill="currentColor" />
           Mundo {worldNumber}
         </span>
-        <h1>{world.title}</h1>
-        <p>Elegí un nivel para continuar tu aventura.</p>
-        <p className="world-star-progress">
-          <Star size={15} fill="currentColor" />
-          {isLastWorld
-            ? `Progreso: ${starProgress.earnedStars} / ${starProgress.totalStars} estrellas`
-            : starProgress.isUnlockedNext
-              ? `Siguiente mundo desbloqueado · ${starProgress.earnedStars} / ${starProgress.totalStars} estrellas`
-              : `Necesitás ${starProgress.requiredStars} de ${starProgress.totalStars} estrellas para desbloquear el siguiente mundo (tenés ${starProgress.earnedStars}).`}
-        </p>
-      </div>
-
-      <aside className="level-detail-panel" aria-label="Detalle del nivel seleccionado">
-        <div className="level-detail-panel__icon">
-          {selectedLevel.state === "Bloqueado" ? <Lock size={32} /> : <Star size={36} fill="currentColor" />}
+        <div className="island-hud__body">
+          <h1>{world.title}</h1>
+          <div className="island-hud__meta">
+            <span className="island-hud__stars">
+              <Star size={14} fill="currentColor" />
+              {starProgress.earnedStars}/{starProgress.totalStars}
+            </span>
+            <span className="island-hud__hint">
+              {!isLastWorld && !starProgress.isUnlockedNext
+                ? `Faltan ${Math.max(0, starProgress.requiredStars - starProgress.earnedStars)}★ para el próximo mundo`
+                : "Tocá un nivel para jugar"}
+            </span>
+          </div>
         </div>
-        <div>
-          <h2>{selectedLevel.title}</h2>
-          <h3>{selectedLevel.name}</h3>
-          <span className={`status-pill status-pill--${selectedLevel.state.toLowerCase()}`}>{selectedLevel.state}</span>
-        </div>
-
-        <Button className="level-detail-panel__cta" onClick={openLevel}>
-          <span>Entrar al nivel</span>
-          <ArrowRight size={20} strokeWidth={2.8} />
-        </Button>
-
-        <p>{selectedLevel.description}</p>
-
-        <div className="reward-row" aria-label="Recompensas">
-          <span>
-            <Star size={22} fill="currentColor" />
-            3
-          </span>
-          <span>
-            <Gem size={22} fill="currentColor" />
-            15
-          </span>
-          <span>
-            <Trophy size={22} />
-            reto
-          </span>
-        </div>
-      </aside>
+      </header>
 
       <button type="button" className="profile-bubble" aria-label="Perfil" onClick={() => setMessage("Perfil de Sofía")}>
         <UserRound size={25} />

@@ -175,7 +175,6 @@ export function SiteAdminPage() {
       search={{ value: search, onChange: setSearch, placeholder: "Buscar cursos, docentes, alumnos…" }}
       onBell={() => setMessage("No tenés notificaciones nuevas.")}
       hero={hero}
-      heroArt={{ mascot: assets.mascotFemaleLaptop, island: assets.worldsIsland3 }}
     >
       {section === "inicio" && (
         <>

@@ -18,6 +18,21 @@ export const SUPERADMIN_USER: DemoUser = {
   classId: "clase-3a",
 };
 
+/* The demo account. "Entrar en modo demo" ALWAYS signs in as this
+   lowest-privilege student — never the superadmin. It can only reach the
+   student game/world view; every admin/teacher surface is off-limits.
+   SECURITY: demo mode must never grant elevated privileges. */
+export const DEMO_STUDENT: DemoUser = {
+  id: "u-demo-student",
+  name: "Explorador demo",
+  username: "demo",
+  password: "demo",
+  role: "alumno",
+  siteId: "sede-norte",
+  classId: "clase-3a",
+  stats: { precision: 0, speed: 0, completedLevels: 0, points: 0 },
+};
+
 export const demoUsers: DemoUser[] = [SUPERADMIN_USER];
 
 /* Sample student records — kept ONLY as data for the teacher view
@@ -62,13 +77,13 @@ export const seedData: DemoData = {
       id: "sede-norte",
       name: "Sede Norte",
       city: "Buenos Aires",
-      coordinator: "Coordinacion TIC",
+      active: true,
     },
     {
       id: "sede-sur",
       name: "Sede Sur",
       city: "La Plata",
-      coordinator: "Equipo Digital",
+      active: true,
     },
   ],
   classes: [
@@ -81,7 +96,7 @@ export const seedData: DemoData = {
       studentIds: ["u-sofia", "u-lucas", "u-valen"],
     },
   ],
-  users: [...demoUsers, ...sampleStudents],
+  users: [...demoUsers, DEMO_STUDENT, ...sampleStudents],
   accessCodes: [
     {
       id: "code-admin-sede",

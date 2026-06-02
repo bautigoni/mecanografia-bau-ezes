@@ -1,4 +1,4 @@
-import { demoUsers, seedData, SUPERADMIN_USER } from "../data/seed";
+import { DEMO_STUDENT, seedData, SUPERADMIN_USER } from "../data/seed";
 import type {
   ActiveUser,
   ClassRoom,
@@ -112,6 +112,9 @@ export function setActiveUser(user: ActiveUser | null) {
       role: user.role,
       siteId: user.siteId,
       classId: user.classId,
+      active: user.active,
+      // Persisted so the forced-password-change guard survives a refresh.
+      mustChangePassword: user.mustChangePassword,
     }),
   );
 }
@@ -128,13 +131,20 @@ export function authenticate(role: Role, username: string, password: string): Ac
   return activeUser;
 }
 
+/** Canonical email form used everywhere we store or compare emails, so a
+ *  Google sign-in always resolves to the same account and no duplicates are
+ *  created: trimmed + lowercased. */
+export function normalizeEmail(email?: string): string {
+  return (email ?? "").trim().toLowerCase();
+}
+
 /** Find a real (non-demo) user by email — used to match the address
  *  returned by Google after a successful sign-in. Case-insensitive,
  *  ignores whitespace. Returns `null` if no user has that email. */
 export function findUserByEmail(email: string): EduTicUser | null {
   if (!email) return null;
   ensureSeedData();
-  const needle = email.trim().toLowerCase();
+  const needle = normalizeEmail(email);
   if (!needle) return null;
   const users = getDemoData().users;
   const found = users.find(
@@ -181,19 +191,22 @@ export function authenticateAny(username: string, password: string): ActiveUser 
     return byUsername || byEmail;
   });
   if (!found) return null;
-  // Hard rule: only the superadmin account may sign in via the UI.
-  if (found.role !== "superadmin") return null;
+  // Students never sign in through the staff form — they use the game via
+  // demo mode / their own flow. This keeps the form for staff only.
+  if (found.role === "alumno") return null;
+  // Deactivated accounts cannot sign in.
+  if (found.active === false) return null;
+  // The active user carries `mustChangePassword` (set on create/reset), so
+  // the route guard can force a password change before any dashboard.
   return toActiveUser(found);
 }
 
-export function demoLogin(role: Role): ActiveUser {
-  const user = demoUsers.find((candidate) => candidate.role === role) ?? demoUsers[0];
-  if (!user) {
-    throw new Error(`No demo user configured for role ${role}`);
-  }
-
-  const { password: _password, stats: _stats, ...activeUser } = user;
-  return activeUser;
+/** Demo sign-in. ALWAYS returns the lowest-privilege demo STUDENT, never an
+ *  admin/teacher — regardless of any argument. This is a hard security
+ *  boundary: demo mode must never grant elevated privileges, so there is no
+ *  role parameter and no fallback that could resolve to the superadmin. */
+export function demoLogin(): ActiveUser {
+  return toActiveUser(DEMO_STUDENT);
 }
 
 /* ------------------------------------------------------------------ */
@@ -349,13 +362,14 @@ export function getSiteById(siteId?: string): Site | undefined {
   return getDemoData().sites.find((site) => site.id === siteId);
 }
 
-export function createSite(input: { name: string; city?: string; coordinator?: string }): Site {
+export function createSite(input: { name: string; city?: string; photo?: string }): Site {
   const data = getDemoData();
   const site: Site = {
     id: makeId("sede"),
     name: input.name.trim() || `Sede ${data.sites.length + 1}`,
     city: input.city?.trim() || "Sin localidad",
-    coordinator: input.coordinator?.trim() || "Pendiente",
+    photo: input.photo || undefined,
+    active: true,
   };
   patchDemoData({ sites: [...data.sites, site] });
   return site;
@@ -368,21 +382,116 @@ export function updateSite(siteId: string, patch: Partial<Omit<Site, "id">>): vo
   });
 }
 
-/** Creates a sede admin (role "admin-sede") bound to a single sede. */
-export function createSedeAdmin(input: { name: string; email?: string; siteId: string }): EduTicUser {
+/** Creates a sede admin (role "admin-sede") bound to a single sede.
+ *  Email is required because role lookup (Google sign-in) keys off it. */
+export function createSedeAdmin(input: { name: string; email: string; siteId: string }): EduTicUser {
   const data = getDemoData();
   const credentials = createCredentials(input.name);
   const admin: EduTicUser = {
     id: makeId("sede-admin"),
     name: input.name.trim(),
     username: credentials.username,
+    // The initial password is temporary — the admin must change it on first
+    // sign-in. Normalised email keeps Google sign-in lookups duplicate-free.
     password: credentials.password,
-    email: input.email?.trim() || undefined,
+    email: normalizeEmail(input.email),
     role: "admin-sede",
     siteId: input.siteId,
+    active: true,
+    mustChangePassword: true,
+    temporaryPassword: true,
+    passwordResetAt: new Date().toISOString(),
   };
   patchDemoData({ users: [...data.users, admin] });
   return admin;
+}
+
+/** Edits a sede admin's editable fields (name, email, assigned sede,
+ *  active flag). Never touches the password — use `resetUserPassword`. */
+export function updateSedeAdmin(
+  userId: string,
+  patch: { name?: string; email?: string; siteId?: string; active?: boolean },
+): void {
+  const data = getDemoData();
+  patchDemoData({
+    users: data.users.map((u) =>
+      u.id === userId
+        ? {
+            ...u,
+            ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
+            ...(patch.email !== undefined ? { email: normalizeEmail(patch.email) } : {}),
+            ...(patch.siteId !== undefined ? { siteId: patch.siteId } : {}),
+            ...(patch.active !== undefined ? { active: patch.active } : {}),
+          }
+        : u,
+    ),
+  });
+}
+
+/** Permanently removes a sede admin. Guarded so it can only ever delete an
+ *  `admin-sede` record — never the superadmin or any other role. */
+export function deleteSedeAdmin(userId: string): boolean {
+  const data = getDemoData();
+  const target = data.users.find((u) => u.id === userId);
+  if (!target || target.role !== "admin-sede") return false;
+  patchDemoData({ users: data.users.filter((u) => u.id !== userId) });
+  return true;
+}
+
+/** Enables/disables a user account (used for sede admins). */
+export function setUserActive(userId: string, active: boolean): void {
+  const data = getDemoData();
+  patchDemoData({
+    users: data.users.map((u) => (u.id === userId ? { ...u, active } : u)),
+  });
+}
+
+/** Resets a user's password to a freshly generated temporary value and
+ *  returns ONLY the new password. The previous password is never read,
+ *  returned, or exposed — the superadmin can hand off the temp value once
+ *  and then encourage Google sign-in by email. */
+export function resetUserPassword(userId: string): string | null {
+  const data = getDemoData();
+  const target = data.users.find((u) => u.id === userId);
+  if (!target) return null;
+  const tempPassword = `tmp-${Math.random().toString(36).slice(2, 8)}`;
+  patchDemoData({
+    users: data.users.map((u) =>
+      u.id === userId
+        ? {
+            ...u,
+            password: tempPassword,
+            // Force a change on next sign-in with this temporary value.
+            mustChangePassword: true,
+            temporaryPassword: true,
+            passwordResetAt: new Date().toISOString(),
+          }
+        : u,
+    ),
+  });
+  return tempPassword;
+}
+
+/** Sets a user's own chosen password and clears the temporary/force-change
+ *  flags. Called from the "Cambiar contraseña" screen after a temp login. */
+export function setUserPassword(userId: string, newPassword: string): boolean {
+  const data = getDemoData();
+  const target = data.users.find((u) => u.id === userId);
+  if (!target) return false;
+  patchDemoData({
+    users: data.users.map((u) =>
+      u.id === userId
+        ? {
+            ...u,
+            password: newPassword,
+            mustChangePassword: false,
+            temporaryPassword: false,
+            passwordUpdatedAt: new Date().toISOString(),
+          }
+        : u,
+    ),
+  });
+  return true;
 }
 
 export function createTeacher(input: { name: string; email?: string; siteId?: string; classId?: string }): EduTicUser {

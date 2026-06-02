@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
+import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { WorldsPage } from "./pages/WorldsPage";
 import { IslandDetailPage } from "./pages/IslandDetailPage";
 import { AdminGeneralPage } from "./pages/AdminGeneralPage";
@@ -15,6 +16,8 @@ export function App() {
     <Routes>
       <Route path="/" element={<LoginPage />} />
       <Route path="/login" element={<LoginPage />} />
+      {/* Forced password change after a temporary-password sign-in. */}
+      <Route path="/cambiar-contrasena" element={<ChangePasswordPage />} />
 
       {/* Student game experience — exclusive to students. Admins/teachers
           are redirected to their own dashboards, never the game map. */}

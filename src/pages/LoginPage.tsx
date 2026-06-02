@@ -49,6 +49,12 @@ export function LoginPage() {
       return;
     }
 
+    // Temporary-password sign-ins must set a new password first.
+    if (nextUser.mustChangePassword) {
+      navigate("/cambiar-contrasena");
+      return;
+    }
+
     navigate(routeForRole(nextUser.role));
   }
 
@@ -63,7 +69,9 @@ export function LoginPage() {
        or admin data, and never localStorage.clear(). */
     if (reset) clearDemoProgressOnly();
     setShowDemoModal(false);
-    const nextUser = loginDemo("superadmin");
+    // Demo mode ALWAYS enters as the lowest-privilege student → game map.
+    // It can never reach an admin/teacher surface.
+    const nextUser = loginDemo();
     navigate(routeForRole(nextUser.role));
   }
 
@@ -79,13 +87,17 @@ export function LoginPage() {
       onCredential: (credential) => {
         const result = loginGoogle(credential);
         if (result.ok) {
+          if (result.user.mustChangePassword) {
+            navigate("/cambiar-contrasena");
+            return;
+          }
           navigate(routeForRole(result.user.role));
           return;
         }
         if (result.reason === "DOMAIN_NOT_ALLOWED") {
           setMessage("Tu dominio de correo no está habilitado para Typely.");
         } else if (result.reason === "USER_NOT_FOUND") {
-          setMessage("Tu cuenta todavía no está habilitada en Typely.");
+          setMessage("No encontramos una cuenta asociada a este correo. Pedile acceso a tu administrador.");
         } else {
           setMessage("No pudimos validar tu cuenta de Google. Probá de nuevo.");
         }

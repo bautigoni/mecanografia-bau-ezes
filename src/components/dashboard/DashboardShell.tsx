@@ -93,14 +93,19 @@ export function DashboardShell({
 
         <img className="dash-sidebar__mascot" src={sidebarMascot} alt="" decoding="async" loading="lazy" />
 
-        <button type="button" className="dash-account" onClick={onLogout} title="Cerrar sesión">
-          <span className="dash-account__avatar">{account.initial}</span>
-          <div className="dash-account__info">
-            <strong>{account.name}</strong>
-            {account.email ? <span>{account.email}</span> : null}
+        <div className="dash-footer">
+          <div className="dash-account">
+            <span className="dash-account__avatar">{account.initial}</span>
+            <div className="dash-account__info">
+              <strong>{account.name}</strong>
+              {account.email ? <span>{account.email}</span> : null}
+            </div>
           </div>
-          <LogOut size={17} />
-        </button>
+          <button type="button" className="dash-logout" onClick={onLogout}>
+            <LogOut size={17} />
+            <span>Cerrar sesión</span>
+          </button>
+        </div>
       </aside>
 
       <div className="dash-main">

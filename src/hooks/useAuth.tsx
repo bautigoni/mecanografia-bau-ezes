@@ -9,6 +9,7 @@ import {
   loginByGoogleEmail,
   setActiveUser,
   setDemoMode,
+  setUserPassword,
 } from "../utils/storage";
 import { isEmailDomainAllowed, parseJwtCredential } from "../utils/googleAuth";
 
@@ -25,7 +26,11 @@ interface AuthContextValue {
    *  This is the preferred path (no role picker needed). */
   loginAny: (username: string, password: string) => ActiveUser | null;
   login: (role: Role, username: string, password: string) => ActiveUser | null;
-  loginDemo: (role: Role) => ActiveUser;
+  /** Demo sign-in — always the lowest-privilege demo student. */
+  loginDemo: () => ActiveUser;
+  /** Persist a new password for the current user and clear the
+   *  force-change flag. Returns the refreshed active user, or null. */
+  completePasswordChange: (newPassword: string) => ActiveUser | null;
   /** Sign in with a Google Identity Services ID-token credential.
    *  - Decodes the token (client-side, untrusted) to read the email.
    *  - Rejects unknown emails — never auto-creates admin accounts.
@@ -62,12 +67,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return nextUser;
       },
-      loginDemo: (role) => {
-        const nextUser = demoLogin(role);
+      loginDemo: () => {
+        // Always the lowest-privilege demo student — never an admin.
+        const nextUser = demoLogin();
         setDemoMode(true); // demo = full free-path preview (all worlds)
         setActiveUser(nextUser);
         setUser(nextUser);
         return nextUser;
+      },
+      completePasswordChange: (newPassword) => {
+        if (!user) return null;
+        const ok = setUserPassword(user.id, newPassword);
+        if (!ok) return null;
+        const refreshed: ActiveUser = { ...user, mustChangePassword: false };
+        setActiveUser(refreshed);
+        setUser(refreshed);
+        return refreshed;
       },
       loginGoogle: (credential) => {
         /* The credential is the ID-token JWT returned by GIS. We decode
@@ -86,10 +101,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!nextUser) {
           return { ok: false, reason: "USER_NOT_FOUND" };
         }
+        // Google proves identity without a password, so a temporary-password
+        // holder who signs in with Google does not need the forced change.
+        const googleUser: ActiveUser = { ...nextUser, mustChangePassword: false };
         setDemoMode(false);
-        setActiveUser(nextUser);
-        setUser(nextUser);
-        return { ok: true, user: nextUser };
+        setActiveUser(googleUser);
+        setUser(googleUser);
+        return { ok: true, user: googleUser };
       },
       logout: () => {
         setDemoMode(false);

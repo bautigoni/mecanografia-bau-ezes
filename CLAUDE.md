@@ -320,13 +320,18 @@ Containerised behind Nginx, reverse-proxied by Caddy. Files in repo root:
 - Use only the copied public assets under `public/assets/`.
 - Keep student UI immersive and minimal — no dense forms, no admin look.
 - Gameplay must be real and keyboard-driven, never placeholder.
-- Every island must have exactly 6 playable levels.
-- If the background art shows more than 6 painted platforms, keep the extra
-  platform as decoration. Do not add fake levels to match the art unless the
-  curriculum is intentionally expanded.
-- Level node positions must be maintained in `src/data/worlds.ts` as platform
-  center coordinates. Do not compensate for bad placement with random CSS
-  offsets on individual numbers.
+- Level count is per-island, not fixed (see §17). It is driven by the number
+  of `Activity` records for that world in `src/data/activities.ts` — NOT by the
+  positions array. To add a level you must add BOTH a new `Activity` and a
+  matching coordinate. Current counts: island1 = 7, island2 = 6, island3 = 7,
+  island4 = 6, island5 = 7, island6–island15 = up to 8.
+- If the background art shows more painted platforms than the curriculum has
+  levels, keep the extra platform as decoration. Do not add fake levels to
+  match the art unless the curriculum is intentionally expanded.
+- Level node positions live in `src/data/levelPositions.ts` (`islandLevelLayouts`,
+  re-exported through `src/data/worlds.ts`) as platform-center % coordinates.
+  Do not compensate for bad placement with random CSS offsets on individual
+  numbers — use the dev editor (§17) instead.
 - Difficulty increases by world (see §4).
 - Spanish must be supported correctly: tildes (á é í ó ú), ñ, mayúsculas,
   and inverted signs `¿` `¡`.
@@ -362,3 +367,50 @@ Containerised behind Nginx, reverse-proxied by Caddy. Files in repo root:
 - Add a per-level "best time" leaderboard alongside accuracy.
 - Improve i18n: today copy is Argentinian Spanish — add neutral Spanish
   variant if needed for other markets.
+
+## 17. Recent Changes (2026-06-01)
+
+### 17a. Roles, auth & security
+- **Demo mode is student-only.** `DEMO_STUDENT` (role `alumno`) in
+  `src/data/seed.ts`; `demoLogin()` in `src/utils/storage.ts` takes no role and
+  ALWAYS returns it (never the superadmin). "Entrar en modo demo" → `/mundos`.
+  Hard rule: demo can never reach an admin/teacher surface.
+- **Google login matches by normalised email.** `normalizeEmail()`
+  (trim + lowercase) is used on write (`createSedeAdmin`/`updateSedeAdmin`) and
+  lookup (`findUserByEmail`/`loginByGoogleEmail`) so the same Gmail resolves to
+  the same account with no duplicates. Unknown email → friendly Spanish error.
+- **Temporary-password forced change.** Sede admins are created / reset with a
+  temp password and `mustChangePassword`/`temporaryPassword` flags
+  (`resetUserPassword`, `setUserPassword`). On login `ProtectedRoute` redirects
+  to `/cambiar-contrasena` (`src/pages/ChangePasswordPage.tsx`) until a new
+  password is set. Google sign-in (passwordless) bypasses this. The current
+  password is never shown — only the new temp value, once.
+- `authenticateAny` now lets staff (superadmin/admin-general/admin-sede/
+  profesor) sign in via the form; students (`alumno`) and deactivated accounts
+  are blocked. Logout button ("Cerrar sesión") lives in the dashboard sidebar
+  footer (`DashboardShell`).
+
+### 17b. Superadmin dashboard (`AdminGeneralPage`)
+- Manages ONLY sedes + sede admins. Removed the "Coordinación TIC" field.
+- `Site` gained `photo?` (base64 data URL) + `active?`. Sede cards show a real
+  uploaded school photo (resize helper `src/utils/image.ts`) with a soft
+  placeholder fallback — never island art.
+- Sede admins: create (email REQUIRED), edit (name/email/sede/active), reset
+  password, and **delete** with a confirmation dialog (`deleteSedeAdmin`).
+- Smaller mascot (sidebar only — the hero/top robot was removed from all three
+  dashboards), compact buttons, scroll-safe modals (`max-height:88vh;
+  overflow-y:auto`). `Toast` already auto-dismisses, caps at 3, de-dupes.
+
+### 17c. Island map UI (`IslandDetailPage`)
+- Positions extracted to `src/data/levelPositions.ts` (single source of truth).
+- The big `.island-title-panel` and right-side `.level-detail-panel` were
+  replaced by a compact floating header (`.island-hud`, top-centre) and a small
+  popover (`.level-popover`) anchored BESIDE the selected node (opens right for
+  left-half nodes, left for right-half, vertically clamped) so it never covers
+  multiple level nodes. Selected node keeps a glowing ring. The map stays the
+  focus. Keep the Typely pastel/glass identity.
+- **Dev-only level position editor**: gated by `import.meta.env.DEV`
+  (`src/components/dev/LevelPositionEditor.tsx`). Enable via `?editor=1` or the
+  "Editar niveles" toggle. Drag markers, 10% grid + crosshair, click-to-copy a
+  coordinate, "Copiar arreglo" pastes straight into `levelPositions.ts`. Fully
+  stripped from production/student builds.

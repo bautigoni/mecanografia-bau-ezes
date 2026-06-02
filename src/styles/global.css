@@ -400,12 +400,20 @@ a {
   position: relative;
   z-index: 1;
   width: min(26rem, 92vw);
+  /* Scroll-safe: never taller than the viewport; long content (edit admin,
+     reset password, etc.) scrolls inside the card so every field and action
+     stays reachable, including on small screens. */
+  max-height: 88vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 1.8rem 1.6rem 1.5rem;
   border-radius: 26px;
   text-align: center;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 24px 60px rgba(54, 86, 134, 0.28);
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(155, 124, 255, 0.1), transparent 60%),
+    linear-gradient(170deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 255, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 60px rgba(54, 86, 134, 0.24);
   animation: softHintIn 240ms ease-out both;
 }
 .demo-modal__icon {
@@ -1771,6 +1779,274 @@ a {
   inset: 0;
   z-index: 8;
   pointer-events: none;
+}
+
+/* =====================================================================
+   DEV-ONLY level position editor (LevelPositionEditor). None of these
+   styles affect the student view — the markup is only rendered in dev
+   builds when the editor is toggled on.
+===================================================================== */
+.is-editing-levels { cursor: crosshair; }
+/* While placing markers, clear the panels that overlay the map so every
+   platform (including those near the edges) is reachable for dragging. */
+.is-editing-levels .island-hud,
+.is-editing-levels .island-title-panel,
+.is-editing-levels .level-detail-panel,
+.is-editing-levels .level-popover,
+.is-editing-levels .profile-bubble { display: none; }
+.level-editor-toggle {
+  position: fixed;
+  left: 1.2rem;
+  bottom: 1.2rem;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid rgba(123, 108, 255, 0.4);
+  border-radius: 999px;
+  color: #5932d4;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 26px rgba(54, 86, 134, 0.2);
+  cursor: pointer;
+}
+.level-editor-toggle.is-on { color: #fff; background: linear-gradient(135deg, #7c71ff, #5932d4); border-color: transparent; }
+
+/* In-map layer holds grid + crosshair + capture surface, below the markers. */
+.lpe-layer { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
+.lpe-capture { position: absolute; inset: 0; pointer-events: auto; cursor: crosshair; }
+.lpe-grid { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.lpe-grid line { stroke: rgba(89, 50, 212, 0.28); stroke-width: 0.15; vector-effect: non-scaling-stroke; }
+.lpe-grid line.lpe-grid__mid { stroke: rgba(89, 50, 212, 0.55); stroke-width: 0.3; }
+.lpe-crosshair { position: absolute; background: rgba(255, 90, 160, 0.8); pointer-events: none; }
+.lpe-crosshair--v { top: 0; bottom: 0; width: 1px; transform: translateX(-0.5px); }
+.lpe-crosshair--h { left: 0; right: 0; height: 1px; transform: translateY(-0.5px); }
+.lpe-cursor-label {
+  position: absolute;
+  z-index: 9;
+  transform: translate(0.6rem, 0.6rem);
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.4rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.72rem;
+  color: #fff;
+  background: rgba(40, 30, 90, 0.82);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Markers become draggable handles in editor mode. */
+.level-node.is-editable { cursor: grab; touch-action: none; }
+.level-node.is-editable.is-dragging { cursor: grabbing; z-index: 12; }
+.level-node.is-editable .level-node__platform { outline: 2px dashed rgba(255, 255, 255, 0.85); outline-offset: 3px; }
+.level-node__coord {
+  position: absolute;
+  left: 50%;
+  bottom: -1.2rem;
+  transform: translateX(-50%);
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.4rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.7rem;
+  color: #fff;
+  background: rgba(89, 50, 212, 0.9);
+  white-space: nowrap;
+}
+
+/* Fixed HUD panel. */
+.lpe-hud {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 45;
+  width: min(20rem, 92vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.9rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.97), rgba(244, 248, 255, 0.94));
+  box-shadow: 0 22px 50px rgba(54, 86, 134, 0.28);
+  backdrop-filter: blur(14px);
+}
+.lpe-hud__head { display: flex; align-items: center; justify-content: space-between; }
+.lpe-hud__head strong { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-display); color: #17355f; }
+.lpe-hud__close { border: 0; background: transparent; color: #8a93b8; cursor: pointer; }
+.lpe-hud__hint { margin: 0; color: #61709e; font-weight: 700; font-size: 0.78rem; }
+.lpe-hud__readout { display: grid; gap: 0.15rem; font-weight: 800; font-size: 0.8rem; color: #45558a; }
+.lpe-hud__toggles { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.lpe-chip {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.35rem 0.6rem; border-radius: 999px;
+  border: 1px solid rgba(123, 108, 255, 0.3);
+  color: #5932d4; background: rgba(123, 108, 255, 0.08);
+  font-weight: 800; font-size: 0.76rem; cursor: pointer;
+}
+.lpe-chip.is-on { color: #fff; background: linear-gradient(135deg, #7c71ff, #5932d4); border-color: transparent; }
+.lpe-hud__json {
+  margin: 0; max-height: 11rem; overflow: auto;
+  padding: 0.6rem; border-radius: 0.7rem;
+  background: #1f2547; color: #c9e8ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem; line-height: 1.5; white-space: pre;
+}
+.lpe-hud__actions { display: flex; gap: 0.5rem; }
+.lpe-btn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;
+  padding: 0.5rem; border-radius: 0.7rem; border: 1px solid rgba(120, 130, 170, 0.24);
+  color: #45558a; background: rgba(255, 255, 255, 0.8);
+  font-weight: 800; font-size: 0.8rem; cursor: pointer;
+}
+.lpe-btn--primary { color: #fff; border-color: transparent; background: linear-gradient(135deg, #54e8c6, #536bff); }
+
+/* =====================================================================
+   COMPACT ISLAND UI — floating header + selected-level popover.
+   Replaces the old large title/right-side panels so the map stays the
+   focus and no panel covers the level nodes.
+===================================================================== */
+.island-hud {
+  position: absolute;
+  top: clamp(0.7rem, 2vh, 1.3rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  max-width: min(92vw, 30rem);
+  padding: 0.55rem 0.95rem 0.55rem 0.6rem;
+  border-radius: 1.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.86), rgba(233, 244, 255, 0.74));
+  box-shadow: 0 16px 36px rgba(54, 86, 134, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  animation: hudDropIn 600ms 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes hudDropIn {
+  from { opacity: 0; transform: translate(-50%, -0.9rem) scale(0.94); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+.island-hud__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  background: linear-gradient(135deg, #7c71ff, #536bff);
+  box-shadow: 0 8px 16px rgba(83, 107, 255, 0.32);
+}
+.island-hud__badge svg { color: #ffe27a; }
+.island-hud__body { min-width: 0; display: grid; gap: 0.1rem; }
+.island-hud__body h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.05rem, 2.4vw, 1.5rem);
+  line-height: 1.05;
+  color: #17355f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.island-hud__meta { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.island-hud__stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  font-weight: 900;
+  font-size: 0.82rem;
+  color: #1f8a6e;
+}
+.island-hud__stars svg { color: #facc15; }
+.island-hud__hint {
+  color: #5a6aa0;
+  font-weight: 750;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Selected level highlight ring on the platform bubble. */
+.level-node.is-selected { z-index: 10; }
+.level-node.is-selected .level-node__platform {
+  outline: 3px solid rgba(255, 255, 255, 0.95);
+  outline-offset: 3px;
+  box-shadow:
+    0 18px 26px rgba(44, 63, 130, 0.28),
+    0 0 0 6px rgba(124, 113, 255, 0.35),
+    0 0 26px rgba(124, 113, 255, 0.5);
+}
+
+/* Compact selected-level popover anchored to the selected node. */
+.level-popover {
+  position: absolute;
+  z-index: 11;
+  width: min(15rem, 72vw);
+  pointer-events: auto;
+}
+@keyframes popoverIn {
+  from { opacity: 0; transform: scale(0.9) translateY(0.25rem); }
+  to   { opacity: 1; transform: none; }
+}
+.level-popover__card {
+  position: relative;
+  display: grid;
+  gap: 0.45rem;
+  animation: popoverIn 220ms cubic-bezier(0.22, 1.2, 0.34, 1) both;
+  padding: 0.8rem 0.85rem;
+  border-radius: 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.97), rgba(236, 246, 255, 0.92));
+  box-shadow: 0 20px 44px rgba(54, 86, 134, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(14px);
+}
+/* Little tail pointing sideways toward the node. */
+.level-popover__tail {
+  position: absolute;
+  width: 0.85rem;
+  height: 0.85rem;
+  transform: rotate(45deg);
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.88);
+}
+.level-popover[data-place="right"] .level-popover__tail { left: -0.42rem; border-right: 0; border-top: 0; }
+.level-popover[data-place="left"]  .level-popover__tail { right: -0.42rem; border-left: 0; border-bottom: 0; }
+.level-popover[data-v="center"] .level-popover__tail { top: 50%; margin-top: -0.42rem; }
+.level-popover[data-v="top"]    .level-popover__tail { top: 1.5rem; }
+.level-popover[data-v="bottom"] .level-popover__tail { bottom: 1.5rem; }
+.level-popover__top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.level-popover__num { font-family: var(--font-display); font-weight: 700; color: #17355f; font-size: 0.92rem; }
+.level-popover__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.08rem;
+  line-height: 1.1;
+  color: #2a3a72;
+}
+.level-popover__stars { display: inline-flex; gap: 0.15rem; color: #facc15; }
+.level-popover__stars svg { filter: drop-shadow(0 2px 3px rgba(214, 170, 30, 0.4)); }
+.level-popover__cta { width: 100%; justify-content: center; gap: 0.4rem; }
+.level-popover[data-place="above"] .level-popover__card { transform-origin: bottom center; }
+
+@media (max-width: 560px) {
+  .island-hud { gap: 0.5rem; padding: 0.45rem 0.7rem 0.45rem 0.5rem; }
+  .island-hud__hint { display: none; }
+  .level-popover { width: min(14rem, 80vw); }
 }
 
 /* Level nodes scale with the stage. clamp() keeps them readable at any size. */
@@ -3409,29 +3685,40 @@ a {
 .people-card {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  padding: 0.85rem;
-  border-radius: 1.15rem;
-  background: rgba(255, 255, 255, 0.66);
-  border: 1px solid rgba(120, 130, 170, 0.16);
-  box-shadow: 0 10px 22px rgba(54, 86, 134, 0.08);
+  gap: 0.7rem;
+  padding: 0.9rem;
+  border-radius: 1.25rem;
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.92), rgba(244, 248, 255, 0.7));
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 12px 26px rgba(54, 86, 134, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: transform 160ms ease, box-shadow 160ms ease;
 }
+.people-card:hover { transform: translateY(-2px); box-shadow: 0 18px 34px rgba(54, 86, 134, 0.16); }
 .people-card strong {
   display: block;
   color: #17355f;
   font-family: var(--font-display);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .people-card span {
   display: block;
   color: #61709e;
   font-size: 0.85rem;
   font-weight: 760;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .people-card small {
   display: block;
   color: #8a73c8;
   font-weight: 800;
   font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .people-card__avatar {
   display: grid;
@@ -7427,11 +7714,15 @@ h3, h4 {
 }
 
 .dash-sidebar__mascot {
-  width: 78%;
-  max-width: 12rem;
+  width: 56%;
+  max-width: 8.5rem;
   margin: auto auto 0;
-  filter: drop-shadow(0 16px 22px rgba(45, 73, 142, 0.22));
+  filter: drop-shadow(0 14px 20px rgba(45, 73, 142, 0.2));
   animation: islandFloat 6s ease-in-out infinite;
+}
+.dash-footer {
+  display: grid;
+  gap: 0.5rem;
 }
 .dash-account {
   display: flex;
@@ -7442,12 +7733,28 @@ h3, h4 {
   padding: 0.6rem 0.7rem;
   color: inherit;
   background: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  transition: transform 160ms ease, box-shadow 160ms ease;
 }
-.dash-account:hover {
+.dash-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  border: 1px solid rgba(240, 82, 120, 0.28);
+  border-radius: 1rem;
+  padding: 0.6rem 0.7rem;
+  color: #d8466b;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  background: rgba(255, 138, 165, 0.14);
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+.dash-logout:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 26px rgba(54, 86, 134, 0.16);
+  background: rgba(255, 138, 165, 0.22);
+  box-shadow: 0 12px 24px rgba(218, 73, 107, 0.18);
 }
 .dash-account__avatar {
   display: grid;
@@ -7611,16 +7918,16 @@ h3, h4 {
 .dash-hero__art {
   position: relative;
   flex-shrink: 0;
-  width: clamp(12rem, 26vw, 24rem);
-  height: 9rem;
+  width: clamp(7rem, 13vw, 11rem);
+  height: 8rem;
   pointer-events: none;
 }
 .dash-hero__robot {
   position: absolute;
-  left: 0;
+  right: 0;
   bottom: -1rem;
-  width: clamp(6rem, 11vw, 9.5rem);
-  filter: drop-shadow(0 16px 22px rgba(45, 73, 142, 0.22));
+  width: clamp(5rem, 8vw, 7rem);
+  filter: drop-shadow(0 14px 20px rgba(45, 73, 142, 0.2));
   animation: islandFloat 5.5s ease-in-out infinite;
 }
 .dash-hero__island {
@@ -7726,7 +8033,7 @@ h3, h4 {
 .link-arrow:hover { text-decoration: underline; }
 .dash-section__cta { margin-top: 1rem; width: 100%; }
 
-/* Sede cards with island art */
+/* Sede cards with real school photos */
 .sede-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
@@ -7735,28 +8042,36 @@ h3, h4 {
 .sede-card {
   display: flex;
   flex-direction: column;
-  border-radius: 1.3rem;
+  border-radius: 1.4rem;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.74);
-  box-shadow: 0 16px 34px rgba(54, 86, 134, 0.12);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.94), rgba(244, 248, 255, 0.72));
+  box-shadow: 0 16px 34px rgba(54, 86, 134, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
 .sede-card:hover { transform: translateY(-4px); box-shadow: 0 26px 50px rgba(54, 86, 134, 0.2); }
 .sede-card__media {
   position: relative;
-  height: 6.5rem;
+  height: 8rem;
   display: grid;
   place-items: center;
+  overflow: hidden;
   background:
-    radial-gradient(circle at 50% 120%, rgba(155, 124, 255, 0.28), transparent 70%),
-    linear-gradient(160deg, #dfe6ff, #eafaf6);
+    radial-gradient(circle at 50% 120%, rgba(155, 124, 255, 0.22), transparent 70%),
+    linear-gradient(160deg, #e6ecff, #eafaf6);
 }
-.sede-card__media img {
-  height: 6rem;
-  object-fit: contain;
-  filter: drop-shadow(0 10px 14px rgba(45, 73, 142, 0.22));
+.sede-card__photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
+.sede-card__placeholder {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+  color: #9aa6cf;
+}
+.sede-card__placeholder small { font-weight: 800; font-size: 0.72rem; }
 .sede-card__status {
   position: absolute;
   top: 0.6rem;
@@ -7766,9 +8081,10 @@ h3, h4 {
   padding: 0.22rem 0.6rem;
   border-radius: 999px;
   color: #1f8a52;
-  background: rgba(91, 232, 186, 0.32);
+  background: rgba(91, 232, 186, 0.45);
   backdrop-filter: blur(6px);
 }
+.sede-card__status.is-off { color: #8a4a4a; background: rgba(200, 120, 120, 0.4); }
 .sede-card__body { padding: 0.85rem 0.95rem 1rem; display: grid; gap: 0.25rem; }
 .sede-card__body strong { font-family: var(--font-display); font-size: 1.05rem; color: #17355f; }
 .sede-card__body span { color: #6a78a8; font-weight: 760; font-size: 0.85rem; }
@@ -7784,6 +8100,238 @@ h3, h4 {
 .sede-card__edit {
   margin-top: 0.6rem;
 }
+
+/* ── Superadmin: compact button + photo upload + people edit ── */
+.button--sm {
+  min-height: 2.3rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.85rem;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  box-shadow: 0 10px 20px rgba(49, 89, 232, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.button--sm.button--secondary,
+.button--sm.button--ghost { box-shadow: 0 8px 18px rgba(71, 104, 148, 0.1); }
+
+/* Labelled fields inside admin forms/modals */
+.admin-form .field { display: grid; gap: 0.3rem; }
+.admin-form .field > span {
+  font-weight: 850;
+  font-size: 0.82rem;
+  color: #45558a;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.admin-form .field .req {
+  font-style: normal;
+  font-size: 0.66rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #c0568a;
+  background: rgba(255, 159, 202, 0.22);
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+}
+
+/* Sede create/edit form with photo */
+.sede-form { gap: 0.9rem; margin-bottom: 1.1rem; }
+.sede-form__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.8rem;
+}
+.sede-form__photo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.photo-preview {
+  width: 7.5rem;
+  height: 5rem;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1.5px dashed rgba(120, 130, 170, 0.36);
+  background: linear-gradient(160deg, #eef2ff, #eafaf6);
+  color: #9aa6cf;
+}
+.photo-preview.has-img { border-style: solid; border-color: rgba(255, 255, 255, 0.85); }
+.photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+.photo-preview__empty { display: grid; justify-items: center; gap: 0.2rem; }
+.photo-preview__empty small { font-weight: 800; font-size: 0.7rem; }
+.sede-form__photo-actions { display: grid; gap: 0.35rem; }
+.photo-upload { cursor: pointer; }
+.photo-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 0;
+  background: transparent;
+  color: #d8466b;
+  font-weight: 800;
+  font-size: 0.82rem;
+  cursor: pointer;
+  justify-self: start;
+}
+.photo-hint { color: #8a93b8; font-weight: 700; font-size: 0.74rem; }
+
+/* People card: main column + status pill + edit button */
+.people-card__main { flex: 1; min-width: 0; }
+.people-card.is-off { opacity: 0.62; }
+.people-card__pill {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 900;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  color: #1f8a52;
+  background: rgba(91, 232, 186, 0.28);
+}
+.people-card__pill.is-off { color: #8a4a4a; background: rgba(200, 120, 120, 0.22); }
+.people-card__edit {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  flex-shrink: 0;
+  border: 1px solid rgba(123, 108, 255, 0.24);
+  border-radius: 0.8rem;
+  color: #6f63ff;
+  background: rgba(123, 108, 255, 0.1);
+  cursor: pointer;
+  transition: background 150ms ease, transform 150ms ease;
+}
+.people-card__edit:hover { background: rgba(123, 108, 255, 0.2); transform: translateY(-1px); }
+
+/* Edit-admin modal: active toggle + password reset box */
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 800;
+  color: #45558a;
+  font-size: 0.9rem;
+}
+.switch-row input { width: 1.1rem; height: 1.1rem; accent-color: #6f63ff; }
+.reset-box {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(120, 130, 170, 0.2);
+  background: rgba(123, 108, 255, 0.07);
+}
+.reset-box__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-self: start;
+  border: 1px solid rgba(123, 108, 255, 0.3);
+  border-radius: 0.8rem;
+  padding: 0.45rem 0.8rem;
+  color: #6f63ff;
+  background: rgba(255, 255, 255, 0.7);
+  font-weight: 800;
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+.reset-box__btn:hover { background: #fff; }
+.reset-box__hint { color: #8a93b8; font-weight: 700; font-size: 0.74rem; }
+.reset-box__result { margin: 0; display: grid; gap: 0.2rem; color: #45558a; font-weight: 800; font-size: 0.86rem; }
+.reset-box__result code {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #17355f;
+  background: rgba(84, 232, 198, 0.22);
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.6rem;
+  justify-self: start;
+}
+.reset-box__result small { color: #8a93b8; font-weight: 700; font-size: 0.72rem; }
+
+/* Danger: delete admin link + confirmation dialog */
+.admin-form__delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.1rem;
+  border: 1px solid rgba(240, 82, 120, 0.3);
+  border-radius: 0.85rem;
+  padding: 0.5rem 0.85rem;
+  color: #d8466b;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.88rem;
+  background: rgba(255, 138, 165, 0.12);
+  cursor: pointer;
+  transition: background 150ms ease, transform 150ms ease;
+}
+.admin-form__delete:hover { background: rgba(255, 138, 165, 0.2); transform: translateY(-1px); }
+.demo-modal__icon--danger { background: linear-gradient(135deg, #ff8aa5, #f05278); box-shadow: 0 10px 22px rgba(218, 73, 107, 0.3); }
+.demo-modal__btn--danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: #fff;
+  background: linear-gradient(135deg, #ff8aa5, #f05278);
+  box-shadow: 0 12px 26px rgba(218, 73, 107, 0.26);
+}
+.confirm-card { text-align: center; }
+.confirm-card p strong { color: #17355f; }
+.confirm-card__actions { margin-top: 0.4rem; }
+
+/* "Cambiar contraseña" screen (reuses the login backdrop) */
+.change-pass-card { max-width: 27rem; }
+.change-pass-card__badge {
+  display: inline-grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto 0.4rem;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, #54e8c6, #536bff);
+  box-shadow: 0 12px 26px rgba(83, 107, 255, 0.3);
+}
+.change-pass-card .field { display: grid; gap: 0.35rem; text-align: left; }
+.change-pass-card .field > span { font-weight: 850; font-size: 0.85rem; color: #45558a; }
+.change-pass-card .field input {
+  width: 100%;
+  min-height: 3rem;
+  border: 1px solid rgba(116, 154, 211, 0.3);
+  border-radius: 1rem;
+  padding: 0.75rem 0.95rem;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.8);
+  outline: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(56, 94, 136, 0.05);
+}
+.change-pass-card .field input:focus {
+  border-color: rgba(34, 199, 184, 0.72);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(34, 199, 184, 0.14), 0 10px 22px rgba(56, 94, 136, 0.08);
+}
+.change-pass-card__submit { width: 100%; }
+.change-pass-card__cancel {
+  border: 0;
+  background: transparent;
+  color: #6a78a8;
+  font-weight: 800;
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+.change-pass-card__cancel:hover { color: #45558a; text-decoration: underline; }
 
 /* Robot tip card */
 .dash-tip {
@@ -7858,7 +8406,7 @@ h3, h4 {
   .dash-sidebar__mascot { display: none; }
   .dash-nav { flex-direction: row; flex-wrap: wrap; margin-top: 0; }
   .dash-nav button span { display: none; }
-  .dash-account { margin-left: auto; }
+  .dash-footer { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
   .dash-main { height: auto; }
   .dash-hero__art { display: none; }
 }

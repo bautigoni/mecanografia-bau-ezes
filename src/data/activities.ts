@@ -147,6 +147,19 @@ const world1: Activity[] = [
     difficulty: 3,
     description: "Cerrá el mundo 1 con velocidad y precisión.",
   }),
+  makeActivity({
+    worldId: "island1",
+    levelNumber: 7,
+    title: "Lluvia de letras",
+    subtitle: "Reto relámpago del bosque",
+    instruction: "Presioná cada letra que cae antes de que se apague.",
+    listenText: "Presioná rápido cada letra que aparece en pantalla.",
+    targets: ["E", "T", "O", "N", "C", "I", "M", "A", "P", "V", "S", "Ñ"],
+    mode: "independent",
+    inputType: "letter",
+    difficulty: 3,
+    description: "Atrapá la lluvia de letras del bosque con velocidad y precisión.",
+  }),
 ];
 
 const world2: Activity[] = [
@@ -321,6 +334,21 @@ const world3: Activity[] = [
     difficulty: 6,
     description: "Cerrá el mundo 3 con signos de exclamación.",
     requiresAccent: true,
+  }),
+  makeActivity({
+    worldId: "island3",
+    levelNumber: 7,
+    title: "Gran dictado",
+    subtitle: "Tildes y signos juntos",
+    instruction: "Escribí cada frase con sus tildes y signos correctos.",
+    listenText: "Escribí cada frase con sus tildes y signos, tal como aparece.",
+    targets: ["¿Cómo estás, Martín?", "¡Qué día tan mágico!", "Mi pingüino lee rápido."],
+    mode: "independent",
+    inputType: "phrase",
+    difficulty: 6,
+    description: "Repaso final de la biblioteca: tildes, ñ y signos del español juntos.",
+    requiresAccent: true,
+    requiresShift: true,
   }),
 ];
 

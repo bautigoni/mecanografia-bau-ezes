@@ -18,6 +18,12 @@ export function ProtectedRoute({ roles, exclusive = false }: { roles: Role[]; ex
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
+  // A user who logged in with a temporary password must set a new one before
+  // reaching ANY protected surface, regardless of role.
+  if (user.mustChangePassword) {
+    return <Navigate to="/cambiar-contrasena" replace />;
+  }
+
   // Superadmin has full access to every protected route — EXCEPT routes
   // explicitly marked exclusive (the student-only game experience).
   if (user.role === "superadmin" && !exclusive) {

@@ -11,6 +11,13 @@ export interface ActiveUser {
   role: Role;
   siteId?: string;
   classId?: string;
+  /** Account enabled flag. Used to deactivate sede admins without deleting
+   *  them. Undefined is treated as active. */
+  active?: boolean;
+  /** When true, the user logged in with a temporary password and MUST set a
+   *  new one before reaching any dashboard. Carried into the active session
+   *  so route guards can enforce it. */
+  mustChangePassword?: boolean;
 }
 
 export interface DemoUser extends ActiveUser {
@@ -22,7 +29,11 @@ export interface Site {
   id: string;
   name: string;
   city: string;
-  coordinator: string;
+  /** School/campus photo as a data URL (uploaded by the superadmin).
+   *  Empty/undefined → a soft placeholder is rendered instead. */
+  photo?: string;
+  /** Whether the sede is currently active. Defaults to active. */
+  active?: boolean;
 }
 
 /** Grade levels supported by the course-path system.
@@ -119,6 +130,12 @@ export interface StudentStats {
 export interface EduTicUser extends ActiveUser {
   password: string;
   stats?: StudentStats;
+  /** True while the stored password is a system-generated temporary one. */
+  temporaryPassword?: boolean;
+  /** ISO timestamp of the last successful self-service password change. */
+  passwordUpdatedAt?: string;
+  /** ISO timestamp of the last superadmin-triggered password reset. */
+  passwordResetAt?: string;
 }
 
 export interface DemoData {

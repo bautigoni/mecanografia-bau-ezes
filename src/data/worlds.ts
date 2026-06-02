@@ -1,4 +1,5 @@
 import { activitiesByWorld, type Activity } from "./activities";
+import { islandLevelLayouts, type LevelPosition } from "./levelPositions";
 import { assets, expansionIslandThumbs, islandDetailBackgrounds, gameplayBackgrounds } from "../utils/assets";
 import {
   getBestStarsForLevel,
@@ -53,10 +54,10 @@ export type Level = {
   stars: number;
 };
 
-export type LevelPosition = {
-  x: number;
-  y: number;
-};
+/* Level marker positions now live in their own config — see
+   src/data/levelPositions.ts. Re-exported here so existing importers
+   (IslandDetailPage etc.) keep working unchanged. */
+export type { LevelPosition };
 
 /* Position of an island on the horizontally-scrolling world map.
    `x` is in viewport-width units (vw) measured along the whole track, so the
@@ -102,99 +103,6 @@ export const WORLD_TOPICS: Record<Activity["worldId"], string> = {
   island12: "Ventanas y pestañas",
   island14: "Comandos avanzados",
   island15: "Reto final",
-};
-
-/* Per-island level layouts.
-   Coordinates are percentages of the 16:9 island scene (1672x941 PNGs) and
-   are tuned by eye to the painted stone platforms in each artwork. The
-   level-map container in IslandDetailPage locks to aspect-ratio 16/9 so
-   these percentages map to the same platform on every viewport. */
-/* Generic winding arcs for the expansion islands. Their backgrounds are
-   open scenes (no bespoke painted platforms), so the nodes simply float
-   along a pleasant path. Two variants keep neighbouring islands from
-   looking identical. 8 points cover the longest world (8 levels). */
-const genericArcA: LevelPosition[] = [
-  { x: 14, y: 72 },
-  { x: 26, y: 58 },
-  { x: 38, y: 46 },
-  { x: 50, y: 40 },
-  { x: 62, y: 48 },
-  { x: 72, y: 62 },
-  { x: 58, y: 74 },
-  { x: 44, y: 68 },
-];
-const genericArcB: LevelPosition[] = [
-  { x: 16, y: 64 },
-  { x: 30, y: 72 },
-  { x: 42, y: 58 },
-  { x: 54, y: 44 },
-  { x: 66, y: 52 },
-  { x: 74, y: 68 },
-  { x: 60, y: 40 },
-  { x: 46, y: 56 },
-];
-
-const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = {
-  // Isla de teclas (bosque) — winding stone path with 6 platforms.
-  island1: [
-    { x: 22, y: 72 },
-    { x: 33, y: 58 },
-    { x: 47, y: 44 },
-    { x: 64, y: 50 },
-    { x: 52, y: 68 },
-    { x: 72, y: 72 },
-  ],
-  // Isla de palabras (potion/lab) — 6 round pads arranged in a loose arc.
-  // Rightmost pad kept at x:72 (matching the other islands) so it never
-  // tucks under the right-hand level info panel.
-  island2: [
-    { x: 28, y: 70 },
-    { x: 38, y: 54 },
-    { x: 55, y: 42 },
-    { x: 72, y: 38 },
-    { x: 50, y: 58 },
-    { x: 70, y: 70 },
-  ],
-  // Isla de la biblioteca — book pedestal + 5 stone platforms.
-  island3: [
-    { x: 24, y: 68 },
-    { x: 38, y: 56 },
-    { x: 52, y: 44 },
-    { x: 66, y: 52 },
-    { x: 46, y: 70 },
-    { x: 72, y: 70 },
-  ],
-  // Isla del árbol / código — 6 crystal platforms scattered around the tree.
-  island4: [
-    { x: 22, y: 70 },
-    { x: 36, y: 58 },
-    { x: 50, y: 44 },
-    { x: 66, y: 52 },
-    { x: 48, y: 70 },
-    { x: 72, y: 72 },
-  ],
-  // Isla digital — 7 platforms (winding path: bottom-left → up → right → down).
-  // Final pad kept at x:72 so the winding route stays clear of the panel.
-  island5: [
-    { x: 18, y: 72 },
-    { x: 28, y: 58 },
-    { x: 40, y: 46 },
-    { x: 55, y: 38 },
-    { x: 67, y: 48 },
-    { x: 56, y: 64 },
-    { x: 72, y: 72 },
-  ],
-  // Expansion islands reuse the generic floating arcs.
-  island6: genericArcA,
-  island7: genericArcB,
-  island8: genericArcA,
-  island9: genericArcB,
-  island10: genericArcA,
-  island11: genericArcB,
-  island12: genericArcA,
-  island13: genericArcB,
-  island14: genericArcA,
-  island15: genericArcB,
 };
 
 type WorldMetaEntry = {
