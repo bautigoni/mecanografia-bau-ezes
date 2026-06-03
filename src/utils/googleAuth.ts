@@ -62,12 +62,27 @@ declare global {
   }
 }
 
-/** Read the public Client ID from the Vite environment. */
+let warnedMissingClientId = false;
+
+/** Read the public Client ID from the Vite environment.
+ *  NOTE: this is baked into the bundle at BUILD time (Vite inlines
+ *  `import.meta.env.VITE_*`), not read at runtime. An empty value here almost
+ *  always means the var was missing on the build host — see the one-time
+ *  console.warn below and DEPLOY.md. */
 export function getGoogleClientId(): string | undefined {
   const value = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  if (!value || typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (!trimmed) {
+    if (!warnedMissingClientId && typeof console !== "undefined") {
+      warnedMissingClientId = true;
+      console.warn(
+        "[TYPELY] VITE_GOOGLE_CLIENT_ID is empty at build time — Google login is disabled. " +
+          "Set it on the build host and rebuild (docker compose up -d --build); it is baked into the bundle, not read at runtime.",
+      );
+    }
+    return undefined;
+  }
+  return trimmed;
 }
 
 /** Read the optional allowlist of institutional email domains. */
@@ -182,27 +197,30 @@ export async function promptGoogleSignIn(opts: {
     use_fedcm_for_prompt: true,
   });
 
-  // Try the lightweight prompt first. If the browser refuses to display
-  // it (FedCM / third-party cookies blocked / suppressed), render the
-  // official GIS button into the fallback anchor so the user has a way
-  // to complete sign-in.
+  // Always render the official GIS button into the fallback anchor as a
+  // reliable second path. On Chrome 121+ the one-tap `prompt()` can be
+  // silently suppressed by FedCM / third-party-cookie policy WITHOUT the
+  // notification callback firing — in that case the rendered button is the
+  // only thing that still works. The credential callback set in initialize()
+  // handles success from either path.
+  if (opts.fallbackAnchor && idApi.renderButton) {
+    opts.fallbackAnchor.innerHTML = "";
+    idApi.renderButton(opts.fallbackAnchor, {
+      type: "standard",
+      theme: "outline",
+      size: "large",
+      text: "continue_with",
+      shape: "pill",
+      logo_alignment: "left",
+    });
+  }
+
+  // Also try the lightweight one-tap prompt. If it's blocked and there was no
+  // anchor to fall back to, surface the dismissal so the UI can react.
   idApi.prompt((notification) => {
     const blocked =
       notification?.isNotDisplayed?.() || notification?.isSkippedMoment?.();
-    if (!blocked) return;
-    if (opts.fallbackAnchor && idApi.renderButton) {
-      opts.fallbackAnchor.innerHTML = "";
-      idApi.renderButton(opts.fallbackAnchor, {
-        type: "standard",
-        theme: "filled_blue",
-        size: "large",
-        text: "continue_with",
-        shape: "pill",
-        logo_alignment: "left",
-      });
-    } else {
-      opts.onError("POPUP_DISMISSED");
-    }
+    if (blocked && !opts.fallbackAnchor) opts.onError("POPUP_DISMISSED");
   });
 }
 

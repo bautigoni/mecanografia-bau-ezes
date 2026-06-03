@@ -179,6 +179,14 @@ export function IslandDetailPage() {
   const starProgress = worldStarProgress(world.slug);
   const isLastWorld = worldNumber >= WORLD_PEDAGOGY_ORDER.length;
 
+  /* "Siguiente" CTA (moved here from the world map). It appears only when the
+     student has fully finished this world: every level completed AND ≥70% of
+     its stars earned AND a next world exists to go to. */
+  const currentWorldIdx = allWorlds.findIndex((w) => w.slug === world.slug);
+  const nextWorld = currentWorldIdx >= 0 ? allWorlds[currentWorldIdx + 1] : undefined;
+  const allLevelsDone = world.levels.every((level) => level.state === "Completado");
+  const canGoToNextWorld = allLevelsDone && starProgress.isUnlockedNext && Boolean(nextWorld);
+
   /* Compact selected-level popover, anchored BESIDE the selected node. The
      level paths wind mostly vertically, so opening to the side (rather than
      above/below) keeps the popover off the neighbouring nodes. It opens to
@@ -478,6 +486,18 @@ export function IslandDetailPage() {
             </span>
           </div>
         </div>
+        {canGoToNextWorld && nextWorld && (
+          <button
+            type="button"
+            className="island-hud__next"
+            onClick={() => navigate(nextWorld.route)}
+            aria-label={`Ir al siguiente mundo: ${nextWorld.title}`}
+            title={`Ir a ${nextWorld.title}`}
+          >
+            <span>Siguiente</span>
+            <ArrowRight size={18} strokeWidth={2.7} />
+          </button>
+        )}
       </header>
 
       <button type="button" className="profile-bubble" aria-label="Mi cuenta" onClick={() => navigate("/mi-cuenta")}>

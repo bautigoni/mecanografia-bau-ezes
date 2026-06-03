@@ -3,7 +3,6 @@ import {
   Asterisk,
   AtSign,
   BookOpen,
-  ArrowRight,
   Check,
   Command,
   Flag,
@@ -34,7 +33,7 @@ import { getWorldStatesForUser, getWorldsForUser, worldStarProgress, type World 
 import { Toast } from "../components/common/Toast";
 import { assets } from "../utils/assets";
 import { getUserContext, makeRapidClickDetector } from "../utils/userContext";
-import { loadProgress, UNLOCK_STAR_THRESHOLD } from "../utils/progress";
+import { loadProgress } from "../utils/progress";
 
 /* ------------------------------------------------------------------ */
 /* Asset pre-fetch cache                                               */
@@ -214,45 +213,10 @@ export function WorldsPage() {
     enterWorld(world, false);
   }
 
-  /* Resolve the world immediately AFTER `world` in the visible order.
-     Returns null if `world` is the last one (no "next" to go to). */
-  function findNextWorld(world: World): World | null {
-    const idx = visibleWorlds.findIndex((w) => w.id === world.id);
-    if (idx === -1 || idx >= visibleWorlds.length - 1) return null;
-    return visibleWorlds[idx + 1];
-  }
-
-  /* "Go to next world" handler. Goes through the SAME enterWorld() pipeline
-     as a normal click so the magical transition + background prefetch fires
-     consistently. */
-  function goToNextWorld(world: World) {
-    const next = findNextWorld(world);
-    if (!next) return;
-    const nextState = worldStates[next.slug];
-    /* If the next world is locked, surface a clear message — the button is
-       already disabled in that case, but the user might tap anyway. */
-    if (nextState === "locked") {
-      const starInfo = worldStarProgress(world.id, progress);
-      setMessage(
-        `Te faltan ${Math.max(0, starInfo.requiredStars - starInfo.earnedStars)} estrellas en este mundo para desbloquear el siguiente.`,
-      );
-      return;
-    }
-    enterWorld(next, false);
-  }
-
   function prefetchWorld(world: World) {
     prefetchImage(world.background);
   }
 
-  /* The "Siguiente" CTA belongs on exactly ONE island: the last world the
-     student has completed (the gateway to where they should go next). Showing
-     it on every completed world cluttered the map and competed with the green
-     tick. -1 when nothing is completed yet → no CTA anywhere. */
-  const lastCompletedIndex = visibleWorlds.reduce(
-    (acc, w, i) => (worldStates[w.slug] === "completed" ? i : acc),
-    -1,
-  );
   /* Real running star total for the menu chip (was a hardcoded "1280"). */
   const totalEarnedStars = visibleWorlds.reduce(
     (sum, w) => sum + worldStarProgress(w.id, progress).earnedStars,
@@ -364,24 +328,18 @@ export function WorldsPage() {
           ))}
 
           {/* Island buttons */}
-          {visibleWorlds.map((world, index) => {
+          {visibleWorlds.map((world) => {
             const BadgeIcon = worldBadges[world.slug];
             const state = worldStates[world.slug];
             const isLocked = state === "locked";
             const isCompleted = state === "completed";
             const isCurrent = state === "current";
             const starInfo = worldStarProgress(world.id, progress);
-            const next = findNextWorld(world);
-            const nextState = next ? worldStates[next.slug] : null;
-            const nextIsLocked = nextState === "locked";
-            const missingStars = Math.max(0, starInfo.requiredStars - starInfo.earnedStars);
             const ctaLabel = isCompleted
               ? "Volver a jugar"
               : isCurrent
                 ? "Seguir jugando"
                 : "Jugar";
-            /* Only the last completed world gets the "Siguiente" chip. */
-            const showCta = index === lastCompletedIndex && Boolean(next);
             const starsClass = isCompleted
               ? "world-stars-chip world-stars-chip--complete"
               : isLocked
@@ -394,30 +352,6 @@ export function WorldsPage() {
                 className="world-island-wrap"
                 style={{ left: `${world.map.x}vw`, top: `${world.map.y}%` }}
               >
-                {showCta && (
-                  <button
-                    type="button"
-                    className="world-next-cta"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      goToNextWorld(world);
-                    }}
-                    disabled={nextIsLocked}
-                    aria-label={
-                      nextIsLocked
-                        ? `Te faltan ${missingStars} estrellas para desbloquear el siguiente mundo`
-                        : `Ir al siguiente mundo: ${worldLabels[next!.slug]}`
-                    }
-                    title={
-                      nextIsLocked
-                        ? `Te faltan ${missingStars} estrellas en este mundo (${Math.round(UNLOCK_STAR_THRESHOLD * 100)}% del total)`
-                        : `Ir a ${worldLabels[next!.slug]}`
-                    }
-                  >
-                    {nextIsLocked ? <Lock size={14} strokeWidth={2.6} /> : <ArrowRight size={16} strokeWidth={2.6} />}
-                    <span>{nextIsLocked ? "Bloqueado" : "Siguiente"}</span>
-                  </button>
-                )}
                 <button
                   type="button"
                   className={[
@@ -451,10 +385,9 @@ export function WorldsPage() {
                     <Star size={14} strokeWidth={2.4} className="world-stars-chip__icon" />
                     {starInfo.earnedStars}/{starInfo.totalStars}
                   </span>
-                  {/* The tick is decorative (the button's aria-label already
-                      announces "completado"); hide it on the island that shows
-                      the Siguiente chip so the two never compete. */}
-                  {isCompleted && !showCta && (
+                  {/* The tick is decorative — the button's aria-label already
+                      announces "completado". */}
+                  {isCompleted && (
                     <span className="world-complete-badge" aria-hidden="true">
                       <Check size={18} strokeWidth={3.4} />
                     </span>

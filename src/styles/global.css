@@ -381,6 +381,20 @@ a {
   justify-content: center;
 }
 
+/* Anchor where Google Identity Services injects its official button as a
+   fallback when the one-tap prompt is suppressed (FedCM / third-party
+   cookies). Reserve height once a button is present so the card doesn't jump.
+   `:has()` is supported in every browser that ships GIS in 2026. */
+.google-login-fallback {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  transition: min-height 180ms ease;
+}
+.google-login-fallback:has(> div) {
+  min-height: 3.25rem;
+}
+
 /* Demo-mode "continuar / empezar de cero" dialog. */
 .demo-modal {
   position: fixed;
@@ -1240,65 +1254,6 @@ a {
 .world-stars-chip--complete {
   background: linear-gradient(135deg, #d8ffe4, #fff7d6);
   color: #153b78;
-}
-
-/* "Go to next world" chip on the last completed world. Sits INSIDE the lower
-   third of the island art (not floating above it) so it never clips off the
-   top of the viewport on high islands. Disabled until the 70% star threshold
-   is met, with the tooltip explaining what's missing. */
-.world-next-cta {
-  position: absolute;
-  top: auto;
-  bottom: 16%;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 4;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.42rem 0.9rem;
-  border-radius: 999px;
-  border: 0;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: clamp(0.78rem, 1vw, 0.95rem);
-  color: white;
-  background: linear-gradient(135deg, #54e8c6, #25c8df, #536bff);
-  box-shadow:
-    0 8px 16px rgba(54, 86, 134, 0.28),
-    0 0 12px rgba(120, 220, 255, 0.45);
-  cursor: pointer;
-  white-space: nowrap;
-  animation: worldNextPulse 2.4s ease-in-out infinite;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
-}
-.world-next-cta:hover:not(:disabled) {
-  transform: translateX(-50%) translateY(-2px) scale(1.04);
-  box-shadow:
-    0 12px 22px rgba(54, 86, 134, 0.34),
-    0 0 18px rgba(120, 220, 255, 0.6);
-}
-.world-next-cta:disabled {
-  cursor: not-allowed;
-  filter: grayscale(0.55) brightness(0.92);
-  background: rgba(225, 230, 245, 0.95);
-  color: #8a93b3;
-  box-shadow: 0 4px 10px rgba(54, 86, 134, 0.12);
-  animation: none;
-}
-.world-next-cta__hint {
-  display: block;
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 0.72rem;
-  color: #61709e;
-  margin-top: 0.18rem;
-  white-space: nowrap;
-  pointer-events: none;
-}
-@keyframes worldNextPulse {
-  0%, 100% { box-shadow: 0 8px 16px rgba(54,86,134,0.28), 0 0 12px rgba(120,220,255,0.45); }
-  50%      { box-shadow: 0 10px 20px rgba(54,86,134,0.32), 0 0 22px rgba(120,220,255,0.7); }
 }
 
 .world-island img {
@@ -2191,6 +2146,37 @@ a {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* "Siguiente" CTA living in the island-detail HUD. Rendered only when the
+   world is 100% complete with ≥70% stars and a next world exists (gated in
+   IslandDetailPage). Brand-gradient pill at the end of the HUD row. */
+.island-hud__next {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.42rem 0.85rem;
+  border: 0;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(0.78rem, 1vw, 0.95rem);
+  color: #fff;
+  background: linear-gradient(135deg, #54e8c6, #25c8df, #536bff);
+  box-shadow: 0 8px 16px rgba(54, 86, 134, 0.28), 0 0 12px rgba(120, 220, 255, 0.45);
+  cursor: pointer;
+  white-space: nowrap;
+  animation: worldNextPulse 2.4s ease-in-out infinite;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.island-hud__next:hover {
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 12px 22px rgba(54, 86, 134, 0.34), 0 0 18px rgba(120, 220, 255, 0.6);
+}
+@keyframes worldNextPulse {
+  0%, 100% { box-shadow: 0 8px 16px rgba(54, 86, 134, 0.28), 0 0 12px rgba(120, 220, 255, 0.45); }
+  50%      { box-shadow: 0 10px 20px rgba(54, 86, 134, 0.32), 0 0 22px rgba(120, 220, 255, 0.7); }
 }
 
 /* Selected level highlight ring on the platform bubble. */
@@ -4662,7 +4648,7 @@ td {
 .auth-button:focus-visible,
 .google-login-btn:focus-visible,
 .password-toggle:focus-visible,
-.world-next-cta:focus-visible,
+.island-hud__next:focus-visible,
 .world-menu__trigger:focus-visible,
 .world-menu__panel button:focus-visible,
 .world-back-button:focus-visible,

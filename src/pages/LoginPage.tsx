@@ -78,12 +78,13 @@ export function LoginPage() {
   /** Google sign-in via Google Identity Services. Opens the GIS popup,
    *  then matches the returned email against Typely's user store. */
   const googleFallbackRef = useRef<HTMLDivElement>(null);
-  function googleLogin() {
+  async function googleLogin() {
     if (!getGoogleClientId()) {
-      setMessage("Google Login no está configurado.");
+      setMessage("Google Login no está configurado. Pedile a tu administrador que cargue VITE_GOOGLE_CLIENT_ID en el servidor.");
       return;
     }
-    promptGoogleSignIn({
+    setMessage(""); // clear any prior error before opening the prompt
+    await promptGoogleSignIn({
       onCredential: async (credential) => {
         const result = await loginGoogle(credential);
         if (result.ok) {

@@ -151,6 +151,16 @@ the new one is verified working:
 docker image prune -f
 ```
 
+> **Build-time env vars (`VITE_*`).** `VITE_GOOGLE_CLIENT_ID` (and any other
+> `VITE_*` var) is **baked into the JS bundle at build time** by Vite, not read
+> at runtime. After adding or changing it in the host `.env`, you **must**
+> `docker compose up -d --build` — a plain `restart` keeps the old bundle.
+> Symptom of a skipped rebuild: the Google button shows the toast
+> *"Google Login no está configurado."* and the browser console logs
+> `[TYPELY] VITE_GOOGLE_CLIENT_ID is empty at build time`. Set
+> `VITE_GOOGLE_CLIENT_ID=…apps.googleusercontent.com` (and optionally
+> `VITE_GOOGLE_ALLOWED_DOMAINS=northfield.edu.ar`) in `.env`, then rebuild.
+
 ## 8. Rolling back
 
 If a release misbehaves, roll back by checking out the previous commit
