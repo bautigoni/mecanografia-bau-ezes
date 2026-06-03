@@ -1,4 +1,4 @@
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GlassInput } from "../components/auth/GlassInput";
 import { AnimatedButton } from "../components/auth/AnimatedButton";
@@ -77,7 +77,6 @@ export function LoginPage() {
 
   /** Google sign-in via Google Identity Services. Opens the GIS popup,
    *  then matches the returned email against Typely's user store. */
-  const googleFallbackRef = useRef<HTMLDivElement>(null);
   async function googleLogin() {
     if (!getGoogleClientId()) {
       setMessage("Google Login no está configurado. Pedile a tu administrador que cargue VITE_GOOGLE_CLIENT_ID en el servidor.");
@@ -111,10 +110,9 @@ export function LoginPage() {
         } else if (reason === "GIS_LOAD_FAILED") {
           setMessage("No se pudo cargar Google. Revisá tu conexión.");
         } else {
-          setMessage("Cancelaste el inicio con Google.");
+          setMessage("No se pudo abrir el inicio con Google. Probá de nuevo.");
         }
       },
-      fallbackAnchor: googleFallbackRef.current,
     });
   }
 
@@ -193,16 +191,13 @@ export function LoginPage() {
             Ingresar
           </AnimatedButton>
 
-          {/* Google sign-in */}
+          {/* Google sign-in — opens the FedCM "continuar como…" popup. */}
           <button type="button" className="google-login-btn" onClick={googleLogin}>
             <span className="google-login-btn__icon" aria-hidden="true">
               <GoogleGlyph />
             </span>
             Ingresar con Google
           </button>
-          {/* Fallback anchor: GIS renders its official button here when
-              the one-tap prompt is suppressed (FedCM / third-party cookies). */}
-          <div ref={googleFallbackRef} className="google-login-fallback" aria-live="polite" />
 
 
           <AnimatedButton

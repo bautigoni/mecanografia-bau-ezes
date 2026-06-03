@@ -381,20 +381,6 @@ a {
   justify-content: center;
 }
 
-/* Anchor where Google Identity Services injects its official button as a
-   fallback when the one-tap prompt is suppressed (FedCM / third-party
-   cookies). Reserve height once a button is present so the card doesn't jump.
-   `:has()` is supported in every browser that ships GIS in 2026. */
-.google-login-fallback {
-  display: grid;
-  place-items: center;
-  min-height: 0;
-  transition: min-height 180ms ease;
-}
-.google-login-fallback:has(> div) {
-  min-height: 3.25rem;
-}
-
 /* Demo-mode "continuar / empezar de cero" dialog. */
 .demo-modal {
   position: fixed;
@@ -7922,6 +7908,7 @@ h3, h4 {
   display: flex;
   align-items: center;
   padding: 0.2rem 0.5rem 0.4rem;
+  flex-shrink: 0;
 }
 .dash-brand .brand__text {
   font-family: var(--font-display);
@@ -7937,6 +7924,7 @@ h3, h4 {
   display: flex;
   align-items: center;
   gap: 0.7rem;
+  flex-shrink: 0;
   border-radius: 1.15rem;
   padding: 0.75rem 0.85rem;
   border: 1px solid rgba(255, 255, 255, 0.85);
@@ -7972,6 +7960,13 @@ h3, h4 {
   flex-direction: column;
   gap: 0.3rem;
   margin-top: 0.3rem;
+  /* The nav is the flexible scroll region of the sidebar: it absorbs any
+     overflow and scrolls internally so the footer (account + "Cerrar sesión")
+     is ALWAYS reachable, even on short viewports (rule #11). */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.15rem;
 }
 .dash-nav button {
   display: flex;
@@ -8017,13 +8012,20 @@ h3, h4 {
 .dash-sidebar__mascot {
   width: 56%;
   max-width: 8.5rem;
-  margin: auto auto 0;
+  margin: 0.6rem auto 0;
+  flex-shrink: 0;
   filter: drop-shadow(0 14px 20px rgba(45, 73, 142, 0.2));
   animation: islandFloat 6s ease-in-out infinite;
+}
+/* On short viewports the decorative mascot is the first thing to drop so the
+   footer (logout) keeps its space. */
+@media (max-height: 760px) {
+  .dash-sidebar__mascot { display: none; }
 }
 .dash-footer {
   display: grid;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 .dash-account {
   display: flex;
@@ -8705,7 +8707,7 @@ h3, h4 {
     gap: 0.6rem;
   }
   .dash-sidebar__mascot { display: none; }
-  .dash-nav { flex-direction: row; flex-wrap: wrap; margin-top: 0; }
+  .dash-nav { flex: 0 1 auto; overflow: visible; flex-direction: row; flex-wrap: wrap; margin-top: 0; }
   .dash-nav button span { display: none; }
   .dash-footer { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
   .dash-main { height: auto; }

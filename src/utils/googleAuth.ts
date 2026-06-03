@@ -164,9 +164,6 @@ export function loadGoogleIdentityServices(): Promise<void> {
 export async function promptGoogleSignIn(opts: {
   onCredential: (credential: string) => void;
   onError: (reason: "MISSING_CLIENT_ID" | "GIS_LOAD_FAILED" | "POPUP_DISMISSED") => void;
-  /** Optional anchor element for rendering the GIS button — used as a
-   *  reliable fallback when `prompt()` is blocked by the browser. */
-  fallbackAnchor?: HTMLElement | null;
 }): Promise<void> {
   const clientId = getGoogleClientId();
   if (!clientId) {
@@ -197,30 +194,15 @@ export async function promptGoogleSignIn(opts: {
     use_fedcm_for_prompt: true,
   });
 
-  // Always render the official GIS button into the fallback anchor as a
-  // reliable second path. On Chrome 121+ the one-tap `prompt()` can be
-  // silently suppressed by FedCM / third-party-cookie policy WITHOUT the
-  // notification callback firing — in that case the rendered button is the
-  // only thing that still works. The credential callback set in initialize()
-  // handles success from either path.
-  if (opts.fallbackAnchor && idApi.renderButton) {
-    opts.fallbackAnchor.innerHTML = "";
-    idApi.renderButton(opts.fallbackAnchor, {
-      type: "standard",
-      theme: "outline",
-      size: "large",
-      text: "continue_with",
-      shape: "pill",
-      logo_alignment: "left",
-    });
-  }
-
-  // Also try the lightweight one-tap prompt. If it's blocked and there was no
-  // anchor to fall back to, surface the dismissal so the UI can react.
+  // Open the Google account chooser — the FedCM "continuar como…" mini-popup.
+  // That popup IS the UI: we deliberately do NOT render any extra in-page
+  // button (it caused a layout jump and a duplicate control). The credential
+  // callback set in initialize() handles success. If the browser blocks the
+  // popup entirely, report it so the page can surface a toast.
   idApi.prompt((notification) => {
     const blocked =
       notification?.isNotDisplayed?.() || notification?.isSkippedMoment?.();
-    if (blocked && !opts.fallbackAnchor) opts.onError("POPUP_DISMISSED");
+    if (blocked) opts.onError("POPUP_DISMISSED");
   });
 }
 
