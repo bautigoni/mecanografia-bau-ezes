@@ -74,8 +74,13 @@ export type World = {
   title: string;
   /** Short topic/theme label shown to teachers (e.g. "Atajos de teclado"). */
   topic: string;
-  /** 1-based difficulty order (position in WORLD_ORDER). */
+  /** 1-based difficulty order (position in WORLD_ORDER).
+   *  Same value as `order` for the free path; a course-path student may
+   *  see a smaller set of these but the number itself is the canonical
+   *  pedagogical position. */
   order: number;
+  /** "Mundo N" label in the same pedagogical position as `order`. */
+  displayNumber: number;
   thumbnail: string;
   background: string;
   /** Background painted behind the actual typing/shortcut gameplay screen. */
@@ -258,12 +263,14 @@ function buildLevels(worldId: Activity["worldId"], progress: CurriculumProgress)
 
 function buildWorld(worldId: Activity["worldId"], progress: CurriculumProgress): World {
   const meta = worldMeta[worldId];
+  const pedagogyPosition = pedagogyOrderOf(worldId);
   return {
     id: worldId,
     slug: worldId,
     title: meta.title,
     topic: WORLD_TOPICS[worldId],
-    order: WORLD_ORDER.indexOf(worldId) + 1,
+    order: pedagogyPosition,
+    displayNumber: pedagogyPosition,
     thumbnail: meta.thumbnail,
     background: meta.background,
     gameplayBg: meta.gameplayBg,
@@ -289,10 +296,19 @@ export const getGameplayBackgroundForWorld = getGameplayBackground;
    the bottom-right of the map — its on-screen position is unchanged, only its
    place in the sequence. Everything that needs a "Mundo N" number or an
    unlock order derives it from this array. */
-/** Canonical difficulty order used for progression unlocking and the
- *  free-path display.  See the comment above worldMapPositions for the
- *  pedagogical rationale. */
-export const WORLD_ORDER: Activity["worldId"][] = [
+/* =====================================================================
+   Canonical pedagogical order — THE single source of truth for
+   "which world is world N in difficulty".
+
+   `island1..island15` are stable internal ids (used by URLs, localStorage
+   and asset paths). They were created in the order the artist files
+   arrived, NOT the order a student should play them. The array below
+   encodes the correct difficulty sequence. Every other piece of code
+   (free-path display, unlock gate, "Mundo N" label, the grade-to-worlds
+   map in `userContext.ts`) MUST derive from this array — never
+   hand-maintain a parallel list.
+===================================================================== */
+export const WORLD_PEDAGOGY_ORDER: ReadonlyArray<Activity["worldId"]> = [
   "island1",   // 1  basic letters
   "island6",   // 2  syllables + short words
   "island2",   // 3  words
@@ -309,6 +325,26 @@ export const WORLD_ORDER: Activity["worldId"][] = [
   "island14",  // 14 advanced shortcuts
   "island15",  // 15 grand final challenge
 ];
+
+/* O(1) lookup: worldId → 1-based pedagogical position. Used everywhere we
+   need to show "Mundo N" to a student, teacher or admin. */
+const _pedagogyIndex: Partial<Record<Activity["worldId"], number>> =
+  Object.fromEntries(WORLD_PEDAGOGY_ORDER.map((id, i) => [id, i + 1]));
+
+/** Returns the 1-based pedagogical position of a world (1..15). Returns
+ *  `0` for unknown ids — callers should treat that as "outside the
+ *  curriculum" and fall back to a neutral display. */
+export function pedagogyOrderOf(worldId: Activity["worldId"]): number {
+  return _pedagogyIndex[worldId] ?? 0;
+}
+
+/* `WORLD_ORDER` is now an alias for `WORLD_PEDAGOGY_ORDER` so the rest of
+   the codebase (which imports `WORLD_ORDER`) keeps compiling without
+   change. New code should prefer `WORLD_PEDAGOGY_ORDER` for clarity. */
+/** Canonical difficulty order used for progression unlocking and the
+ *  free-path display. Aliased to WORLD_PEDAGOGY_ORDER — prefer the
+ *  longer name in new code. */
+export const WORLD_ORDER: ReadonlyArray<Activity["worldId"]> = WORLD_PEDAGOGY_ORDER;
 
 export type WorldLockState = "completed" | "current" | "locked";
 
@@ -335,7 +371,7 @@ export function worldStarProgress(
    When `unlockAll` is true (free path: demo / superadmin / teacher) nothing
    is ever locked. */
 function buildStarStates(
-  orderedIds: Activity["worldId"][],
+  orderedIds: ReadonlyArray<Activity["worldId"]>,
   progress: CurriculumProgress,
   unlockAll: boolean,
 ): Record<string, WorldLockState> {

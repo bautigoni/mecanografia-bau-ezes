@@ -1,0 +1,228 @@
+# dbnew.md — TYPELY Backend Implementation Log
+
+> Running log of every change made while implementing the backend,
+> database, naming cleanup, and perf wins. One bullet per file change.
+
+## Conventions
+- One bullet per file touched.
+- Each bullet says **what** changed, **why**, and **how it was tested**
+  when applicable.
+- Tests we run at the end of every phase: `npm run build`.
+
+## Phase A — Naming & order cleanup (in progress)
+
+### Decision
+The `island1..island15` ids in the data layer were created in the order
+the artist files arrived, NOT in the order a student should play them.
+The current `WORLD_ORDER` array in `src/data/worlds.ts` already encodes
+the correct pedagogical order — but every other piece of code still
+calls them `islandN`. The fix: introduce a single `WORLD_PEDAGOGY_ORDER`
+constant (the canonical list, in difficulty order) and a `worldId` alias
+that maps `w1..w15 → island1..island15` for asset paths / URLs.
+
+The goal is **clean data with zero behaviour change**: the URL stays
+`/worlds/<islandId>`, the asset paths stay
+`/typely_islands_webp/background-island1.webp`, `localStorage` keys
+stay the same. The only visible change: the **display number** on each
+island becomes its difficulty position (1..15) rather than its file
+order.
+
+### Why not a hard rename everywhere?
+- URLs and asset paths are stable, public, and bookmarked.
+- `localStorage` keys (`edutic_progress_v1` → `islandN: {...}`) cannot
+  be renamed without losing every student's saved progress.
+- A rename-only-on-display approach gets 100% of the value with 5% of
+  the surface area.
+
+### Files changed in Phase A
+- `src/data/worlds.ts` — added `WORLD_PEDAGOGY_ORDER` (canonical
+  difficulty list), `pedagogyOrderOf(id)` O(1) lookup, and `displayNumber`
+  on the `World` type. `WORLD_ORDER` is now derived from
+  `WORLD_PEDAGOGY_ORDER` so there is one source of truth. `buildWorld()`
+  populates both `order` and `displayNumber` from the same lookup.
+- `src/pages/WorldsPage.tsx` — the icon badge now renders
+  `M{world.displayNumber}` above the icon (e.g. `M3` for the 3rd world
+  in difficulty order). Asset path / URL / localStorage behaviour
+  unchanged.
+- `src/styles/global.css` — `.world-icon-badge` is now a 2-row grid
+  (number on top, icon below). Added `.world-icon-badge__num` and
+  `.world-icon-badge__icon` rules. Badge size unchanged.
+## Phase B — Performance wins (in progress)
+
+### Files changed in Phase B
+- `src/App.tsx` — `GameplayPage`, `AdminGeneralPage` and `SiteAdminPage`
+  are now loaded via `React.lazy()` with a `Suspense` fallback that
+  matches the Typely pastel/glass style. Initial JS bundle went from
+  **431.71 kB → 343.77 kB (gz: 128.55 kB → 106.06 kB)**, a 17% drop.
+  Lazy chunks: GameplayPage 17.19 kB gz, AdminGeneralPage 5.38 kB gz,
+  SiteAdminPage 3.51 kB gz.
+- `src/pages/WorldsPage.tsx` — `enterWorld()` no longer blocks navigation
+  on a 430–1100 ms JS timer. It sets `selectedWorld` (which flips the
+  `.is-entering-world` class and the CSS radial flash), prefetches the
+  destination background, and navigates after one frame. Net result:
+  faster navigation, no orphan timers, no `bg.onload` race conditions.
+  Also memoized `trackWidthVw`, `centers`, `ROUTE_D` and `routeSparkles`
+  so the SVG path is rebuilt only when the visible set changes — not
+  on every focus/hover.
+- `src/styles/global.css` — Phase A already added the badge styles for
+  the pedagogical number; no further CSS changes in Phase B.
+
+## Phase C — Database, API, auth (in progress)
+
+### Decision recap
+- **DB:** Postgres 16, new Docker service `db`, single source of truth
+  for users, sedes, classes, progress, attempts.
+- **API:** Fastify + Drizzle (TypeScript end-to-end), new Docker service
+  `api` on `127.0.0.1:3006`, reverse-proxied by Caddy under `/api/*`.
+- **Hot path:** the typing engine keeps reading from `localStorage` so
+  the game never blocks on a network round-trip. The API only receives
+  a level-complete POST (batched) and is the only source of truth for
+  cross-device progress + teacher dashboards.
+- **Auth:** JWT access + refresh token in HTTP-only cookies, bcrypt
+  password hashing (cost 12). Google sign-in via ID-token verification
+  using Google's JWKS (server-side, never trust the client-decoded
+  payload for authorisation). Demo mode stays client-only, always
+  student.
+- **Role invariant:** `admin_sede` cannot create or modify another
+  `admin_sede` or any `superadmin`. Enforced in `canGrantRole(actor,
+  target)`, which is called by every user-mutating endpoint.
+
+### Files changed in Phase C (frontend)
+- `src/utils/api.ts` — new typed `api.*` client (login, google, refresh,
+  logout, me, sedes, users, progress, import). Auto-retries once on 401
+  after a silent `/api/auth/refresh`. Surfaces `ApiError` with friendly
+  Spanish messages.
+- `src/hooks/useAuth.tsx` — rewritten to be the API-aware auth provider.
+  `loginAny`/`login`/`loginGoogle` are now async and return
+  `ActiveUser | null`. `bootstrapping` flag tells the router to wait for
+  the silent refresh-cookie recovery. `usingApi` is exposed so dashboards
+  can show a "backend offline" pill if needed. Falls back to the existing
+  localStorage user list when the API is unreachable, so demo mode keeps
+  working offline.
+- `src/pages/LoginPage.tsx` — `submit()` and the Google callback became
+  `async` to await the new auth API. Added a `NETWORK_ERROR` branch for
+  the friendly Spanish message.
+- `src/pages/ChangePasswordPage.tsx` — `submit()` and the cancel button
+  now `await` / `void` the async auth calls.
+
+### Files changed in Phase C (backend)
+- `docker-compose.yml` — added `db` (Postgres 16) and `api` (Fastify +
+  Drizzle) services. Both bind to loopback only. The `db` service has
+  a `pg_isready` healthcheck. `mecanografia` now `depends_on` the DB.
+- `Dockerfile.api` — new multi-stage image: `node:22-alpine` builder
+  runs `tsc -p api/tsconfig.json`; `node:22-alpine` runtime copies the
+  compiled `dist/` and runs `node api/dist/server.js`. Secrets are read
+  from `/run/secrets/*` and exported as env vars.
+- `db/init/001_schema.sql` — full schema. Tables: `sedes`, `users`,
+  `classes`, `class_teachers`, `class_students`, `class_worlds`,
+  `level_progress`, `attempts` (partitioned by month), `invitations`,
+  `refresh_tokens`. Includes a `touch_updated_at` trigger.
+- `db/init/002_partitions.sql` — idempotent pre-creation of the next 12
+  monthly `attempts_YYYYMM` partitions. Safe to re-run from a monthly
+  cron.
+- `api/package.json` + `api/tsconfig.json` — Drizzle/Fastify/Postgres
+  stack. Strict TS, ESM, declarations off (we ship the compiled JS
+  inside the container).
+- `api/src/db/schema.ts` — Drizzle schema mirroring the SQL. Exported
+  types: `Role`, `Grade`, `DbUser`, etc.
+- `api/src/db/index.ts` — Postgres connection pool (max 10) + Drizzle
+  wrapper.
+- `api/src/rbac.ts` — the role guard. `canGrantRole(actor, target)`
+  enforces the hard rule: `admin_sede` can never grant `admin_sede` or
+  any higher role. `canActOnSede(actor, targetSedeId)` blocks
+  cross-sede mutations. Throws `ForbiddenError` for friendly HTTP 403s.
+- `api/src/auth.ts` — JWT signing/verifying (HS256, 15 min access),
+  bcrypt helpers, opaque refresh tokens (30 days, stored hashed),
+  Google ID-token verification against `googleapis.com/oauth2/v3/certs`
+  JWKS.
+- `api/src/routes/auth.ts` — `/api/auth/login`, `/api/auth/google`,
+  `/api/auth/refresh`, `/api/auth/logout`, `/api/auth/me`. Cookies are
+  HTTP-only, SameSite=Lax, `secure` in production. Students are blocked
+  from the staff form.
+- `api/src/routes/sedes.ts` — superadmin-only CRUD.
+- `api/src/routes/users.ts` — list/create/edit/delete/reset-password
+  + self-service `change-password`. All routes call `assertCanGrant()`
+  and `canActOnSede()` so the invariants hold.
+- `api/src/routes/progress.ts` — `GET /api/progress/me`, `POST
+  /api/progress/complete` (upsert + append to `attempts`), `GET
+  /api/teacher/students` (per-class for profesores, per-sede for
+  admins).
+- `api/src/routes/import.ts` — `POST /api/import/users`. CSV with
+  header `name,email,role,grade,class`. Per-row validation, duplicate
+  detection, class auto-create, returns per-row temp passwords so the
+  admin can hand them out.
+- `api/src/seed.ts` — idempotent superadmin seed. Reads
+  `SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD` env vars, defaults to
+  `bautistagoni@northfield.edu.ar` / `admin` (CHANGE in prod).
+- `secrets/README.md` + `secrets/.gitignore` — operator runbook.
+- `.env.example` — added `DATABASE_URL`, `JWT_SECRET`, `RESEND_API_KEY`,
+  `INVITE_FROM`, `CORS_ORIGIN`, `SUPERADMIN_*`.
+- `.dockerignore` — `secrets/*` excluded from the build context.
+
+## Phase D — Teacher dashboard & CSV import
+
+### Files changed in Phase D
+- `src/utils/api.ts` — added `importUsersCsv(csv)` (sends raw
+  `text/csv`) and `listUsers({role, sedeId})` for the teacher/admin
+  dashboards.
+- `src/pages/TeacherPage.tsx` — when the session is API-backed, the
+  students list now comes from `GET /api/users?role=alumno` and shows
+  real per-student best-accuracy (the max of all their `level_progress`
+  rows). Falls back to the existing localStorage list when the API
+  request fails.
+- `src/pages/SiteAdminPage.tsx` — added a "Importar desde CSV" panel
+  inside the Alumnos section. Drop a `.csv` (or click to pick) and the
+  UI posts it to `/api/import/users`, then renders a per-row result
+  (username + temporary password, or the error reason). The class
+  column auto-creates the class on the fly if it doesn't exist.
+- `src/styles/global.css` — added the `.csv-import*` block (drop zone,
+  result list, success/error row tinting).
+
+## Phase E — Hardening
+
+### Files changed in Phase E
+- `db/init/002_partitions.sql` — monthly partition pre-creation
+  (idempotent, safe to cron monthly).
+- `DEPLOY.md` — full rewrite for the new 3-container architecture:
+  - **Step 2:** new secrets provisioning runbook (`openssl rand`,
+    chmod 600).
+  - **Step 4:** new `docker exec api node dist/seed.js` to create the
+    superadmin. The seed prints the password once.
+  - **Step 6:** Caddy block now has a `rate_limit @api 30r/m` rule for
+    `/api/*`, with a `127.0.0.1/32` allow so health checks and internal
+    traffic are not throttled.
+  - **Step 9:** new backup runbook — daily `pg_dump | gzip` cron at
+    03:00 UTC, 30-day retention, with an opt-out for `attempts*` if
+    the analytics log outgrows the budget.
+  - **Step 10:** common-ops table now includes the API, the DB, the
+    API log tail, the psql shell, and the partition pre-creation
+    command.
+  - **Notes:** updated to mention the new secrets directory, the
+    Postgres connection pool tuning for the 1 GB VPS, and the monthly
+    partition policy.
+
+## Final verification
+
+| Check                          | Result   |
+| ------------------------------ | -------- |
+| `tsc --noEmit` (frontend)      | OK       |
+| `tsc -p api/tsconfig.json`     | OK       |
+| `vite build`                   | OK       |
+| Frontend initial JS (gz)       | 106.06 kB (was 128.55 kB) |
+| `GameplayPage` chunk (gz)      | 17.19 kB |
+| `AdminGeneralPage` chunk (gz)  | 5.38 kB  |
+| `SiteAdminPage` chunk (gz)     | 4.17 kB  |
+
+## Pending work (future, not blocking)
+
+- Email invitations via Resend (the data path + token hashing is in
+  place; only the `send()` call needs wiring once `RESEND_API_KEY` is
+  set).
+- "Mundo N" badge already shows the pedagogical position everywhere.
+  Future cleanup: a single derived `worldByNumber()` helper could be
+  added to `worlds.ts` for routes that want to read the "current
+  Mundo" by number.
+- Server-side monthly partition rotation cron (the SQL exists; needs
+  a cron container or a host cron line to call it).
+
+

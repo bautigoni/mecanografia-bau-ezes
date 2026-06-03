@@ -106,7 +106,9 @@ export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = 
     { x: 73.9, y: 79 },
     { x: 79.7, y: 33.2 },
     { x: 52, y: 40.2 },
-    { x: 60, y: 40 },
+    // Nudged a few % right + down (2026-06-02) so the marker clears the
+    // next-world entrance overlay that was eating the click target.
+    { x: 63, y: 43 },
     { x: 46, y: 56 },
   ],
 
@@ -117,7 +119,9 @@ export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = 
     { x: 73.6, y: 83.4 },
     { x: 78.9, y: 59.9 },
     { x: 77.1, y: 25.1 },
-    { x: 49.5, y: 12.4 },
+    // Nudged a few % left + down (2026-06-02) so the marker clears the
+    // next-world entrance overlay that was eating the click target.
+    { x: 47, y: 15.5 },
     { x: 44, y: 68 },
   ],
 

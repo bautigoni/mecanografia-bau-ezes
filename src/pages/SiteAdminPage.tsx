@@ -2,12 +2,14 @@ import { FormEvent, useMemo, useState } from "react";
 import {
   BookOpen,
   Copy,
+  Download,
   GraduationCap,
   Home,
   LineChart,
   Mail,
   Plus,
   Send,
+  Upload,
   Users,
   Zap,
 } from "lucide-react";
@@ -31,6 +33,7 @@ import {
 } from "../utils/storage";
 import { sendInvitationEmail } from "../utils/emailService";
 import { assets } from "../utils/assets";
+import { api } from "../utils/api";
 
 const NAV: DashNavItem[] = [
   { id: "inicio", label: "Inicio", icon: Home },
@@ -56,6 +59,8 @@ export function SiteAdminPage() {
   const [teacherDraft, setTeacherDraft] = useState({ name: "", email: "" });
   const [studentDraft, setStudentDraft] = useState("");
   const [inviteDraft, setInviteDraft] = useState({ email: "", name: "" });
+  const [importResult, setImportResult] = useState<null | { created: number; skipped: number; rows: Array<{ ok: boolean; email: string; username?: string; temporaryPassword?: string; message?: string }> }>(null);
+  const [importing, setImporting] = useState(false);
 
   const classes = useMemo(() => getClassesBySite(siteId), [siteId, message]);
   const teachers = useMemo(() => getUsersBySite(siteId, "profesor"), [siteId, message]);
@@ -109,6 +114,58 @@ export function SiteAdminPage() {
     } catch {
       setMessage(link);
     }
+  }
+
+  async function importCsv(file: File) {
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const csv = await file.text();
+      const res = await api.importUsersCsv(csv);
+      setImportResult({
+        created: res.created,
+        skipped: res.skipped,
+        rows: res.results.map((r) => ({
+          ok: r.ok,
+          email: r.email,
+          username: r.username,
+          temporaryPassword: r.temporaryPassword,
+          message: r.message,
+        })),
+      });
+      refresh(`Importación lista: ${res.created} creados, ${res.skipped} omitidos.`);
+    } catch (err) {
+      refresh(err instanceof Error ? err.message : "Error importando el CSV.");
+    } finally {
+      setImporting(false);
+    }
+  }
+  /* Download the FULL import result (every row, including temp passwords) as a
+     CSV so the admin can hand out credentials. The on-screen list only previews
+     the first rows; this is the complete, authoritative record. */
+  function downloadImportReport() {
+    if (!importResult) return;
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const header = "email,usuario,clave_temporal,estado,detalle";
+    const lines = importResult.rows.map((r) =>
+      [
+        esc(r.email ?? ""),
+        esc(r.username ?? ""),
+        esc(r.temporaryPassword ?? ""),
+        r.ok ? "creado" : "omitido",
+        esc(r.message ?? ""),
+      ].join(","),
+    );
+    const blob = new Blob([`${header}\n${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `importacion-alumnos-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setMessage("Reporte descargado.");
   }
   function leave() {
     logout();
@@ -265,6 +322,53 @@ export function SiteAdminPage() {
             </select>
             <div className="admin-form__actions"><Button type="submit"><Plus size={18} /> Crear alumno</Button></div>
           </form>
+
+          {/* CSV import — pasted in to handle "I have 30 students" without
+              requiring the admin to type each one. Format: header row with
+              name,email,role,grade,class. The class column creates a new
+              class on the fly if it doesn't exist. */}
+          <div className="csv-import">
+            <div className="csv-import__head">
+              <Upload size={18} />
+              <strong>Importar desde CSV</strong>
+              <span className="csv-import__hint">Columnas: name, email, role, grade, class</span>
+            </div>
+            <label className={`csv-import__drop ${importing ? "is-loading" : ""}`}>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                disabled={importing}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void importCsv(f);
+                  e.target.value = "";
+                }}
+              />
+              <span>{importing ? "Importando…" : "Hacé clic o soltá un .csv acá"}</span>
+            </label>
+            {importResult && (
+              <div className="csv-import__result" role="status">
+                <strong>{importResult.created} creados · {importResult.skipped} omitidos</strong>
+                <ul>
+                  {importResult.rows.slice(0, 20).map((r, i) => (
+                    <li key={i} className={r.ok ? "ok" : "err"}>
+                      <span>{r.email}</span>
+                      {r.ok
+                        ? <code>{r.username} / {r.temporaryPassword}</code>
+                        : <em>{r.message}</em>}
+                    </li>
+                  ))}
+                </ul>
+                {importResult.rows.length > 20 && (
+                  <small>Mostrando las primeras 20 de {importResult.rows.length} filas. Descargá el reporte para ver todas con sus claves.</small>
+                )}
+                <Button type="button" variant="secondary" className="button--sm csv-import__download" onClick={downloadImportReport}>
+                  <Download size={16} /> Descargar reporte (.csv)
+                </Button>
+              </div>
+            )}
+          </div>
+
           <PeopleList people={students} icon={Users} empty="Sin alumnos" />
         </section>
       )}

@@ -27,7 +27,7 @@ export function ChangePasswordPage() {
   if (!user) return <Navigate to="/login" replace />;
   if (!user.mustChangePassword) return <Navigate to={routeForRole(user.role)} replace />;
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (next.length < MIN_LENGTH) {
       setMessage(`La nueva contraseña debe tener al menos ${MIN_LENGTH} caracteres.`);
@@ -37,7 +37,7 @@ export function ChangePasswordPage() {
       setMessage("Las contraseñas no coinciden.");
       return;
     }
-    const refreshed = completePasswordChange(next);
+    const refreshed = await completePasswordChange(next);
     if (!refreshed) {
       setMessage("No pudimos actualizar la contraseña. Probá de nuevo.");
       return;
@@ -84,7 +84,7 @@ export function ChangePasswordPage() {
             type="button"
             className="change-pass-card__cancel"
             onClick={() => {
-              logout();
+              void logout();
               navigate("/login", { replace: true });
             }}
           >

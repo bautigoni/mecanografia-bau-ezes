@@ -2,16 +2,30 @@ import { ArrowLeft, Backpack, KeyRound, Medal, Shield, Star, Trophy } from "luci
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { assets } from "../utils/assets";
+import { useAuth } from "../hooks/useAuth";
+import { getUserContext } from "../utils/userContext";
+import { loadProgress } from "../utils/progress";
+import { getWorldsForUser, worldStarProgress } from "../data/worlds";
 
+/* Badges unlock at real star milestones so the screen reflects actual play
+   instead of a hardcoded unlocked/locked flag. */
 const rewards = [
-  { name: "Medalla inicial", description: "Completaste tu primera misión.", icon: Medal, unlocked: true },
-  { name: "Llave de teclas", description: "Desbloquea caminos nuevos.", icon: KeyRound, unlocked: true },
-  { name: "Escudo preciso", description: "Por escribir con cuidado.", icon: Shield, unlocked: false },
-  { name: "Mochila digital", description: "Herramientas para aprender.", icon: Backpack, unlocked: false },
+  { name: "Medalla inicial", description: "Completaste tu primera misión.", icon: Medal, threshold: 1 },
+  { name: "Llave de teclas", description: "Desbloquea caminos nuevos.", icon: KeyRound, threshold: 10 },
+  { name: "Escudo preciso", description: "Por escribir con cuidado.", icon: Shield, threshold: 30 },
+  { name: "Mochila digital", description: "Herramientas para aprender.", icon: Backpack, threshold: 60 },
 ];
 
 export function RewardsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const context = getUserContext(user);
+  const progress = loadProgress();
+  const totalStars = getWorldsForUser(context, progress).reduce(
+    (sum, w) => sum + worldStarProgress(w.id, progress).earnedStars,
+    0,
+  );
 
   return (
     <main className="student-soft-page page-fade" style={{ backgroundImage: `url("${assets.homeBg}")` }}>
@@ -30,7 +44,7 @@ export function RewardsPage() {
       <section className="reward-hero">
         <Trophy size={54} />
         <div>
-          <h2>1280 estrellas</h2>
+          <h2>{totalStars} estrellas</h2>
           <p>Seguís avanzando por las islas con mucha curiosidad.</p>
         </div>
       </section>
@@ -38,14 +52,15 @@ export function RewardsPage() {
       <section className="reward-grid">
         {rewards.map((reward) => {
           const Icon = reward.icon;
+          const unlocked = totalStars >= reward.threshold;
           return (
-            <article className={reward.unlocked ? "reward-card is-unlocked" : "reward-card"} key={reward.name}>
+            <article className={unlocked ? "reward-card is-unlocked" : "reward-card"} key={reward.name}>
               <div>
                 <Icon size={34} />
               </div>
               <h3>{reward.name}</h3>
               <p>{reward.description}</p>
-              <span>{reward.unlocked ? "Desbloqueado" : "Por desbloquear"}</span>
+              <span>{unlocked ? "Desbloqueado" : `Por desbloquear · ${reward.threshold}★`}</span>
             </article>
           );
         })}

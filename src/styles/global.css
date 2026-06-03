@@ -1073,10 +1073,20 @@ a {
   transform: scale(1.035);
 }
 
-.world-island {
+.world-island-wrap {
   position: absolute;
   z-index: 2;
   width: min(25vw, 25rem);
+  min-width: 14rem;
+  /* Position is set inline per-island. The wrap is just a positioning
+     context for the absolute CTA chip above the island. */
+}
+
+.world-island {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
   min-width: 14rem;
   border: 0;
   padding: 0;
@@ -1152,23 +1162,143 @@ a {
   transform: translateY(-0.15rem) scale(1.015);
 }
 
-/* Completed worlds keep their colour and gain a little green tick chip. */
+/* Screen-reader only helper. Visually hidden but still announced. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Completed worlds keep their colour and gain a friendly green tick chip.
+   The tick is positioned at the BOTTOM-RIGHT of the island so it never collides
+   with the icon badge on top or the star count chip in the middle. We give it
+   a soft ring + a small entrance pop so it reads as a celebration sticker, not
+   as UI noise. */
 .world-complete-badge {
   position: absolute;
-  top: -3%;
-  right: 8%;
-  z-index: 3;
+  bottom: 4%;
+  right: 6%;
+  z-index: 2;
   display: grid;
-  width: clamp(1.9rem, 2.6vw, 2.6rem);
-  height: clamp(1.9rem, 2.6vw, 2.6rem);
+  width: clamp(2rem, 2.4vw, 2.6rem);
+  height: clamp(2rem, 2.4vw, 2.6rem);
   place-items: center;
-  border: 2px solid rgba(255, 255, 255, 0.92);
+  border: 2px solid rgba(255, 255, 255, 0.95);
   border-radius: 999px;
   color: white;
   background: linear-gradient(145deg, #95ee86, #3fba63);
   box-shadow:
-    0 10px 18px rgba(49, 145, 89, 0.26),
-    0 0 16px rgba(113, 232, 125, 0.4);
+    0 8px 14px rgba(49, 145, 89, 0.28),
+    0 0 14px rgba(113, 232, 125, 0.45);
+  animation: worldTickPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes worldTickPop {
+  0%   { transform: scale(0.4) rotate(-18deg); opacity: 0; }
+  60%  { transform: scale(1.18) rotate(6deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+/* Star count chip on the island. Shows earned/total stars in a glass pill so
+   students see their score at a glance — the "lapicito" / pencil-row spot the
+   user asked for. Position is bottom-centre on the island, above the tick. */
+.world-stars-chip {
+  position: absolute;
+  bottom: 0.4%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.18rem 0.65rem 0.18rem 0.5rem;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(0.78rem, 1.05vw, 0.98rem);
+  color: #17355f;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 6px 12px rgba(54, 86, 134, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.world-stars-chip__icon {
+  color: #facc15;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.08));
+}
+.world-stars-chip--locked {
+  color: #61709e;
+}
+.world-stars-chip--complete {
+  background: linear-gradient(135deg, #d8ffe4, #fff7d6);
+  color: #153b78;
+}
+
+/* "Go to next world" chip on the last completed world. Sits INSIDE the lower
+   third of the island art (not floating above it) so it never clips off the
+   top of the viewport on high islands. Disabled until the 70% star threshold
+   is met, with the tooltip explaining what's missing. */
+.world-next-cta {
+  position: absolute;
+  top: auto;
+  bottom: 16%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.9rem;
+  border-radius: 999px;
+  border: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(0.78rem, 1vw, 0.95rem);
+  color: white;
+  background: linear-gradient(135deg, #54e8c6, #25c8df, #536bff);
+  box-shadow:
+    0 8px 16px rgba(54, 86, 134, 0.28),
+    0 0 12px rgba(120, 220, 255, 0.45);
+  cursor: pointer;
+  white-space: nowrap;
+  animation: worldNextPulse 2.4s ease-in-out infinite;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+.world-next-cta:hover:not(:disabled) {
+  transform: translateX(-50%) translateY(-2px) scale(1.04);
+  box-shadow:
+    0 12px 22px rgba(54, 86, 134, 0.34),
+    0 0 18px rgba(120, 220, 255, 0.6);
+}
+.world-next-cta:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.55) brightness(0.92);
+  background: rgba(225, 230, 245, 0.95);
+  color: #8a93b3;
+  box-shadow: 0 4px 10px rgba(54, 86, 134, 0.12);
+  animation: none;
+}
+.world-next-cta__hint {
+  display: block;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: #61709e;
+  margin-top: 0.18rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+@keyframes worldNextPulse {
+  0%, 100% { box-shadow: 0 8px 16px rgba(54,86,134,0.28), 0 0 12px rgba(120,220,255,0.45); }
+  50%      { box-shadow: 0 10px 20px rgba(54,86,134,0.32), 0 0 22px rgba(120,220,255,0.7); }
 }
 
 .world-island img {
@@ -1304,9 +1434,11 @@ a {
   left: 50%;
   z-index: 3;
   display: grid;
+  grid-template-rows: auto auto;
+  place-items: center;
+  row-gap: 0.1rem;
   width: clamp(3rem, 4.15vw, 4.7rem);
   height: clamp(3rem, 4.15vw, 4.7rem);
-  place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.94);
   border-radius: 999px;
   color: #26beb4;
@@ -1320,6 +1452,24 @@ a {
     inset 0 -0.4rem 0.9rem rgba(242, 209, 165, 0.18);
   transform: translate(-50%, -52%);
   backdrop-filter: blur(12px) saturate(1.16);
+}
+
+/* The "M1"…"M15" pedagogical label inside the world badge. The number is
+   the difficulty order (1..15) so what the student sees in the UI matches
+   what the unlock gate, the "Mundo N" tooltip and the teacher reports
+   report. The icon shrinks to make room. */
+.world-icon-badge__num {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(0.62rem, 0.78vw, 0.78rem);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: inherit;
+  opacity: 0.85;
+}
+.world-icon-badge__icon {
+  width: 60%;
+  height: 60%;
 }
 
 .world-island--island1 .world-icon-badge {
@@ -1782,9 +1932,72 @@ a {
 }
 
 /* =====================================================================
-   DEV-ONLY level position editor (LevelPositionEditor). None of these
-   styles affect the student view — the markup is only rendered in dev
-   builds when the editor is toggled on.
+   CSV import (admin-sede)
+   ===================================================================== */
+.csv-import {
+  margin: 1.2rem 0 1.6rem;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(91, 232, 186, 0.10), rgba(83, 107, 255, 0.10));
+  border: 1px solid rgba(83, 107, 255, 0.18);
+  display: grid;
+  gap: 0.7rem;
+}
+.csv-import__head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: #17355f;
+  font-family: var(--font-display);
+  font-weight: 600;
+  flex-wrap: wrap;
+}
+.csv-import__hint {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: #4a5d8a;
+  font-family: var(--font-body);
+  font-weight: 600;
+  opacity: 0.85;
+}
+.csv-import__drop {
+  display: grid;
+  place-items: center;
+  padding: 1.6rem 1rem;
+  border: 2px dashed rgba(83, 107, 255, 0.45);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.55);
+  color: #3159e8;
+  font-family: var(--font-display);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.csv-import__drop:hover { background: rgba(255, 255, 255, 0.78); border-color: rgba(83, 107, 255, 0.7); }
+.csv-import__drop.is-loading { opacity: 0.6; cursor: progress; }
+.csv-import__drop input { display: none; }
+.csv-import__result {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  color: #17355f;
+}
+.csv-import__result ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.25rem; }
+.csv-import__result li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 8px;
+}
+.csv-import__result li.ok { background: rgba(91, 232, 186, 0.20); }
+.csv-import__result li.err { background: rgba(255, 159, 202, 0.22); }
+.csv-import__result code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; color: #17355f; }
+.csv-import__result em { color: #b3265b; font-style: normal; }
 ===================================================================== */
 .is-editing-levels { cursor: crosshair; }
 /* While placing markers, clear the panels that overlay the map so every
@@ -4436,6 +4649,46 @@ td {
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
   }
+}
+
+/* ===== Accessibility — visible keyboard focus =====
+   Most custom buttons reset the native outline (or rely on the browser
+   default that the glass theme hides). This gives every interactive control
+   a consistent, on-brand focus ring for keyboard users. Pointer clicks are
+   unaffected (`:focus-visible` only fires for keyboard / programmatic focus).
+   `.world-island` keeps its own white ring (defined earlier, after this in
+   source order it would lose — so it is intentionally left out here). */
+.button:focus-visible,
+.auth-button:focus-visible,
+.google-login-btn:focus-visible,
+.password-toggle:focus-visible,
+.world-next-cta:focus-visible,
+.world-menu__trigger:focus-visible,
+.world-menu__panel button:focus-visible,
+.world-back-button:focus-visible,
+.profile-bubble:focus-visible,
+.level-editor-toggle:focus-visible,
+.level-popover__cta:focus-visible,
+.dash-nav button:focus-visible,
+.dash-logout:focus-visible,
+.dash-bell:focus-visible,
+.link-arrow:focus-visible,
+.people-card__edit:focus-visible,
+.kpi-card.is-clickable:focus-visible,
+.island-toggle-card__switch:focus-visible,
+.reset-box__btn:focus-visible,
+.admin-form__delete:focus-visible,
+.photo-upload:focus-within,
+.photo-remove:focus-visible,
+.level-complete-action:focus-visible,
+.change-pass-card__submit:focus-visible,
+.change-pass-card__cancel:focus-visible,
+.csv-import__download:focus-visible,
+.demo-modal__btn:focus-visible,
+.demo-modal__close:focus-visible,
+.toast__close:focus-visible {
+  outline: 3px solid rgba(83, 107, 255, 0.7);
+  outline-offset: 2px;
 }
 
 /* ===== Typography pass — rounded display font for headings & emphasis,
