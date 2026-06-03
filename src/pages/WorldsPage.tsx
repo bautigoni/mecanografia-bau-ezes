@@ -245,6 +245,20 @@ export function WorldsPage() {
     prefetchImage(world.background);
   }
 
+  /* The "Siguiente" CTA belongs on exactly ONE island: the last world the
+     student has completed (the gateway to where they should go next). Showing
+     it on every completed world cluttered the map and competed with the green
+     tick. -1 when nothing is completed yet → no CTA anywhere. */
+  const lastCompletedIndex = visibleWorlds.reduce(
+    (acc, w, i) => (worldStates[w.slug] === "completed" ? i : acc),
+    -1,
+  );
+  /* Real running star total for the menu chip (was a hardcoded "1280"). */
+  const totalEarnedStars = visibleWorlds.reduce(
+    (sum, w) => sum + worldStarProgress(w.id, progress).earnedStars,
+    0,
+  );
+
   return (
     <main
       className={
@@ -282,7 +296,7 @@ export function WorldsPage() {
             </button>
             <button type="button" onClick={() => navigate("/logros")}>
               <Star size={19} />
-              <span>1280 estrellas</span>
+              <span>{totalEarnedStars} estrellas</span>
             </button>
             {/* Superadmin-only shortcut to the teacher/admin panel. */}
             {context.isSuperAdmin && (
@@ -350,7 +364,7 @@ export function WorldsPage() {
           ))}
 
           {/* Island buttons */}
-          {visibleWorlds.map((world) => {
+          {visibleWorlds.map((world, index) => {
             const BadgeIcon = worldBadges[world.slug];
             const state = worldStates[world.slug];
             const isLocked = state === "locked";
@@ -366,7 +380,8 @@ export function WorldsPage() {
               : isCurrent
                 ? "Seguir jugando"
                 : "Jugar";
-            const showCta = Boolean(next) && !isLocked;
+            /* Only the last completed world gets the "Siguiente" chip. */
+            const showCta = index === lastCompletedIndex && Boolean(next);
             const starsClass = isCompleted
               ? "world-stars-chip world-stars-chip--complete"
               : isLocked
@@ -400,7 +415,7 @@ export function WorldsPage() {
                     }
                   >
                     {nextIsLocked ? <Lock size={14} strokeWidth={2.6} /> : <ArrowRight size={16} strokeWidth={2.6} />}
-                    <span>{nextIsLocked ? "Siguiente" : "Siguiente"}</span>
+                    <span>{nextIsLocked ? "Bloqueado" : "Siguiente"}</span>
                   </button>
                 )}
                 <button
@@ -417,7 +432,9 @@ export function WorldsPage() {
                   onClick={() => handleIslandClick(world)}
                   onPointerEnter={() => !isLocked && prefetchWorld(world)}
                   onFocus={() => !isLocked && prefetchWorld(world)}
-                  aria-label={`${worldLabels[world.slug]}${isLocked ? " (bloqueado)" : ""}`}
+                  aria-label={`${worldLabels[world.slug]}${
+                    isLocked ? " (bloqueado)" : isCompleted ? " (completado)" : ""
+                  }`}
                   aria-disabled={isLocked}
                 >
                   <span className="world-icon-badge" aria-hidden="true">
@@ -434,8 +451,11 @@ export function WorldsPage() {
                     <Star size={14} strokeWidth={2.4} className="world-stars-chip__icon" />
                     {starInfo.earnedStars}/{starInfo.totalStars}
                   </span>
-                  {isCompleted && (
-                    <span className="world-complete-badge" aria-label="Mundo completado" aria-hidden="true">
+                  {/* The tick is decorative (the button's aria-label already
+                      announces "completado"); hide it on the island that shows
+                      the Siguiente chip so the two never compete. */}
+                  {isCompleted && !showCta && (
+                    <span className="world-complete-badge" aria-hidden="true">
                       <Check size={18} strokeWidth={3.4} />
                     </span>
                   )}

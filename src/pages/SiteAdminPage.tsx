@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from "react";
 import {
   BookOpen,
   Copy,
+  Download,
   GraduationCap,
   Home,
   LineChart,
@@ -138,6 +139,33 @@ export function SiteAdminPage() {
     } finally {
       setImporting(false);
     }
+  }
+  /* Download the FULL import result (every row, including temp passwords) as a
+     CSV so the admin can hand out credentials. The on-screen list only previews
+     the first rows; this is the complete, authoritative record. */
+  function downloadImportReport() {
+    if (!importResult) return;
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const header = "email,usuario,clave_temporal,estado,detalle";
+    const lines = importResult.rows.map((r) =>
+      [
+        esc(r.email ?? ""),
+        esc(r.username ?? ""),
+        esc(r.temporaryPassword ?? ""),
+        r.ok ? "creado" : "omitido",
+        esc(r.message ?? ""),
+      ].join(","),
+    );
+    const blob = new Blob([`${header}\n${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `importacion-alumnos-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setMessage("Reporte descargado.");
   }
   function leave() {
     logout();
@@ -331,7 +359,12 @@ export function SiteAdminPage() {
                     </li>
                   ))}
                 </ul>
-                {importResult.rows.length > 20 && <small>Mostrando las primeras 20 filas. Revisá la consola para ver el resto.</small>}
+                {importResult.rows.length > 20 && (
+                  <small>Mostrando las primeras 20 de {importResult.rows.length} filas. Descargá el reporte para ver todas con sus claves.</small>
+                )}
+                <Button type="button" variant="secondary" className="button--sm csv-import__download" onClick={downloadImportReport}>
+                  <Download size={16} /> Descargar reporte (.csv)
+                </Button>
               </div>
             )}
           </div>

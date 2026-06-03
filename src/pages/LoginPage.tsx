@@ -197,7 +197,7 @@ export function LoginPage() {
             <span className="google-login-btn__icon" aria-hidden="true">
               <GoogleGlyph />
             </span>
-            Login with Google
+            Ingresar con Google
           </button>
           {/* Fallback anchor: GIS renders its official button here when
               the one-tap prompt is suppressed (FedCM / third-party cookies). */}

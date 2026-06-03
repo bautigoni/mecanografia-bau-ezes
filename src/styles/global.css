@@ -1242,11 +1242,14 @@ a {
   color: #153b78;
 }
 
-/* "Go to next world" chip on the CURRENT world. Disabled until 70% threshold
+/* "Go to next world" chip on the last completed world. Sits INSIDE the lower
+   third of the island art (not floating above it) so it never clips off the
+   top of the viewport on high islands. Disabled until the 70% star threshold
    is met, with the tooltip explaining what's missing. */
 .world-next-cta {
   position: absolute;
-  top: -2.6rem;
+  top: auto;
+  bottom: 16%;
   left: 50%;
   transform: translateX(-50%);
   z-index: 4;
@@ -4646,6 +4649,46 @@ td {
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
   }
+}
+
+/* ===== Accessibility — visible keyboard focus =====
+   Most custom buttons reset the native outline (or rely on the browser
+   default that the glass theme hides). This gives every interactive control
+   a consistent, on-brand focus ring for keyboard users. Pointer clicks are
+   unaffected (`:focus-visible` only fires for keyboard / programmatic focus).
+   `.world-island` keeps its own white ring (defined earlier, after this in
+   source order it would lose — so it is intentionally left out here). */
+.button:focus-visible,
+.auth-button:focus-visible,
+.google-login-btn:focus-visible,
+.password-toggle:focus-visible,
+.world-next-cta:focus-visible,
+.world-menu__trigger:focus-visible,
+.world-menu__panel button:focus-visible,
+.world-back-button:focus-visible,
+.profile-bubble:focus-visible,
+.level-editor-toggle:focus-visible,
+.level-popover__cta:focus-visible,
+.dash-nav button:focus-visible,
+.dash-logout:focus-visible,
+.dash-bell:focus-visible,
+.link-arrow:focus-visible,
+.people-card__edit:focus-visible,
+.kpi-card.is-clickable:focus-visible,
+.island-toggle-card__switch:focus-visible,
+.reset-box__btn:focus-visible,
+.admin-form__delete:focus-visible,
+.photo-upload:focus-within,
+.photo-remove:focus-visible,
+.level-complete-action:focus-visible,
+.change-pass-card__submit:focus-visible,
+.change-pass-card__cancel:focus-visible,
+.csv-import__download:focus-visible,
+.demo-modal__btn:focus-visible,
+.demo-modal__close:focus-visible,
+.toast__close:focus-visible {
+  outline: 3px solid rgba(83, 107, 255, 0.7);
+  outline-offset: 2px;
 }
 
 /* ===== Typography pass — rounded display font for headings & emphasis,

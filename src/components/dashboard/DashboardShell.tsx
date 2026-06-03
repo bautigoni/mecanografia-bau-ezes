@@ -166,7 +166,24 @@ export function KpiCard({
   onClick?: () => void;
 }) {
   return (
-    <article className={`kpi-card kpi-card--${tone} ${onClick ? "is-clickable" : ""}`} onClick={onClick}>
+    <article
+      className={`kpi-card kpi-card--${tone} ${onClick ? "is-clickable" : ""}`}
+      onClick={onClick}
+      /* When the card is actionable, expose it to keyboard + AT as a button. */
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `${label}: ${value}` : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
       <span className="kpi-card__icon">
         <Icon size={24} />
       </span>

@@ -317,7 +317,13 @@ export function AdminGeneralPage() {
         <Button className="button--sm" onClick={startCreateSite}>
           <Plus size={18} /> Crear sede
         </Button>
-        <Button className="button--sm" variant="secondary" onClick={openCreateAdmin} disabled={data.sites.length === 0}>
+        <Button
+          className="button--sm"
+          variant="secondary"
+          onClick={openCreateAdmin}
+          disabled={data.sites.length === 0}
+          title={data.sites.length === 0 ? "Primero creá una sede para poder asignarle un administrador." : undefined}
+        >
           <UserCog size={18} /> Crear admin de sede
         </Button>
       </div>
@@ -429,7 +435,12 @@ export function AdminGeneralPage() {
               <h2><ShieldCheck size={22} /> Administradores de sede</h2>
               <p>Cada admin gestiona únicamente su sede asignada.</p>
             </div>
-            <Button className="button--sm" onClick={openCreateAdmin} disabled={data.sites.length === 0}>
+            <Button
+              className="button--sm"
+              onClick={openCreateAdmin}
+              disabled={data.sites.length === 0}
+              title={data.sites.length === 0 ? "Primero creá una sede para poder asignarle un administrador." : undefined}
+            >
               <UserCog size={18} /> Crear admin de sede
             </Button>
           </div>

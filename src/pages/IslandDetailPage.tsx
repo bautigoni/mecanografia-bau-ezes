@@ -480,7 +480,7 @@ export function IslandDetailPage() {
         </div>
       </header>
 
-      <button type="button" className="profile-bubble" aria-label="Perfil" onClick={() => setMessage("Perfil de Sofía")}>
+      <button type="button" className="profile-bubble" aria-label="Mi cuenta" onClick={() => navigate("/mi-cuenta")}>
         <UserRound size={25} />
         <span>Perfil</span>
       </button>
