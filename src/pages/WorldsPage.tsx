@@ -122,6 +122,15 @@ export function WorldsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedWorld, setSelectedWorld] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  /* Hold a short "preparando…" screen on the FIRST visit per session so the
+     map reveals fully painted instead of popping in island by island. */
+  const [worldsReady, setWorldsReady] = useState(() => {
+    try {
+      return sessionStorage.getItem("edutic.worldsLoaded") === "1";
+    } catch {
+      return false;
+    }
+  });
   const pendingNav = useRef<number | null>(null);
   const sceneRef = useRef<HTMLDivElement | null>(null);
 
@@ -165,6 +174,54 @@ export function WorldsPage() {
     const left = Math.max(0, targetPx - scene.clientWidth / 2);
     scene.scrollTo({ left, behavior: "smooth" });
     // Run once on mount; unlock-state changes after page-load are rare.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* Preload every island thumbnail behind the "preparando…" screen, then
+     reveal the map. Waits for all images to decode (so nothing pops in), with
+     a ~1.8 s minimum so it reads as intentional and a 3.5 s hard cap so it can
+     never hang. Only the first visit per session waits — later returns (assets
+     already cached) skip the loader entirely. */
+  useEffect(() => {
+    if (worldsReady) return;
+    let cancelled = false;
+    const finish = () => {
+      if (cancelled) return;
+      try {
+        sessionStorage.setItem("edutic.worldsLoaded", "1");
+      } catch {
+        /* ignore */
+      }
+      setWorldsReady(true);
+    };
+    const urls = Array.from(new Set(visibleWorlds.map((w) => w.thumbnail)));
+    if (urls.length === 0) {
+      finish();
+      return;
+    }
+    const start = performance.now();
+    const MIN_MS = 1800;
+    let remaining = urls.length;
+    const onOne = () => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        const elapsed = performance.now() - start;
+        window.setTimeout(finish, Math.max(0, MIN_MS - elapsed));
+      }
+    };
+    urls.forEach((src) => {
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = onOne;
+      img.onerror = onOne;
+      img.src = src;
+      prefetched.add(src);
+    });
+    const cap = window.setTimeout(finish, 3500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(cap);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -231,6 +288,22 @@ export function WorldsPage() {
       style={{ backgroundImage: `url("${assets.homeBg}")` }}
     >
       <div className="worlds-atmosphere" aria-hidden="true" />
+
+      {!worldsReady && (
+        <div className="worlds-loader" role="status" aria-live="polite">
+          <div className="worlds-loader__card">
+            <span className="worlds-loader__halo" aria-hidden="true" />
+            <img
+              className="worlds-loader__mascot"
+              src={assets.mascotMaleProud}
+              alt=""
+              decoding="async"
+            />
+            <span className="worlds-loader__spinner" aria-hidden="true" />
+            <p>Preparando tu aventura…</p>
+          </div>
+        </div>
+      )}
 
       {/* ── Hamburger menu ── */}
       <div className={menuOpen ? "world-menu is-open" : "world-menu"}>

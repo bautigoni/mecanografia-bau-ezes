@@ -797,6 +797,80 @@ a {
   opacity: 0.92;
 }
 
+/* ── World-map "preparando…" loading screen (first entry per session) ── */
+.worlds-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.5), transparent 60%),
+    linear-gradient(180deg, rgba(207, 238, 255, 0.92), rgba(221, 211, 255, 0.92));
+  backdrop-filter: blur(8px);
+  animation: worldsLoaderIn 260ms ease both;
+}
+@keyframes worldsLoaderIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.worlds-loader__card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  padding: 2rem 2.4rem 1.7rem;
+  border-radius: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.8), rgba(233, 244, 255, 0.66));
+  box-shadow: 0 24px 60px rgba(54, 86, 134, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.worlds-loader__halo {
+  position: absolute;
+  inset: -30%;
+  z-index: -1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(124, 113, 255, 0.35), transparent 62%);
+  filter: blur(28px);
+  animation: worldsLoaderHalo 4s ease-in-out infinite;
+}
+@keyframes worldsLoaderHalo {
+  0%, 100% { transform: scale(0.95); opacity: 0.7; }
+  50%      { transform: scale(1.08); opacity: 1; }
+}
+.worlds-loader__mascot {
+  width: clamp(6rem, 16vw, 8.5rem);
+  height: auto;
+  filter: drop-shadow(0 14px 20px rgba(45, 73, 142, 0.22));
+  animation: islandFloat 3.5s ease-in-out infinite;
+}
+.worlds-loader__spinner {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  border: 0.32rem solid rgba(83, 107, 255, 0.22);
+  border-top-color: #536bff;
+  border-right-color: #25c8df;
+  animation: worldsLoaderSpin 0.9s linear infinite;
+}
+@keyframes worldsLoaderSpin {
+  to { transform: rotate(360deg); }
+}
+.worlds-loader__card p {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1rem, 2.4vw, 1.25rem);
+  color: #17355f;
+  letter-spacing: 0.01em;
+}
+@media (prefers-reduced-motion: reduce) {
+  .worlds-loader__spinner,
+  .worlds-loader__mascot,
+  .worlds-loader__halo { animation: none; }
+}
+
 .world-menu {
   position: absolute;
   right: clamp(1.35rem, 3vw, 2.55rem);
