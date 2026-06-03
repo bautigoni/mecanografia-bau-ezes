@@ -540,6 +540,71 @@ export function createClass(input: { name: string; siteId: string; grade?: Class
   return classRoom;
 }
 
+/* ---- Class-scoped getters + student management (sede-admin course view) ---- */
+
+/** Students (role alumno) that belong to a given class. */
+export function getStudentsInClass(classId?: string): EduTicUser[] {
+  if (!classId) return [];
+  const data = getDemoData();
+  const classRoom = data.classes.find((c) => c.id === classId);
+  if (!classRoom) return [];
+  return data.users.filter(
+    (u) => u.role === "alumno" && classRoom.studentIds.includes(u.id),
+  );
+}
+
+/** Teachers (role profesor) assigned to a given class. */
+export function getTeachersInClass(classId?: string): EduTicUser[] {
+  if (!classId) return [];
+  const data = getDemoData();
+  const classRoom = data.classes.find((c) => c.id === classId);
+  if (!classRoom) return [];
+  return data.users.filter(
+    (u) => u.role === "profesor" && classRoom.teacherIds.includes(u.id),
+  );
+}
+
+/** Rename any user (used to edit a student's display name in a course). */
+export function updateUserName(userId: string, name: string): void {
+  const clean = name.trim();
+  if (!clean) return;
+  const data = getDemoData();
+  patchDemoData({
+    users: data.users.map((u) => (u.id === userId ? { ...u, name: clean } : u)),
+  });
+}
+
+/** Removes a student from a class WITHOUT deleting the account. */
+export function removeStudentFromClass(userId: string, classId: string): void {
+  const data = getDemoData();
+  patchDemoData({
+    classes: data.classes.map((c) =>
+      c.id === classId
+        ? { ...c, studentIds: c.studentIds.filter((id) => id !== userId) }
+        : c,
+    ),
+    users: data.users.map((u) =>
+      u.id === userId && u.classId === classId ? { ...u, classId: undefined } : u,
+    ),
+  });
+}
+
+/** Permanently deletes a student account and removes it from every class.
+ *  Guarded so it can only ever delete an `alumno` record. */
+export function deleteStudent(userId: string): boolean {
+  const data = getDemoData();
+  const target = data.users.find((u) => u.id === userId);
+  if (!target || target.role !== "alumno") return false;
+  patchDemoData({
+    users: data.users.filter((u) => u.id !== userId),
+    classes: data.classes.map((c) => ({
+      ...c,
+      studentIds: c.studentIds.filter((id) => id !== userId),
+    })),
+  });
+  return true;
+}
+
 /* ---- Sede-scoped getters ---- */
 export function getUsersBySite(siteId: string | undefined, role?: Role): EduTicUser[] {
   const users = getDemoData().users.filter((u) => u.siteId === siteId);

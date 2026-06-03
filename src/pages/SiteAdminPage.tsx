@@ -5,12 +5,16 @@ import {
   Download,
   GraduationCap,
   Home,
+  KeyRound,
   LineChart,
   Mail,
+  Pencil,
   Plus,
   Send,
+  Trash2,
   Upload,
   Users,
+  X,
   Zap,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -24,12 +28,18 @@ import {
   createInvitation,
   createStudent,
   createTeacher,
+  deleteStudent,
   getClassesBySite,
   getDemoData,
   getInvitationsBySite,
   getSiteById,
+  getStudentsInClass,
+  getTeachersInClass,
   getUsersBySite,
+  removeStudentFromClass,
+  resetUserPassword,
   setInvitationStatus,
+  updateUserName,
 } from "../utils/storage";
 import { sendInvitationEmail } from "../utils/emailService";
 import { assets } from "../utils/assets";
@@ -62,15 +72,69 @@ export function SiteAdminPage() {
   const [importResult, setImportResult] = useState<null | { created: number; skipped: number; rows: Array<{ ok: boolean; email: string; username?: string; temporaryPassword?: string; message?: string }> }>(null);
   const [importing, setImporting] = useState(false);
 
+  /* Course detail: open a course to manage the students inside it. */
+  const [openCourseId, setOpenCourseId] = useState<string | null>(null);
+  const [courseStudentDraft, setCourseStudentDraft] = useState("");
+  const [studentEdit, setStudentEdit] = useState<{ id: string; name: string } | null>(null);
+  const [resetInfo, setResetInfo] = useState<{ id: string; password: string } | null>(null);
+
   const classes = useMemo(() => getClassesBySite(siteId), [siteId, message]);
   const teachers = useMemo(() => getUsersBySite(siteId, "profesor"), [siteId, message]);
   const students = useMemo(() => getUsersBySite(siteId, "alumno"), [siteId, message]);
   const invitations = useMemo(() => getInvitationsBySite(siteId), [siteId, message]);
   const [selectedClass, setSelectedClass] = useState(classes[0]?.id ?? "");
 
+  const openCourse = openCourseId ? classes.find((c) => c.id === openCourseId) ?? null : null;
+  const courseStudents = useMemo(
+    () => getStudentsInClass(openCourseId ?? undefined),
+    [openCourseId, message],
+  );
+  const courseTeachers = useMemo(
+    () => getTeachersInClass(openCourseId ?? undefined),
+    [openCourseId, message],
+  );
+
   function refresh(toast: string) {
     setVersion((v) => v + 1);
     setMessage(toast);
+  }
+
+  /* ---- Course-detail handlers (manage students inside a course) ---- */
+  function closeCourse() {
+    setOpenCourseId(null);
+    setStudentEdit(null);
+    setResetInfo(null);
+    setCourseStudentDraft("");
+  }
+  function addStudentToCourse(e: FormEvent) {
+    e.preventDefault();
+    if (!openCourseId || !courseStudentDraft.trim()) return;
+    const s = createStudent({ name: courseStudentDraft, siteId, classId: openCourseId });
+    setCourseStudentDraft("");
+    refresh(`Alumno agregado: ${s.username} / ${s.password}`);
+  }
+  function saveStudentName() {
+    if (!studentEdit || !studentEdit.name.trim()) return;
+    updateUserName(studentEdit.id, studentEdit.name);
+    setStudentEdit(null);
+    refresh("Nombre del alumno actualizado.");
+  }
+  function resetStudentPassword(id: string, username?: string) {
+    const password = resetUserPassword(id);
+    if (password) {
+      setResetInfo({ id, password });
+      refresh(`Contraseña restablecida para ${username ?? "el alumno"}.`);
+    }
+  }
+  function removeStudent(id: string) {
+    if (!openCourseId) return;
+    removeStudentFromClass(id, openCourseId);
+    refresh("Alumno quitado del curso.");
+  }
+  function deleteStudentAccount(id: string) {
+    deleteStudent(id);
+    setStudentEdit(null);
+    refresh("Alumno eliminado.");
   }
 
   function submitClass(e: FormEvent) {
@@ -244,10 +308,10 @@ export function SiteAdminPage() {
               ) : (
                 <div className="people-card-grid">
                   {classes.slice(0, 4).map((c) => (
-                    <div key={c.id} className="people-card">
+                    <button type="button" key={c.id} className="people-card people-card--button" onClick={() => setOpenCourseId(c.id)} title="Abrir curso">
                       <span className="people-card__avatar people-card__avatar--green"><BookOpen size={20} /></span>
                       <div><strong>{c.name}</strong><span>{studentsInClass(c.id).length} alumnos · {c.teacherIds.length} docentes</span></div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -283,14 +347,17 @@ export function SiteAdminPage() {
           {classes.length === 0 ? (
             <div className="empty-state empty-state--compact"><h3>Sin cursos todavía</h3></div>
           ) : (
-            <div className="people-card-grid">
-              {classes.map((c) => (
-                <div key={c.id} className="people-card">
-                  <span className="people-card__avatar people-card__avatar--green"><BookOpen size={20} /></span>
-                  <div><strong>{c.name}</strong><span>{studentsInClass(c.id).length} alumnos · {c.teacherIds.length} docentes</span></div>
-                </div>
-              ))}
-            </div>
+            <>
+              <p className="dash-hint">Tocá un curso para ver y editar sus alumnos.</p>
+              <div className="people-card-grid">
+                {classes.map((c) => (
+                  <button type="button" key={c.id} className="people-card people-card--button" onClick={() => setOpenCourseId(c.id)} title="Abrir curso">
+                    <span className="people-card__avatar people-card__avatar--green"><BookOpen size={20} /></span>
+                    <div><strong>{c.name}</strong><span>{studentsInClass(c.id).length} alumnos · {c.teacherIds.length} docentes</span></div>
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </section>
       )}
@@ -418,6 +485,89 @@ export function SiteAdminPage() {
             </div>
           )}
         </section>
+      )}
+
+      {openCourse && (
+        <div className="demo-modal" role="dialog" aria-modal="true" aria-labelledby="course-modal-title">
+          <div className="demo-modal__backdrop" onClick={closeCourse} />
+          <div className="demo-modal__card course-modal__card">
+            <span className="demo-modal__icon" aria-hidden="true"><BookOpen size={24} /></span>
+            <h2 id="course-modal-title">{openCourse.name}</h2>
+            <p>{courseStudents.length} alumnos · {courseTeachers.length} docentes</p>
+
+            <div className="course-modal__section">
+              <h3><GraduationCap size={16} /> Docentes</h3>
+              {courseTeachers.length === 0 ? (
+                <small className="course-modal__empty">Sin docentes asignados a este curso.</small>
+              ) : (
+                <ul className="course-people">
+                  {courseTeachers.map((t) => (
+                    <li key={t.id}><strong>{t.name}</strong><span>{t.email ?? t.username}</span></li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="course-modal__section">
+              <h3><Users size={16} /> Alumnos</h3>
+              <form className="admin-form admin-form--inline course-modal__add" onSubmit={addStudentToCourse}>
+                <input
+                  placeholder="Nombre del nuevo alumno"
+                  value={courseStudentDraft}
+                  onChange={(e) => setCourseStudentDraft(e.target.value)}
+                />
+                <Button type="submit" className="button--sm"><Plus size={16} /> Agregar</Button>
+              </form>
+
+              {courseStudents.length === 0 ? (
+                <small className="course-modal__empty">Este curso todavía no tiene alumnos.</small>
+              ) : (
+                <ul className="course-students">
+                  {courseStudents.map((s) => (
+                    <li key={s.id} className="course-student">
+                      <div className="course-student__main">
+                        {studentEdit?.id === s.id ? (
+                          <input
+                            className="course-student__edit"
+                            value={studentEdit.name}
+                            autoFocus
+                            onChange={(e) => setStudentEdit({ id: s.id, name: e.target.value })}
+                            onKeyDown={(e) => { if (e.key === "Enter") saveStudentName(); if (e.key === "Escape") setStudentEdit(null); }}
+                          />
+                        ) : (
+                          <>
+                            <strong>{s.name}</strong>
+                            <span>{s.username} · {Math.round(s.stats?.precision ?? 0)}% precisión</span>
+                          </>
+                        )}
+                      </div>
+                      <div className="course-student__actions">
+                        {studentEdit?.id === s.id ? (
+                          <>
+                            <button type="button" className="course-student__btn is-ok" onClick={saveStudentName} aria-label="Guardar nombre">Guardar</button>
+                            <button type="button" className="course-student__btn" onClick={() => setStudentEdit(null)} aria-label="Cancelar">Cancelar</button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" className="course-student__btn" onClick={() => setStudentEdit({ id: s.id, name: s.name })} aria-label={`Editar ${s.name}`} title="Editar nombre"><Pencil size={15} /></button>
+                            <button type="button" className="course-student__btn" onClick={() => resetStudentPassword(s.id, s.username)} aria-label={`Restablecer contraseña de ${s.name}`} title="Restablecer contraseña"><KeyRound size={15} /></button>
+                            <button type="button" className="course-student__btn" onClick={() => removeStudent(s.id)} aria-label={`Quitar a ${s.name} del curso`} title="Quitar del curso"><Trash2 size={15} /></button>
+                            <button type="button" className="course-student__btn is-danger" onClick={() => deleteStudentAccount(s.id)} aria-label={`Eliminar a ${s.name}`} title="Eliminar alumno">Eliminar</button>
+                          </>
+                        )}
+                      </div>
+                      {resetInfo?.id === s.id && (
+                        <code className="course-student__pass">Nueva clave temporal: {s.username} / {resetInfo.password}</code>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <button type="button" className="demo-modal__close" aria-label="Cerrar" onClick={closeCourse}><X size={18} /></button>
+          </div>
+        </div>
       )}
 
       <Toast message={message} />
