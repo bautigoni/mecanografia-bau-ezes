@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BookOpen, GraduationCap, Home, LineChart, Power, PowerOff, TrendingUp, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/common/Button";
@@ -8,6 +8,7 @@ import { useAuth } from "../hooks/useAuth";
 import { worlds } from "../data/worlds";
 import { getEnabledWorldsForClass, getTeacherStudents, updateTeacherWorldSelection } from "../utils/storage";
 import { assets } from "../utils/assets";
+import { api } from "../utils/api";
 
 const NAV: DashNavItem[] = [
   { id: "inicio", label: "Inicio", icon: Home },
@@ -15,13 +16,73 @@ const NAV: DashNavItem[] = [
   { id: "estudiantes", label: "Estudiantes", icon: Users },
 ];
 
+interface ApiStudentRow {
+  id: string;
+  fullName: string;
+  email: string;
+  username?: string;
+  classId?: string | null;
+  progress: Array<{ worldId: string; levelNumber: number; bestAccuracy: number; bestWpm: number | null; attempts: number; lastAttemptAt: string }>;
+}
+
+function summariseAccuracy(rows: ApiStudentRow[]): number {
+  if (!rows.length) return 0;
+  let total = 0;
+  for (const s of rows) {
+    if (!s.progress.length) continue;
+    const max = s.progress.reduce((m, p) => Math.max(m, p.bestAccuracy), 0);
+    total += max;
+  }
+  return Math.round(total / rows.length);
+}
+
 export function TeacherPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, usingApi } = useAuth();
   const navigate = useNavigate();
   const [section, setSection] = useState("inicio");
   const [message, setMessage] = useState("");
+  const [apiStudents, setApiStudents] = useState<ApiStudentRow[] | null>(null);
 
-  const students = getTeacherStudents(user);
+  /* Prefer the API when the session is API-backed. Falls back to
+     localStorage if the request fails (offline demo mode, fresh deploy). */
+  useEffect(() => {
+    if (!usingApi) {
+      setApiStudents(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = (await api.listUsers({ role: "alumno" })) as ApiStudentRow[];
+        if (!cancelled) setApiStudents(rows);
+      } catch {
+        if (!cancelled) setApiStudents(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [usingApi]);
+
+  const localStudents = useMemo(() => getTeacherStudents(user), [user]);
+  const students: ApiStudentRow[] = apiStudents
+    ? apiStudents.map((s) => ({ ...s }))
+    : localStudents.map((s) => ({
+        id: s.id,
+        fullName: s.name,
+        email: s.email ?? "",
+        classId: s.classId,
+        progress: s.stats
+          ? [
+              {
+                worldId: "island1",
+                levelNumber: 1,
+                bestAccuracy: s.stats.precision,
+                bestWpm: s.stats.speed,
+                attempts: 1,
+                lastAttemptAt: new Date().toISOString(),
+              },
+            ]
+          : [],
+      }));
   const classId = user?.classId ?? "clase-3a";
   const allWorldIds = useMemo(() => worlds.map((w) => w.id), []);
   const [enabled, setEnabled] = useState<Set<string>>(() => new Set(getEnabledWorldsForClass(classId) ?? allWorldIds));
@@ -33,14 +94,12 @@ export function TeacherPage() {
     setMessage(next ? "Isla habilitada para la clase." : "Isla deshabilitada para la clase.");
   }
   function leave() {
-    logout();
+    void logout();
     navigate("/login");
   }
 
   const enabledWorlds = worlds.filter((w) => enabled.has(w.id));
-  const avgPrecision = students.length
-    ? Math.round(students.reduce((s, u) => s + (u.stats?.precision ?? 0), 0) / students.length)
-    : 0;
+  const avgPrecision = summariseAccuracy(students);
   const firstName = (user?.name ?? "Profe").split(" ")[0];
 
   const kpis = (
@@ -109,13 +168,16 @@ export function TeacherPage() {
                 <div className="empty-state empty-state--compact"><h3>Sin estudiantes</h3></div>
               ) : (
                 <div>
-                  {students.map((s) => (
-                    <div key={s.id} className="progress-row">
-                      <span className="progress-row__name">{s.name}</span>
-                      <div className="progress-track"><div className="progress-track__fill" style={{ width: `${s.stats?.precision ?? 0}%` }} /></div>
-                      <span className="progress-row__pct">{s.stats?.precision ?? 0}%</span>
-                    </div>
-                  ))}
+                  {students.map((s) => {
+                    const max = s.progress.reduce((m, p) => Math.max(m, p.bestAccuracy), 0);
+                    return (
+                      <div key={s.id} className="progress-row">
+                        <span className="progress-row__name">{s.fullName}</span>
+                        <div className="progress-track"><div className="progress-track__fill" style={{ width: `${max}%` }} /></div>
+                        <span className="progress-row__pct">{max}%</span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -175,13 +237,16 @@ export function TeacherPage() {
             <div className="empty-state empty-state--compact"><h3>Sin estudiantes</h3></div>
           ) : (
             <div>
-              {students.map((s) => (
-                <div key={s.id} className="progress-row">
-                  <span className="progress-row__name">{s.name}</span>
-                  <div className="progress-track"><div className="progress-track__fill" style={{ width: `${s.stats?.precision ?? 0}%` }} /></div>
-                  <span className="progress-row__pct">{s.stats?.precision ?? 0}%</span>
-                </div>
-              ))}
+              {students.map((s) => {
+                const max = s.progress.reduce((m, p) => Math.max(m, p.bestAccuracy), 0);
+                return (
+                  <div key={s.id} className="progress-row">
+                    <span className="progress-row__name">{s.fullName}</span>
+                    <div className="progress-track"><div className="progress-track__fill" style={{ width: `${max}%` }} /></div>
+                    <span className="progress-row__pct">{max}%</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>

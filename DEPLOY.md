@@ -1,9 +1,18 @@
 # Deploying TYPELY (Mecanografia) on Oracle VPS
 
-The app ships as a single static-site container behind Caddy. Build artifacts
-are produced inside the image by Node 22, then served by Nginx on port 80
-(mapped to the host only on `127.0.0.1:3005`). Caddy terminates TLS and
-reverse-proxies the public hostname into that loopback port.
+The app ships as **three containers** behind Caddy:
+
+1. `db` — Postgres 16 (loopback only, port 5432). Schema is applied from
+   `db/init/*.sql` on first start.
+2. `api` — Fastify + Drizzle (loopback only, port 3006). Caddy reverse-
+   proxies `/api/*` to this service. All auth, user management,
+   progress reporting, and teacher analytics live here.
+3. `mecanografia` — the existing static-site container, served by Nginx
+   on port 80 (host `127.0.0.1:3005`). Caddy reverse-proxies the
+   public hostname into that loopback port. The frontend also calls
+   `/api/*` (same hostname), which Caddy routes to the api service.
+
+Caddy terminates TLS, rate-limits `/api/*`, and reverse-proxies the rest.
 
 ## Prerequisites
 
@@ -23,42 +32,88 @@ git clone <your-git-url> /opt/apps/mecanografia
 cd /opt/apps/mecanografia
 ```
 
-## 2. Build and start the container
+## 2. Provision the secrets
+
+The `db` and `api` services read secrets from `secrets/*.txt` (mounted
+at `/run/secrets/*` inside the containers). **Never commit real
+values.** The `secrets/` directory is `.gitignore`d.
+
+```bash
+mkdir -p secrets
+openssl rand -base64 64 > secrets/jwt_secret.txt
+openssl rand -base64 24 | tr -d '/+=' > secrets/db_password.txt
+printf 'postgres://typely:%s@db:5432/typely\n' "$(cat secrets/db_password.txt)" > secrets/database_url.txt
+: > secrets/resend_api_key.txt   # empty = invite emails disabled, share-link only
+chmod 600 secrets/*.txt
+```
+
+> The `RESEND_API_KEY` is optional. If empty, the invitation email
+> endpoint returns 503 and the admin gets a shareable invite link
+> instead. The product works fully without it.
+
+## 3. Build and start the containers
 
 ```bash
 docker compose up -d --build
 ```
 
-The first build pulls `node:22-alpine` and `nginx:alpine`, then runs
-`npm ci` and `npm run build` (= `tsc --noEmit && vite build`). Subsequent
-builds reuse Docker layer cache and finish in a few seconds when only
-source code has changed.
-
-Check that the container is healthy:
+Compose starts `db` first (waiting for the `pg_isready` healthcheck),
+then `api` (waits for the DB), then `mecanografia` (waits for the DB
+to ensure the API can talk to it on first boot).
 
 ```bash
 docker compose ps
-docker compose logs --tail=50 mecanografia
+docker compose logs --tail=50 api
+docker compose logs --tail=50 db
 ```
 
-## 3. Smoke-test the container locally
+## 4. Seed the superadmin
+
+The seed is idempotent. It creates the canonical superadmin
+(`bautistagoni@northfield.edu.ar` by default — change via
+`SUPERADMIN_EMAIL` in your shell before running), the first sede
+"Principal", and prints the password to stdout. **Change the password
+after first login.**
+
+```bash
+docker compose exec -e SUPERADMIN_PASSWORD='your-strong-password' api node dist/seed.js
+```
+
+The seed prints the credentials exactly once. Capture them now.
+
+## 5. Smoke-test the container locally
 
 ```bash
 curl -I http://127.0.0.1:3005
+curl -I http://127.0.0.1:3006/health
 ```
 
-You should see `HTTP/1.1 200 OK` with `content-type: text/html`. A
-follow-up `curl http://127.0.0.1:3005/some/deep/route` must also return
-the SPA `index.html` (not a 404) — that confirms the React Router
-fallback in `nginx.conf` is wired up correctly.
+You should see `HTTP/1.1 200 OK` from both. A follow-up
+`curl http://127.0.0.1:3005/some/deep/route` must also return the SPA
+`index.html` (not a 404) — that confirms the React Router fallback in
+`nginx.conf` is wired up correctly.
 
-## 4. Add the Caddy reverse-proxy block
+## 6. Add the Caddy reverse-proxy block
 
 Open the host Caddyfile (typically `/etc/caddy/Caddyfile`) and append:
 
 ```caddy
 mecanografia.bauhub.online {
+    # Static SPA
     reverse_proxy 127.0.0.1:3005
+
+    # API + rate limiting. The `rate_limit` directive is part of the
+    # standard Caddy distribution. Key by client IP behind a single
+    # reverse proxy. Tune `burst` and `rps` to taste — these are
+    # conservative defaults that allow the gameplay UI (which fires a
+    # few requests per level complete) while blocking naive abuse.
+    @api path /api/*
+    rate_limit @api 30r/m {
+        127.0.0.1/32
+    }
+    reverse_proxy @api 127.0.0.1:3006 {
+        header_up X-Real-IP {remote_host}
+    }
 }
 ```
 
@@ -74,11 +129,12 @@ outside the VPS:
 
 ```bash
 curl -I https://mecanografia.bauhub.online
+curl -I https://mecanografia.bauhub.online/api/health
 ```
 
-`HTTP/2 200` confirms TLS + proxy are both working.
+`HTTP/2 200` for both confirms TLS + proxy are both working.
 
-## 5. Updating the app
+## 7. Updating the app
 
 ```bash
 cd /opt/apps/mecanografia
@@ -86,15 +142,16 @@ git pull
 docker compose up -d --build
 ```
 
-Compose detects the rebuilt image and recreates only the `mecanografia`
-service with zero downtime for Caddy. Optionally prune the previous
-image layer once the new one is verified working:
+Compose detects the rebuilt image and recreates the affected services
+with zero downtime for the others (the `db` container is never
+recreated on rebuilds). Optionally prune the previous image layer once
+the new one is verified working:
 
 ```bash
 docker image prune -f
 ```
 
-## 6. Rolling back
+## 8. Rolling back
 
 If a release misbehaves, roll back by checking out the previous commit
 and rebuilding:
@@ -106,20 +163,52 @@ git checkout <commit-sha>
 docker compose up -d --build
 ```
 
-## 7. Common operations
+The DB volume (`dbdata`) is never touched on rollback, so progress
+records are preserved.
 
-| Action                       | Command                                              |
-| ---------------------------- | ---------------------------------------------------- |
-| Tail container logs          | `docker compose logs -f mecanografia`                |
-| Restart the container        | `docker compose restart mecanografia`                |
-| Stop & remove the container  | `docker compose down`                                |
-| Re-read Caddyfile            | `sudo systemctl reload caddy`                        |
-| Check what's listening       | `sudo ss -tlnp \| grep 3005`                         |
-| Inspect built static assets  | `docker compose exec mecanografia ls /usr/share/nginx/html` |
+## 9. Backups
+
+The DB is a plain Postgres data directory (`dbdata` volume) — easy to
+back up. Recommended: a daily `pg_dump` with off-site rotation.
+
+```bash
+docker compose exec -T db pg_dump -U typely -d typely \
+  | gzip > /opt/backups/typely-$(date +%Y%m%d).sql.gz
+```
+
+Wire that into a cron at 03:00 UTC (low traffic):
+
+```cron
+0 3 * * * cd /opt/apps/mecanografia && \
+  /usr/bin/docker compose exec -T db pg_dump -U typely -d typely \
+  | gzip > /opt/backups/typely-$(date +\%Y\%m\%d).sql.gz
+```
+
+Keep at least 30 daily backups; old `attempts` partitions are the
+biggest cost (they can be excluded from routine backups with
+`--exclude-table-data='attempts*'` if the analytics log outgrows your
+backup budget).
+
+## 10. Common operations
+
+| Action                       | Command                                                       |
+| ---------------------------- | ------------------------------------------------------------- |
+| Tail frontend logs           | `docker compose logs -f mecanografia`                         |
+| Tail API logs                | `docker compose logs -f api`                                  |
+| Tail DB logs                 | `docker compose logs -f db`                                   |
+| Restart the frontend         | `docker compose restart mecanografia`                         |
+| Restart the API              | `docker compose restart api`                                  |
+| Stop & remove the containers | `docker compose down`                                         |
+| Stop & remove the DB too     | `docker compose down -v`  *(destroys all progress)*           |
+| Open a psql shell            | `docker compose exec db psql -U typely -d typely`             |
+| Re-read Caddyfile            | `sudo systemctl reload caddy`                                 |
+| Check what's listening       | `sudo ss -tlnp \| grep -E '3005\|3006\|5432'`                 |
+| List current partitions      | `docker compose exec db psql -U typely -d typely -c "\d+ attempts"` |
+| Pre-create next month        | `docker compose exec db psql -U typely -d typely -f /docker-entrypoint-initdb.d/002_partitions.sql` |
 
 ## Notes
 
-- The container only binds to `127.0.0.1:3005`, so the app cannot be hit
+- The containers only bind to `127.0.0.1`, so the app cannot be hit
   directly from the public internet — all traffic must go through Caddy.
 - `nginx.conf` enables long-term caching on hashed `/assets/*` files and
   forces `no-store` on `index.html`, so updates roll out cleanly without
@@ -127,3 +216,11 @@ docker compose up -d --build
 - `.dockerignore` keeps `node_modules`, `dist`, `.env`, `Images/`,
   `Images-new/`, `Skills/`, and the project's `.claude/` folder out of
   the build context — builds are fast and no secrets leak into the image.
+- `secrets/*` is also excluded from the build context, so the secrets
+  never enter the image. They are mounted at runtime by compose.
+- Postgres is tuned for the 1 GB VPS: a max of 10 pooled connections,
+  idle timeout 30s. Bump `max` in `api/src/db/index.ts` only if the
+  VPS is upgraded.
+- The `attempts` table is partitioned by month. The pre-creation
+  script (`db/init/002_partitions.sql`) is idempotent and safe to run
+  from a monthly cron.

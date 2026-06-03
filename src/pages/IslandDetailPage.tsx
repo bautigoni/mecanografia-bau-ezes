@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
-import { getWorldBySlug, getWorlds, worldStarProgress, type Level, type LevelPosition } from "../data/worlds";
+import { getWorldBySlug, getWorlds, worldStarProgress, WORLD_PEDAGOGY_ORDER, type Level, type LevelPosition } from "../data/worlds";
 import { LevelPositionEditor } from "../components/dev/LevelPositionEditor";
 import { assets } from "../utils/assets";
 
@@ -162,7 +162,7 @@ export function IslandDetailPage() {
   const world = maybeWorld;
   const actualIndex = world.levels.findIndex((level) => level.state === "Actual");
   const currentIndex = actualIndex >= 0 ? actualIndex : initialIndex;
-  const worldNumber = allWorlds.findIndex((item) => item.slug === world.slug) + 1;
+  const worldNumber = world.displayNumber;
   const safeIndex = Math.min(selectedIndex, world.levels.length - 1);
   const selectedLevel = world.levels[safeIndex];
   /* While the dev editor is on, markers + ship follow the live draft so the
@@ -177,7 +177,7 @@ export function IslandDetailPage() {
   const shipAsset = getShipAsset(currentPosition, nextPosition);
   /* Star progress toward unlocking the next world (70% gate). */
   const starProgress = worldStarProgress(world.slug);
-  const isLastWorld = worldNumber >= allWorlds.length;
+  const isLastWorld = worldNumber >= WORLD_PEDAGOGY_ORDER.length;
 
   /* Compact selected-level popover, anchored BESIDE the selected node. The
      level paths wind mostly vertically, so opening to the side (rather than

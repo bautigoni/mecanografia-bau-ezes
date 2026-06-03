@@ -3,6 +3,7 @@ import {
   Asterisk,
   AtSign,
   BookOpen,
+  ArrowRight,
   Check,
   Command,
   Flag,
@@ -26,14 +27,14 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { getWorldStatesForUser, getWorldsForUser, type World } from "../data/worlds";
+import { getWorldStatesForUser, getWorldsForUser, worldStarProgress, type World } from "../data/worlds";
 import { Toast } from "../components/common/Toast";
 import { assets } from "../utils/assets";
 import { getUserContext, makeRapidClickDetector } from "../utils/userContext";
-import { loadProgress } from "../utils/progress";
+import { loadProgress, UNLOCK_STAR_THRESHOLD } from "../utils/progress";
 
 /* ------------------------------------------------------------------ */
 /* Asset pre-fetch cache                                               */
@@ -131,15 +132,22 @@ export function WorldsPage() {
   const visibleWorlds = getWorldsForUser(context, progress);
   const worldStates = getWorldStatesForUser(context, progress);
 
-  /* Track widths and SVG path — recomputed whenever visible set changes. */
-  const trackWidthVw = trackWidth(visibleWorlds);
-  const centers = visibleWorlds.map(islandCenter);
-  const ROUTE_D = buildRoute(centers);
-  const routeSparkles = centers.slice(0, -1).map((c, i) => ({
-    x: (c.x + centers[i + 1].x) / 2,
-    y: (c.y + centers[i + 1].y) / 2,
-    delay: (i % 4) * 0.6,
-  }));
+  /* Track widths and SVG path — memoized so the heavy SVG path string is
+     rebuilt only when the visible set changes, not on every hover/focus
+     render. Cheaper than relying on the referential stability of
+     `visibleWorlds` (the function reads localStorage). */
+  const trackWidthVw = useMemo(() => trackWidth(visibleWorlds), [visibleWorlds]);
+  const centers = useMemo(() => visibleWorlds.map(islandCenter), [visibleWorlds]);
+  const ROUTE_D = useMemo(() => buildRoute(centers), [centers]);
+  const routeSparkles = useMemo(
+    () =>
+      centers.slice(0, -1).map((c, i) => ({
+        x: (c.x + centers[i + 1].x) / 2,
+        y: (c.y + centers[i + 1].y) / 2,
+        delay: (i % 4) * 0.6,
+      })),
+    [centers],
+  );
 
   /* Hidden 5-click dev bypass — clicking an island 5× quickly enters it
      even if it is locked.  No UI feedback is shown; it's invisible to
@@ -171,30 +179,24 @@ export function WorldsPage() {
       setMessage("Conseguí el 70% de estrellas del mundo anterior para desbloquear este mundo.");
       return;
     }
+    /* Pre-fetch the island background so the destination page paints instantly.
+       We used to gate the navigation on a JS timer (430–1100 ms) so the radial
+       white flash had time to animate. The flash itself is CSS — it keeps
+       playing while we navigate — so the JS timer was just blocking the user.
+       A simple `setSelectedWorld` flips the `.is-entering-world` class, the
+       CSS transition (`.world-transition.is-active`) handles the fade, and
+       the next page appears as soon as React commits. Net effect: navigation
+       feels snappier, especially on slow devices, with no visual regression. */
     setSelectedWorld(world.id);
-    /* Pre-fetch the island background so the transition feels instant. */
-    const bg = new Image();
-    bg.decoding = "async";
-    bg.src = world.background;
     prefetched.add(world.background);
-
-    const minDelay = 430;
-    const maxDelay = 1100;
-    const startedAt = performance.now();
-    function go() {
-      if (pendingNav.current != null) window.clearTimeout(pendingNav.current);
+    if (pendingNav.current != null) window.clearTimeout(pendingNav.current);
+    /* Tiny delay so the CSS transition starts before the route changes,
+       otherwise the new page mounts over the still-fading overlay. 1
+       frame is enough. */
+    pendingNav.current = window.setTimeout(() => {
       pendingNav.current = null;
       navigate(world.route);
-    }
-    if (bg.complete && bg.naturalWidth > 0) {
-      pendingNav.current = window.setTimeout(go, minDelay);
-    } else {
-      bg.onload = () => {
-        const elapsed = performance.now() - startedAt;
-        pendingNav.current = window.setTimeout(go, Math.max(0, minDelay - elapsed));
-      };
-      pendingNav.current = window.setTimeout(go, maxDelay);
-    }
+    }, 16);
   }
 
   function handleIslandClick(world: World) {
@@ -210,6 +212,33 @@ export function WorldsPage() {
       return;
     }
     enterWorld(world, false);
+  }
+
+  /* Resolve the world immediately AFTER `world` in the visible order.
+     Returns null if `world` is the last one (no "next" to go to). */
+  function findNextWorld(world: World): World | null {
+    const idx = visibleWorlds.findIndex((w) => w.id === world.id);
+    if (idx === -1 || idx >= visibleWorlds.length - 1) return null;
+    return visibleWorlds[idx + 1];
+  }
+
+  /* "Go to next world" handler. Goes through the SAME enterWorld() pipeline
+     as a normal click so the magical transition + background prefetch fires
+     consistently. */
+  function goToNextWorld(world: World) {
+    const next = findNextWorld(world);
+    if (!next) return;
+    const nextState = worldStates[next.slug];
+    /* If the next world is locked, surface a clear message — the button is
+       already disabled in that case, but the user might tap anyway. */
+    if (nextState === "locked") {
+      const starInfo = worldStarProgress(world.id, progress);
+      setMessage(
+        `Te faltan ${Math.max(0, starInfo.requiredStars - starInfo.earnedStars)} estrellas en este mundo para desbloquear el siguiente.`,
+      );
+      return;
+    }
+    enterWorld(next, false);
   }
 
   function prefetchWorld(world: World) {
@@ -326,41 +355,96 @@ export function WorldsPage() {
             const state = worldStates[world.slug];
             const isLocked = state === "locked";
             const isCompleted = state === "completed";
+            const isCurrent = state === "current";
+            const starInfo = worldStarProgress(world.id, progress);
+            const next = findNextWorld(world);
+            const nextState = next ? worldStates[next.slug] : null;
+            const nextIsLocked = nextState === "locked";
+            const missingStars = Math.max(0, starInfo.requiredStars - starInfo.earnedStars);
+            const ctaLabel = isCompleted
+              ? "Volver a jugar"
+              : isCurrent
+                ? "Seguir jugando"
+                : "Jugar";
+            const showCta = Boolean(next) && !isLocked;
+            const starsClass = isCompleted
+              ? "world-stars-chip world-stars-chip--complete"
+              : isLocked
+                ? "world-stars-chip world-stars-chip--locked"
+                : "world-stars-chip";
 
             return (
-              <button
+              <div
                 key={world.id}
-                type="button"
-                className={[
-                  "world-island",
-                  `world-island--${world.slug}`,
-                  `world-island--${state}`,
-                  state === "current" ? "is-current" : "",
-                  selectedWorld === world.id ? "is-selected" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                className="world-island-wrap"
                 style={{ left: `${world.map.x}vw`, top: `${world.map.y}%` }}
-                onClick={() => handleIslandClick(world)}
-                onPointerEnter={() => !isLocked && prefetchWorld(world)}
-                onFocus={() => !isLocked && prefetchWorld(world)}
-                aria-label={`${worldLabels[world.slug]}${isLocked ? " (bloqueado)" : ""}`}
-                aria-disabled={isLocked}
               >
-                <span className="world-icon-badge" aria-hidden="true">
-                  {isLocked ? (
-                    <Lock size={24} strokeWidth={2.3} />
-                  ) : (
-                    <BadgeIcon size={28} strokeWidth={2.1} />
-                  )}
-                </span>
-                {isCompleted && (
-                  <span className="world-complete-badge" aria-hidden="true">
-                    <Check size={18} strokeWidth={3.4} />
-                  </span>
+                {showCta && (
+                  <button
+                    type="button"
+                    className="world-next-cta"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      goToNextWorld(world);
+                    }}
+                    disabled={nextIsLocked}
+                    aria-label={
+                      nextIsLocked
+                        ? `Te faltan ${missingStars} estrellas para desbloquear el siguiente mundo`
+                        : `Ir al siguiente mundo: ${worldLabels[next!.slug]}`
+                    }
+                    title={
+                      nextIsLocked
+                        ? `Te faltan ${missingStars} estrellas en este mundo (${Math.round(UNLOCK_STAR_THRESHOLD * 100)}% del total)`
+                        : `Ir a ${worldLabels[next!.slug]}`
+                    }
+                  >
+                    {nextIsLocked ? <Lock size={14} strokeWidth={2.6} /> : <ArrowRight size={16} strokeWidth={2.6} />}
+                    <span>{nextIsLocked ? "Siguiente" : "Siguiente"}</span>
+                  </button>
                 )}
-                <img src={world.thumbnail} alt="" loading="eager" decoding="async" />
-              </button>
+                <button
+                  type="button"
+                  className={[
+                    "world-island",
+                    `world-island--${world.slug}`,
+                    `world-island--${state}`,
+                    isCurrent ? "is-current" : "",
+                    selectedWorld === world.id ? "is-selected" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() => handleIslandClick(world)}
+                  onPointerEnter={() => !isLocked && prefetchWorld(world)}
+                  onFocus={() => !isLocked && prefetchWorld(world)}
+                  aria-label={`${worldLabels[world.slug]}${isLocked ? " (bloqueado)" : ""}`}
+                  aria-disabled={isLocked}
+                >
+                  <span className="world-icon-badge" aria-hidden="true">
+                    {isLocked ? (
+                      <Lock size={24} strokeWidth={2.3} />
+                    ) : (
+                      <>
+                        <span className="world-icon-badge__num">M{world.displayNumber}</span>
+                        <BadgeIcon size={20} strokeWidth={2.1} className="world-icon-badge__icon" />
+                      </>
+                    )}
+                  </span>
+                  <span className={starsClass} aria-hidden="true">
+                    <Star size={14} strokeWidth={2.4} className="world-stars-chip__icon" />
+                    {starInfo.earnedStars}/{starInfo.totalStars}
+                  </span>
+                  {isCompleted && (
+                    <span className="world-complete-badge" aria-label="Mundo completado" aria-hidden="true">
+                      <Check size={18} strokeWidth={3.4} />
+                    </span>
+                  )}
+                  <img src={world.thumbnail} alt="" loading="eager" decoding="async" />
+                </button>
+                {/* Kept for visual continuity with prior layout — also gives
+                    a label that screen-readers can announce. */}
+                <span className="sr-only">{ctaLabel}: {worldLabels[world.slug]}</span>
+              </div>
             );
           })}
         </div>

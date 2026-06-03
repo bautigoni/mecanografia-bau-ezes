@@ -45,8 +45,18 @@ function stripAccents(value: string): string {
    Option/AltGr + the vowel. We show ´ + a as the universal hint — the kid
    recognises "the tilde mark, then the letter". */
 const ACCENT_MAP: Record<string, string> = {
-  "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u", "ü": "u",
-  "Á": "A", "É": "E", "Í": "I", "Ó": "O", "Ú": "U", "Ü": "U",
+  "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u",
+  "Á": "A", "É": "E", "Í": "I", "Ó": "O", "Ú": "U",
+};
+
+/* Dieresis/umlaut (¨) is a DIFFERENT dead key on ES keyboards. ¨ lives on
+   the ´ key but ONLY when Shift is held (without Shift, ´ is the acute
+   accent). The right teaching combo is therefore Shift + ´ then the vowel —
+   NOT just ´ + u (which on ES-LA would produce "ú", not "ü"). The user
+   explicitly asked for this fix. */
+const DIERESIS_MAP: Record<string, string> = {
+  "ü": "u",
+  "Ü": "U",
 };
 
 /* Shift combinations on a Latin-American Spanish keyboard.
@@ -86,8 +96,9 @@ const SECONDARY_COMBOS: Record<string, string[][]> = {
 function keyCapFor(character: string): string {
   if (!character) return "";
   if (character === " ") return "Space";
-  // Accented vowels & ñ render on the keyboard as the *base* letter.
+  // Accented vowels, dieresis & ñ render on the keyboard as the *base* letter.
   if (ACCENT_MAP[character]) return ACCENT_MAP[character].toUpperCase();
+  if (DIERESIS_MAP[character]) return DIERESIS_MAP[character].toUpperCase();
   if (/^[a-zA-Z]$/.test(character)) return character.toUpperCase();
   if (character === "ñ" || character === "Ñ") return "Ñ";
   return character; // digits, punctuation, ¿, ', etc. render as-is.
@@ -99,6 +110,9 @@ function keyCapFor(character: string): string {
    - uppercase letter                                                   → 2 keys (Shift + LETTER)
    - accented vowel                                                     → 1 key (base letter)
    - uppercase accented vowel                                           → 2 keys (Shift + LETTER)
+   - dieresis (ü / Ü)                                                   → 1 key (base letter U);
+                                                                           the visual hint in `comboFor`
+                                                                           covers the Shift + ´ combo.
 */
 function expectedKeysFor(character: string): string[] {
   if (!character) return [];
@@ -109,6 +123,12 @@ function expectedKeysFor(character: string): string[] {
     const base = ACCENT_MAP[character];
     if (/[A-Z]/.test(base)) return ["Shift", base];
     return [base.toUpperCase()];
+  }
+
+  // Dieresis (ü / Ü) — highlight the base letter only; Shift + ´ is a hint,
+  // not a key the kid is supposed to press for the cap highlight.
+  if (DIERESIS_MAP[character]) {
+    return [DIERESIS_MAP[character].toUpperCase()];
   }
 
   // Plain uppercase letter (a-z or Ñ)
@@ -136,6 +156,16 @@ function comboFor(character: string): string[] | null {
       return ["´", "Shift", base.toLowerCase().toUpperCase()];
     }
     return ["´", base];
+  }
+
+  // Dieresis (ü / Ü) — the dead key ¨ lives on Shift + ´ on ES keyboards.
+  // Hint: Shift + ´ (then the vowel). Uppercase adds a second Shift.
+  if (DIERESIS_MAP[character]) {
+    const base = DIERESIS_MAP[character];
+    if (base === base.toUpperCase()) {
+      return ["Shift", "´", "Shift", base];
+    }
+    return ["Shift", "´", base];
   }
 
   // Plain uppercase letters always need Shift + the lowercase letter.

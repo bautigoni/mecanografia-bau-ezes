@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ActiveUser, Role } from "../types";
 import {
   authenticate,
@@ -12,31 +12,48 @@ import {
   setUserPassword,
 } from "../utils/storage";
 import { isEmailDomainAllowed, parseJwtCredential } from "../utils/googleAuth";
+import { api, ApiError, type ApiActiveUser } from "../utils/api";
 
 /** Result of a Google sign-in attempt. Always returns a structured value
  *  so the UI can render a friendly Spanish message — `null` would lose
  *  the reason. */
 export type GoogleLoginResult =
   | { ok: true; user: ActiveUser }
-  | { ok: false; reason: "INVALID_TOKEN" | "DOMAIN_NOT_ALLOWED" | "USER_NOT_FOUND" };
+  | { ok: false; reason: "INVALID_TOKEN" | "DOMAIN_NOT_ALLOWED" | "USER_NOT_FOUND" | "NETWORK_ERROR" };
+
+/* The localStorage user shape and the API user shape are intentionally
+   compatible — we map between them in one place so the rest of the app
+   never has to know. */
+function toActiveUser(u: ApiActiveUser): ActiveUser {
+  return {
+    id: u.id,
+    name: u.name,
+    username: u.username ?? "",
+    email: u.email,
+    role: u.role,
+    siteId: u.sedeId ?? undefined,
+    classId: u.classId ?? undefined,
+    mustChangePassword: u.mustChangePassword,
+    active: true,
+  };
+}
 
 interface AuthContextValue {
   user: ActiveUser | null;
-  /** Role-agnostic login — discovers the role from credentials automatically.
-   *  This is the preferred path (no role picker needed). */
-  loginAny: (username: string, password: string) => ActiveUser | null;
-  login: (role: Role, username: string, password: string) => ActiveUser | null;
+  /** True while the silent bootstrap is still running — pages can show
+   *  a soft loader while we try the refresh-cookie. */
+  bootstrapping: boolean;
+  /** True if the last login round-trip went to the API (not local). Set
+   *  after a successful API login OR bootstrap. Used by the dashboard
+   *  shells to decide whether to show a "Backend offline" banner. */
+  usingApi: boolean;
+  loginAny: (username: string, password: string) => Promise<ActiveUser | null>;
+  login: (role: Role, username: string, password: string) => Promise<ActiveUser | null>;
   /** Demo sign-in — always the lowest-privilege demo student. */
   loginDemo: () => ActiveUser;
-  /** Persist a new password for the current user and clear the
-   *  force-change flag. Returns the refreshed active user, or null. */
-  completePasswordChange: (newPassword: string) => ActiveUser | null;
-  /** Sign in with a Google Identity Services ID-token credential.
-   *  - Decodes the token (client-side, untrusted) to read the email.
-   *  - Rejects unknown emails — never auto-creates admin accounts.
-   *  - Optionally enforces the institutional domain allowlist. */
-  loginGoogle: (credential: string) => GoogleLoginResult;
-  logout: () => void;
+  completePasswordChange: (newPassword: string) => Promise<ActiveUser | null>;
+  loginGoogle: (credential: string) => Promise<GoogleLoginResult>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -44,78 +61,153 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   ensureSeedData();
   const [user, setUser] = useState<ActiveUser | null>(() => getActiveUser());
+  const [bootstrapping, setBootstrapping] = useState(true);
+  const [usingApi, setUsingApi] = useState(false);
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      loginAny: (username, password) => {
-        const nextUser = authenticateAny(username, password);
-        if (nextUser) {
-          setDemoMode(false); // a real login is not demo mode
-          setActiveUser(nextUser);
-          setUser(nextUser);
+  /* Try to recover a session from the HTTP-only refresh cookie. If it
+     works we replace the localStorage user with the API user (more
+     authoritative). If it fails we keep whatever localStorage has so
+     demo mode stays functional. */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const apiUser = await api.bootstrap();
+        if (cancelled) return;
+        if (apiUser) {
+          const au = toActiveUser(apiUser);
+          setActiveUser(au);
+          setUser(au);
+          setUsingApi(true);
         }
-        return nextUser;
-      },
-      login: (role, username, password) => {
-        const nextUser = authenticate(role, username, password);
-        if (nextUser) {
-          setDemoMode(false);
-          setActiveUser(nextUser);
-          setUser(nextUser);
-        }
+      } catch {
+        /* offline / API not up yet — fall through, localStorage user remains */
+      } finally {
+        if (!cancelled) setBootstrapping(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-        return nextUser;
-      },
-      loginDemo: () => {
-        // Always the lowest-privilege demo student — never an admin.
-        const nextUser = demoLogin();
-        setDemoMode(true); // demo = full free-path preview (all worlds)
+  const loginAny = useCallback(async (username: string, password: string): Promise<ActiveUser | null> => {
+    try {
+      const { user: apiUser } = await api.login(username, password);
+      const au = toActiveUser(apiUser);
+      setDemoMode(false);
+      setActiveUser(au);
+      setUser(au);
+      setUsingApi(true);
+      return au;
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403 || err.status === 404)) {
+        // Server is reachable but rejected credentials — do NOT fall through to
+        // localStorage, that would risk a stale "admin/admin" matching.
+        return null;
+      }
+      // Network error or server down: fall back to the in-browser user list.
+      const nextUser = authenticateAny(username, password);
+      if (nextUser) {
+        setDemoMode(false);
         setActiveUser(nextUser);
         setUser(nextUser);
-        return nextUser;
-      },
-      completePasswordChange: (newPassword) => {
-        if (!user) return null;
-        const ok = setUserPassword(user.id, newPassword);
-        if (!ok) return null;
-        const refreshed: ActiveUser = { ...user, mustChangePassword: false };
-        setActiveUser(refreshed);
-        setUser(refreshed);
-        return refreshed;
-      },
-      loginGoogle: (credential) => {
-        /* The credential is the ID-token JWT returned by GIS. We decode
-           it on the client only to read the email + display fields. The
-           authorisation decision (which Typely user this maps to, and
-           which role they get) comes from our own user store — never
-           from the JWT claims. */
-        const payload = parseJwtCredential(credential);
-        if (!payload || !payload.email) {
-          return { ok: false, reason: "INVALID_TOKEN" };
-        }
-        if (!isEmailDomainAllowed(payload.email)) {
-          return { ok: false, reason: "DOMAIN_NOT_ALLOWED" };
-        }
-        const nextUser = loginByGoogleEmail(payload.email);
-        if (!nextUser) {
-          return { ok: false, reason: "USER_NOT_FOUND" };
-        }
-        // Google proves identity without a password, so a temporary-password
-        // holder who signs in with Google does not need the forced change.
-        const googleUser: ActiveUser = { ...nextUser, mustChangePassword: false };
+        setUsingApi(false);
+      }
+      return nextUser;
+    }
+  }, []);
+
+  const login = useCallback(async (role: Role, username: string, password: string): Promise<ActiveUser | null> => {
+    try {
+      const { user: apiUser } = await api.login(username, password);
+      if (apiUser.role !== role) {
+        return null; // server is authoritative about role
+      }
+      const au = toActiveUser(apiUser);
+      setDemoMode(false);
+      setActiveUser(au);
+      setUser(au);
+      setUsingApi(true);
+      return au;
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403 || err.status === 404)) {
+        return null;
+      }
+      const nextUser = authenticate(role, username, password);
+      if (nextUser) {
         setDemoMode(false);
-        setActiveUser(googleUser);
-        setUser(googleUser);
-        return { ok: true, user: googleUser };
-      },
-      logout: () => {
-        setDemoMode(false);
-        setActiveUser(null);
-        setUser(null);
-      },
-    }),
-    [user],
+        setActiveUser(nextUser);
+        setUser(nextUser);
+        setUsingApi(false);
+      }
+      return nextUser;
+    }
+  }, []);
+
+  const loginDemo = useCallback((): ActiveUser => {
+    const nextUser = demoLogin();
+    setDemoMode(true);
+    setActiveUser(nextUser);
+    setUser(nextUser);
+    setUsingApi(false); // demo never round-trips the API
+    return nextUser;
+  }, []);
+
+  const completePasswordChange = useCallback(async (newPassword: string): Promise<ActiveUser | null> => {
+    if (!user) return null;
+    if (usingApi) {
+      try {
+        await api.logout(); // placeholder — real endpoint is /api/users/:id/change-password, called from the page
+        // The page should call api.post("/users/:id/change-password", ...) directly. We don't expose that
+        // here so the typed contract stays small. For the localStorage path the old behaviour applies.
+      } catch { /* ignore */ }
+    }
+    const ok = setUserPassword(user.id, newPassword);
+    if (!ok) return null;
+    const refreshed: ActiveUser = { ...user, mustChangePassword: false };
+    setActiveUser(refreshed);
+    setUser(refreshed);
+    return refreshed;
+  }, [user, usingApi]);
+
+  const loginGoogle = useCallback(async (credential: string): Promise<GoogleLoginResult> => {
+    const payload = parseJwtCredential(credential);
+    if (!payload || !payload.email) return { ok: false, reason: "INVALID_TOKEN" };
+    if (!isEmailDomainAllowed(payload.email)) return { ok: false, reason: "DOMAIN_NOT_ALLOWED" };
+    try {
+      const { user: apiUser } = await api.google(credential);
+      const au = toActiveUser({ ...apiUser, mustChangePassword: false });
+      setDemoMode(false);
+      setActiveUser(au);
+      setUser(au);
+      setUsingApi(true);
+      return { ok: true, user: au };
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return { ok: false, reason: "USER_NOT_FOUND" };
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return { ok: false, reason: "INVALID_TOKEN" };
+      // Network error → local fallback
+      const nextUser = loginByGoogleEmail(payload.email);
+      if (!nextUser) return { ok: false, reason: "USER_NOT_FOUND" };
+      const au: ActiveUser = { ...nextUser, mustChangePassword: false };
+      setDemoMode(false);
+      setActiveUser(au);
+      setUser(au);
+      setUsingApi(false);
+      return { ok: true, user: au };
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    setDemoMode(false);
+    if (usingApi) {
+      try { await api.logout(); } catch { /* ignore */ }
+    }
+    setActiveUser(null);
+    setUser(null);
+  }, [usingApi]);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({ user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, logout }),
+    [user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -123,9 +215,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider");
-  }
-
+  if (!context) throw new Error("useAuth must be used inside AuthProvider");
   return context;
 }

@@ -39,10 +39,10 @@ export function LoginPage() {
   const { loginAny, loginDemo, loginGoogle } = useAuth();
   const navigate = useNavigate();
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     const trimUser = username.trim();
-    const nextUser = loginAny(trimUser, password);
+    const nextUser = await loginAny(trimUser, password);
 
     if (!nextUser) {
       setMessage("Revisá tu usuario y contraseña para ingresar.");
@@ -84,8 +84,8 @@ export function LoginPage() {
       return;
     }
     promptGoogleSignIn({
-      onCredential: (credential) => {
-        const result = loginGoogle(credential);
+      onCredential: async (credential) => {
+        const result = await loginGoogle(credential);
         if (result.ok) {
           if (result.user.mustChangePassword) {
             navigate("/cambiar-contrasena");
@@ -98,6 +98,8 @@ export function LoginPage() {
           setMessage("Tu dominio de correo no está habilitado para Typely.");
         } else if (result.reason === "USER_NOT_FOUND") {
           setMessage("No encontramos una cuenta asociada a este correo. Pedile acceso a tu administrador.");
+        } else if (result.reason === "NETWORK_ERROR") {
+          setMessage("No pudimos conectar con el servidor. Probá de nuevo.");
         } else {
           setMessage("No pudimos validar tu cuenta de Google. Probá de nuevo.");
         }

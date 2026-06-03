@@ -1,4 +1,63 @@
 services:
+  # ------------------------------------------------------------------
+  # Postgres 16 — single source of truth for users, sedes, classes,
+  # progress and the per-attempt audit log. Bound to loopback only
+  # (port 5432 on the host). Migrations + schema are applied at
+  # first start from ./db/init/*.sql.
+  # ------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: mecanografia_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: typely
+      POSTGRES_USER: typely
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    secrets:
+      - db_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U typely -d typely"]
+      interval: 10s
+      retries: 5
+      start_period: 20s
+
+  # ------------------------------------------------------------------
+  # Fastify API — handles auth (manual + Google), users, sedes,
+  # classes, progress reporting, and teacher analytics. Bound to
+  # loopback only (port 3006 on the host). Caddy reverse-proxies
+  # /api/* to this service.
+  # ------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: mecanografia_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL_FILE: /run/secrets/database_url
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      RESEND_API_KEY_FILE: /run/secrets/resend_api_key
+      GOOGLE_CLIENT_ID: "${VITE_GOOGLE_CLIENT_ID:-}"
+      INVITE_FROM: "${INVITE_FROM:-Typely <no-reply@example.com>}"
+    secrets:
+      - database_url
+      - jwt_secret
+      - resend_api_key
+    ports:
+      - "127.0.0.1:3006:3000"
+
+  # ------------------------------------------------------------------
+  # Existing static-site container. Vite builds the frontend bundle,
+  # nginx serves /dist on port 80 (mapped to 127.0.0.1:3005 on host).
+  # ------------------------------------------------------------------
   mecanografia:
     build:
       context: .
@@ -12,7 +71,23 @@ services:
         VITE_GOOGLE_ALLOWED_DOMAINS: "${VITE_GOOGLE_ALLOWED_DOMAINS:-}"
     container_name: mecanografia
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       # Bind to loopback so the container is only reachable via the Caddy
       # reverse proxy on the host, never directly from the public internet.
       - "127.0.0.1:3005:80"
+
+volumes:
+  dbdata:
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  database_url:
+    file: ./secrets/database_url.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  resend_api_key:
+    file: ./secrets/resend_api_key.txt
