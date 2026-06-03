@@ -1080,11 +1080,6 @@ a {
   min-width: 14rem;
   /* Position is set inline per-island. The wrap is just a positioning
      context for the absolute CTA chip above the island. */
-  /* Off-screen islands in the horizontal lane skip rendering/layout work
-     until scrolled near — kills the burst of work on first paint. The
-     reserved intrinsic size keeps the scroll width stable. */
-  content-visibility: auto;
-  contain-intrinsic-size: 22rem 24rem;
 }
 
 .world-island {
@@ -1254,18 +1249,12 @@ a {
   width: 100%;
   height: auto;
   object-fit: contain;
-  /* Calmer, slower float (smaller amplitude + 5s) so the map reads as gently
-     alive without a busy bob fighting the first paint. */
-  animation: worldIslandFloat 5s ease-in-out infinite;
+  animation: islandFloat 6.4s ease-in-out infinite;
   /* Shadow baked into the image once — cheap on the GPU and avoids paint
      work on hover. We do not toggle filter on hover so the compositor only
      has to re-rasterise the `transform`. */
   filter: drop-shadow(0 22px 22px rgba(45, 73, 142, 0.22));
   will-change: transform;
-}
-@keyframes worldIslandFloat {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-0.28rem); }
 }
 
 .world-island:hover {
@@ -1302,10 +1291,9 @@ a {
   background:
     radial-gradient(circle at center, rgba(255, 255, 255, 0.98), rgba(210, 244, 255, 0.64) 28%, rgba(221, 196, 255, 0.5) 50%, transparent 74%);
   transform: scale(0.9);
-  /* Shortened from 420ms — the longer flash read as a stall on navigation. */
   transition:
-    opacity 280ms ease,
-    transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 420ms ease,
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .world-transition.is-active {

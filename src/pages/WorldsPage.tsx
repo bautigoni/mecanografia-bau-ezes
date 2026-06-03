@@ -328,18 +328,13 @@ export function WorldsPage() {
           ))}
 
           {/* Island buttons */}
-          {visibleWorlds.map((world, index) => {
+          {visibleWorlds.map((world) => {
             const BadgeIcon = worldBadges[world.slug];
             const state = worldStates[world.slug];
             const isLocked = state === "locked";
             const isCompleted = state === "completed";
             const isCurrent = state === "current";
             const starInfo = worldStarProgress(world.id, progress);
-            /* First 5 islands are above the fold → load eagerly with high
-               priority. The rest stream in lazily as the lane scrolls (and are
-               `content-visibility`-gated in CSS so off-screen ones don't decode
-               on first paint). */
-            const isAboveFold = index < 5;
             const ctaLabel = isCompleted
               ? "Volver a jugar"
               : isCurrent
@@ -397,13 +392,7 @@ export function WorldsPage() {
                       <Check size={18} strokeWidth={3.4} />
                     </span>
                   )}
-                  <img
-                    src={world.thumbnail}
-                    alt=""
-                    loading={isAboveFold ? "eager" : "lazy"}
-                    decoding="async"
-                    fetchPriority={isAboveFold ? "high" : "low"}
-                  />
+                  <img src={world.thumbnail} alt="" loading="eager" decoding="async" />
                 </button>
                 {/* Kept for visual continuity with prior layout — also gives
                     a label that screen-readers can announce. */}
