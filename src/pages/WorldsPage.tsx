@@ -59,7 +59,7 @@ function trackWidth(worlds: World[]) {
 
 /** Visual centre of an island (for the SVG trail path). */
 function islandCenter(world: World) {
-  return { x: world.map.x + 8, y: world.map.y + 16 };
+  return { x: world.map.x + 10, y: world.map.y + 16 };
 }
 
 function buildRoute(points: { x: number; y: number }[]): string {
@@ -131,6 +131,9 @@ export function WorldsPage() {
       return false;
     }
   });
+  /* Slugs that became unlocked since the last visit → play a celebratory
+     reveal animation when the student returns to the map. */
+  const [justUnlocked, setJustUnlocked] = useState<Set<string>>(new Set());
   const pendingNav = useRef<number | null>(null);
   const sceneRef = useRef<HTMLDivElement | null>(null);
 
@@ -224,6 +227,37 @@ export function WorldsPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* Detect islands unlocked since the last visit and flag them for the reveal
+     animation. Runs once the map is actually visible (after the loader). On a
+     student's very first ever visit we only record the baseline — no burst. */
+  useEffect(() => {
+    if (!worldsReady) return;
+    const KEY = "edutic.unlockedSeen";
+    const unlockedSlugs = visibleWorlds
+      .filter((w) => worldStates[w.slug] !== "locked")
+      .map((w) => w.slug);
+    let prev: string[] | null = null;
+    try {
+      const raw = localStorage.getItem(KEY);
+      prev = raw ? (JSON.parse(raw) as string[]) : null;
+    } catch {
+      prev = null;
+    }
+    try {
+      localStorage.setItem(KEY, JSON.stringify(unlockedSlugs));
+    } catch {
+      /* ignore */
+    }
+    if (!prev) return; // first ever visit — just record the baseline
+    const prevSet = new Set(prev);
+    const newly = unlockedSlugs.filter((s) => !prevSet.has(s));
+    if (newly.length === 0) return;
+    setJustUnlocked(new Set(newly));
+    const t = window.setTimeout(() => setJustUnlocked(new Set()), 2400);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [worldsReady]);
 
   function leave() {
     logout();
@@ -432,6 +466,7 @@ export function WorldsPage() {
                     `world-island--${world.slug}`,
                     `world-island--${state}`,
                     isCurrent ? "is-current" : "",
+                    justUnlocked.has(world.slug) ? "is-unlocking" : "",
                     selectedWorld === world.id ? "is-selected" : "",
                   ]
                     .filter(Boolean)
@@ -466,6 +501,16 @@ export function WorldsPage() {
                     </span>
                   )}
                   <img src={world.thumbnail} alt="" loading="eager" decoding="async" />
+                  {/* Locked islands are hidden behind a frosted veil so the
+                      real art can't be previewed — a "default" mystery island
+                      with a padlock. */}
+                  {isLocked && <span className="world-island__frost" aria-hidden="true" />}
+                  {/* Celebratory sparkle burst when this island is unlocked. */}
+                  {justUnlocked.has(world.slug) && (
+                    <span className="world-island__burst" aria-hidden="true">
+                      <i /><i /><i /><i /><i /><i />
+                    </span>
+                  )}
                 </button>
                 {/* Kept for visual continuity with prior layout — also gives
                     a label that screen-readers can announce. */}

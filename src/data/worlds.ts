@@ -153,24 +153,25 @@ const expansionTitles = [
 ===================================================================== */
 
 /* Map placement: x is vw from left-edge of the track, y is % of viewport
-   height.  Islands alternate high (y≈11) and low (y≈49) to create the
-   classic staircase-path look.  Spacing is 17 vw between each island. */
+   height.  Islands alternate high (y≈13) and low (y≈49) to create the
+   classic staircase-path look.  Spacing is a constant 20 vw between each
+   island so the whole row reads evenly. */
 const worldMapPositions: Record<Activity["worldId"], MapPosition> = {
-  island1:  { x:  6, y: 13 },  // #1
-  island6:  { x: 23, y: 49 },  // #2
-  island2:  { x: 40, y: 13 },  // #3
-  island7:  { x: 57, y: 49 },  // #4
-  island13: { x: 74, y: 13 },  // #5
-  island3:  { x: 91, y: 49 },  // #6
-  island8:  { x: 108, y: 13 }, // #7
-  island4:  { x: 125, y: 49 }, // #8
-  island9:  { x: 142, y: 13 }, // #9
-  island10: { x: 159, y: 49 }, // #10
-  island5:  { x: 176, y: 13 }, // #11
-  island11: { x: 193, y: 49 }, // #12
-  island12: { x: 210, y: 13 }, // #13
-  island14: { x: 227, y: 49 }, // #14
-  island15: { x: 244, y: 13 }, // #15
+  island1:  { x:   6, y: 13 },  // #1
+  island6:  { x:  26, y: 49 },  // #2
+  island2:  { x:  46, y: 13 },  // #3
+  island7:  { x:  66, y: 49 },  // #4
+  island13: { x:  86, y: 13 },  // #5
+  island3:  { x: 106, y: 49 },  // #6
+  island8:  { x: 126, y: 13 },  // #7
+  island4:  { x: 146, y: 49 },  // #8
+  island9:  { x: 166, y: 13 },  // #9
+  island10: { x: 186, y: 49 },  // #10
+  island5:  { x: 206, y: 13 },  // #11
+  island11: { x: 226, y: 49 },  // #12
+  island12: { x: 246, y: 13 },  // #13
+  island14: { x: 266, y: 49 },  // #14
+  island15: { x: 286, y: 13 },  // #15
 };
 
 /* Build the meta for an expansion island (island6 … island15).
