@@ -1063,7 +1063,11 @@ a {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
+  /* `vector-effect: non-scaling-stroke` was disabling the SVG path cache,
+     which meant every tick of the `routeShimmer` `stroke-dashoffset`
+     animation re-rasterized the filter region (feGaussianBlur +
+     feColorMatrix) for the whole track. Letting the stroke scale with the
+     path lets the browser cache the filtered output between dashes. */
 }
 
 /* Soft coloured aura that blooms under the whole route. */
@@ -1154,11 +1158,20 @@ a {
      Position comes only from the inline left/top (world.map). */
   width: min(20vw, 21rem);
   min-width: 13rem;
-  /* Off-screen islands in the horizontal lane skip layout/paint (and their
-     float animation) until scrolled near — the single biggest scroll-perf win
-     with zero visual change. */
+  /* Off-screen islands in the horizontal lane skip paint until scrolled near.
+     (The spec only pauses painting, not the animation — keeping the keyframe
+     running is fine; the gain is in NOT re-rasterizing the big PNG off-screen.) */
   content-visibility: auto;
   contain-intrinsic-size: 21rem 24rem;
+  /* The idle float is now on the WRAP, not on the inner <img>. The wrap is a
+     small, filter-free box the compositor can promote on its own layer, so the
+     6.4s keyframe no longer forces the browser to recompute the heavy
+     `filter: drop-shadow(...)` chain on the giant island PNG every frame.
+     Hover still lives on `.world-island` (the button) so a transform on hover
+     stacks ON TOP of the float instead of fighting it. `will-change: transform`
+     keeps the wrap on the GPU. */
+  animation: islandFloat 6.4s ease-in-out infinite;
+  will-change: transform;
 }
 
 .world-island {
@@ -1171,33 +1184,54 @@ a {
   padding: 0;
   background: transparent;
   cursor: pointer;
-  /* Drop shadows live on the inner <img> so the compositor can paint them
-     once per island instead of re-evaluating filter() on hover. */
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* Anchor the lift to the base of the island so hover feels like the
+     island rising off its painted shadow, not just a uniform scale.
+     `will-change: transform` keeps the lift on the compositor (no
+     layout/paint work) which is what makes it feel smooth. The 240ms
+     duration is the same as the `::before` cloud shadow (see below) so
+     the island and its halo land in lockstep — no more "outrunning the
+     shadow" lag. `translate3d(0,0,0)` in the resting transform forces the
+     compositor to put the button on its own GPU layer. */
+  transform-origin: center bottom;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .world-island::before {
   position: absolute;
-  left: 9%;
-  right: 9%;
-  bottom: -8%;
+  left: 14%;
+  right: 14%;
+  bottom: -4%;
   z-index: -1;
-  height: 23%;
+  height: 14%;
   border-radius: 999px;
-  background: radial-gradient(ellipse, rgba(61, 66, 151, 0.23), rgba(61, 66, 151, 0.1) 45%, transparent 72%);
-  filter: blur(0.45rem);
+  /* Pastel cyan→violet soft halo under the island — the magical "pocket of
+     cloud" you get when something is levitating. Was wider (left/right 9%,
+     height 20%, alpha 0.32) and read as a visible floor band under the
+     transparent PNG. Narrower footprint + lower alpha + tighter blur so it
+     now reads as a hint of grounding depth, not a shadow. */
+  background: radial-gradient(ellipse, rgba(132, 196, 255, 0.18), rgba(173, 148, 255, 0.10) 45%, transparent 72%);
+  filter: blur(0.4rem);
   content: "";
   transform: scaleX(0.96);
+  /* Same 240ms duration + same easing as the button lift, so the cloud and
+     the island arrive together. The 300ms / 220ms split we had before made
+     the island visibly outrun its shadow on hover. */
   transition:
-    opacity 300ms ease,
-    transform 300ms ease;
+    opacity 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .world-island::after {
   position: absolute;
-  inset: -9%;
+  /* Was inset: -9% — extended 9% past the island on every side and, on a
+     fresh student, made M1's `is-current` glow read as a stray "moon"
+     floating to the right of the island. Now clamped to the button's
+     bounds so the pulse stays a soft inner halo, not an external orb. */
+  inset: 0;
   z-index: 0;
-  border-radius: 48%;
+  border-radius: 38%;
   background:
     radial-gradient(ellipse at center, rgba(255, 255, 255, 0.6), rgba(173, 118, 255, 0.24) 38%, rgba(95, 226, 214, 0.12) 54%, transparent 72%);
   filter: blur(0.9rem);
@@ -1210,8 +1244,12 @@ a {
 }
 
 .world-island.is-current::after {
-  opacity: 0.72;
-  animation: selectedWorldGlow 4.2s ease-in-out infinite;
+  opacity: 0.6;
+  /* 6.4s matches the wrap's `islandFloat` so the current island's glow
+     pulses IN phase with its bob, not against it. The previous 4.2s made
+     the current island visibly wobble (two unsynchronised timelines on the
+     same widget). */
+  animation: selectedWorldGlow 6.4s ease-in-out infinite;
 }
 
 /* ===== World lock states ===== */
@@ -1226,7 +1264,7 @@ a {
 .world-island.world-island--locked img {
   filter:
     grayscale(1) brightness(0.92) contrast(0.96)
-    drop-shadow(0 16px 18px rgba(45, 73, 142, 0.16));
+    drop-shadow(0 5px 6px rgba(124, 138, 178, 0.12));
   opacity: 0.85;
 }
 
@@ -1253,23 +1291,31 @@ a {
 
 /* ── Island unlock reveal (plays when you return to the map after unlocking) ── */
 .world-island.is-unlocking img {
-  animation:
-    worldUnlockReveal 1.3s cubic-bezier(0.22, 1, 0.36, 1) both,
-    islandFloat 6.4s ease-in-out infinite;
+  /* The idle float now lives on .world-island-wrap (so the img filter chain
+     isn't recomputed every frame), so we only need the reveal animation on the
+     <img> itself. The wrap keeps bobbing in the background throughout. */
+  animation: worldUnlockReveal 1.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @keyframes worldUnlockReveal {
   0% {
-    filter: grayscale(1) brightness(0.92) drop-shadow(0 16px 18px rgba(45, 73, 142, 0.16));
+    filter:
+      grayscale(1) brightness(0.92)
+      drop-shadow(0 5px 6px rgba(124, 138, 178, 0.12));
     opacity: 0.55;
     transform: scale(0.9);
   }
   55% {
-    filter: grayscale(0) saturate(1.2) brightness(1.08) drop-shadow(0 22px 24px rgba(45, 73, 142, 0.26));
+    filter:
+      grayscale(0) saturate(1.2) brightness(1.08)
+      drop-shadow(0 6px 7px rgba(132, 196, 255, 0.22))
+      drop-shadow(0 12px 14px rgba(124, 113, 255, 0.18));
     opacity: 1;
     transform: scale(1.09);
   }
   100% {
-    filter: drop-shadow(0 22px 22px rgba(45, 73, 142, 0.22));
+    filter:
+      drop-shadow(0 4px 4px rgba(132, 196, 255, 0.14))
+      drop-shadow(0 8px 10px rgba(124, 113, 255, 0.10));
     opacity: 1;
     transform: scale(1);
   }
@@ -1303,8 +1349,20 @@ a {
   100% { opacity: 0; transform: rotate(var(--dir)) translateY(-3.6rem) scale(1.15); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .world-island.is-unlocking img { animation: islandFloat 6.4s ease-in-out infinite; }
+  /* The global `*` rule already clamps animation/transition to 1ms, but the
+     wrap-level `islandFloat` lives on a class the global rule still covers
+     (so it's effectively killed). Belt-and-braces: explicitly null it. */
+  .world-island-wrap { animation: none; }
   .world-island__burst { display: none; }
+  /* The global reduced-motion rule above already clamps every transition to
+     1ms, but the *target values* of the hover/selected transforms would
+     still snap the island into its lifted state. Neutralise them so the
+     pointer still reads as interactive, just without movement. */
+  .world-island:hover,
+  .world-island.is-selected,
+  .world-island--locked:hover {
+    transform: none;
+  }
 }
 
 /* The icon badge becomes a quiet padlock chip on locked worlds. */
@@ -1316,7 +1374,10 @@ a {
 }
 
 .world-island--locked:hover {
-  transform: translateY(-0.15rem) scale(1.015);
+  /* Locked islands still get a tiny "I'm here" response so the cursor
+     (not-allowed) doesn't feel dead, but the lift is so subtle it never
+     fights with the wrap's float. GPU-only transform. */
+  transform: translate3d(0, -0.12rem, 0) scale(1.012);
 }
 
 /* Screen-reader only helper. Visually hidden but still announced. */
@@ -1406,31 +1467,56 @@ a {
   width: 100%;
   height: auto;
   object-fit: contain;
-  animation: islandFloat 6.4s ease-in-out infinite;
-  /* Shadow baked into the image once — cheap on the GPU and avoids paint
-     work on hover. We do not toggle filter on hover so the compositor only
-     has to re-rasterise the `transform`. */
-  filter: drop-shadow(0 22px 22px rgba(45, 73, 142, 0.22));
+  /* The idle float used to live here. We moved it to .world-island-wrap so the
+     hover transform on the button and the float no longer both target the
+     same element. The wrap is filter-free, so the 6.4s keyframe no longer
+     forces the browser to recompute the heavy `filter: drop-shadow(...)`
+     chain on the giant island PNG every frame. Hover now lifts the button on
+     top of the floating wrap — float and lift stop fighting. */
+  /* Almost imperceptible grounding glow. The previous (10/10, 22/26) drop-shadows
+     followed the alpha and stacked into a visible dark band under the bottom of
+     the island — kids read it as a heavy cast shadow on the ground. Two barely-
+     there tints now, tighter blur + lower opacity + softer pastel:
+       - a 4px cyan kiss right under the silhouette (gives the "floating" cue)
+       - an 8px violet halo a touch wider (the magical cloud pocket)
+     No second hard drop → no visible band under transparent PNGs. */
+  filter:
+    drop-shadow(0 4px 4px rgba(132, 196, 255, 0.14))
+    drop-shadow(0 8px 10px rgba(124, 113, 255, 0.10));
 }
 
 .world-island:hover {
-  transform: translateY(-0.5rem) scale(1.05);
+  /* Soft, low-amplitude lift. Stacks ON TOP of the wrap's `islandFloat`
+     (the wrap keeps bobbing in the background), so the button just rises
+     a little more on hover — not a full second animation fighting the
+     first. 1.03 + 0.3rem stays in step with the cloud shadow fade below
+     and feels like the island gently rising rather than snapping. */
+  transform: translate3d(0, -0.3rem, 0) scale(1.03);
 }
 
 .world-island:hover::before {
+  /* Only fade the shadow brighter on hover — do NOT scale it. Letting the
+     shadow scale in lockstep with the button was the main source of the
+     "lagging / fighting" feel. Now both finish at the same 240ms pace. */
   opacity: 0.82;
-  transform: scaleX(1.05);
+  transform: scaleX(0.96);
 }
 
 .world-island.is-selected {
-  transform: translateY(-0.7rem) scale(1.09);
+  /* Selected is the "lifted into the air" celebration pose: stronger than
+     hover, but still gentle. Stacks on top of the wrap's `islandFloat` so
+     the visible peak is wrap-float + selected-lift, not a teleport. */
+  transform: translate3d(0, -0.42rem, 0) scale(1.05);
 }
 .world-island.is-selected img {
-  /* Stronger ambient glow when selected — applied to the inner <img> so we
-     only repaint the image, not the whole island button. */
+  /* Slightly brighter ambient glow when selected — applied to the inner <img>
+     so we only repaint the image, not the whole island button. The white inner
+     drop-shadow is the new "lift" cue; the two pastel shadows are kept in step
+     with the resting state so no dark band re-appears on hover/select. */
   filter:
-    drop-shadow(0 26px 22px rgba(45, 73, 142, 0.28))
-    drop-shadow(0 0 22px rgba(255, 255, 255, 0.7));
+    drop-shadow(0 5px 5px rgba(132, 196, 255, 0.18))
+    drop-shadow(0 10px 12px rgba(124, 113, 255, 0.14))
+    drop-shadow(0 0 18px rgba(255, 255, 255, 0.7));
 }
 
 .world-island:focus-visible {
@@ -1458,7 +1544,10 @@ a {
 }
 
 .world-island:active {
-  transform: scale(0.99);
+  /* Translate stays at zero on press so the lift tween snaps cleanly back;
+     we only squash the scale. The wrap's `islandFloat` keeps the island
+     gently bobbing underneath while you click. */
+  transform: translate3d(0, 0, 0) scale(0.99);
 }
 
 /* Slug-based placement keeps visual composition independent from data order.
@@ -1478,21 +1567,28 @@ a {
    on its evenly-spaced wrap position with the uniform wrap width. Only the
    staggered float delays + the badge accent remain. */
 
-.world-island--island2 img {
-  animation-delay: -1.6s;
-}
-
-.world-island--island3 img {
-  animation-delay: -2.7s;
-}
-
-.world-island--island4 img {
-  animation-delay: -0.8s;
-}
-
-.world-island--island5 img {
-  animation-delay: -3.3s;
-}
+/* Staggered idle float delays — the float lives on .world-island-wrap (see
+   comment above). We cover EVERY island (1..15) with a phase offset derived
+   from its pedagogical index so no two wraps ever share phase. The old
+   rule only staggered island2..island5, leaving 12 of 15 islands bobbing in
+   lockstep — a marching band that read as "broken animation". With these
+   delays each wrap is at a different point of the 6.4s cycle on first paint
+   and stays there. */
+.world-island-wrap:has(.world-island--island1)  { animation-delay: -0.4s; }
+.world-island-wrap:has(.world-island--island2)  { animation-delay: -1.6s; }
+.world-island-wrap:has(.world-island--island3)  { animation-delay: -2.7s; }
+.world-island-wrap:has(.world-island--island4)  { animation-delay: -0.8s; }
+.world-island-wrap:has(.world-island--island5)  { animation-delay: -3.3s; }
+.world-island-wrap:has(.world-island--island6)  { animation-delay: -4.1s; }
+.world-island-wrap:has(.world-island--island7)  { animation-delay: -5.0s; }
+.world-island-wrap:has(.world-island--island8)  { animation-delay: -1.2s; }
+.world-island-wrap:has(.world-island--island9)  { animation-delay: -3.8s; }
+.world-island-wrap:has(.world-island--island10) { animation-delay: -2.0s; }
+.world-island-wrap:has(.world-island--island11) { animation-delay: -4.7s; }
+.world-island-wrap:has(.world-island--island12) { animation-delay: -0.2s; }
+.world-island-wrap:has(.world-island--island13) { animation-delay: -5.5s; }
+.world-island-wrap:has(.world-island--island14) { animation-delay: -3.0s; }
+.world-island-wrap:has(.world-island--island15) { animation-delay: -1.9s; }
 
 .world-island--island5 .world-icon-badge {
   color: #5a8dff;
@@ -1553,10 +1649,17 @@ a {
   color: #33bfae;
 }
 
+/* Home mascots: the float used to live on the same <img> that carries the
+   two drop-shadow filters. Every frame of `mascotFloat` was forcing the
+   rasterizer to re-blur the alpha channel of a 14–24rem tall PNG. Same
+   trick we used for the islands (move the float to a filter-free wrapper):
+   `.home-mascot-float` (the new <span> wrap in WorldsPage.tsx) bobs on
+   the GPU, the <img> stays still and the drop-shadows are computed once. */
 .home-mascot {
   position: absolute;
   z-index: 5;
   bottom: clamp(-0.7rem, -1.4vh, -0.2rem);
+  left: 0;
   width: auto;
   max-width: 18vw;
   height: clamp(14rem, 32vh, 24rem);
@@ -1564,8 +1667,21 @@ a {
   filter:
     drop-shadow(0 18px 22px rgba(48, 82, 116, 0.2))
     drop-shadow(0 0 20px rgba(255, 255, 255, 0.26));
-  animation: mascotFloat 5.2s ease-in-out infinite;
   pointer-events: none;
+}
+
+/* Float layer — small, filter-free, GPU-promoted. The <span> is sized to
+   the same footprint as the <img> so the visible position is unchanged. */
+.home-mascot-float {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  animation: mascotFloat 5.2s ease-in-out infinite;
+  will-change: transform;
+}
+.home-mascot-wrap--right .home-mascot-float {
+  animation-delay: -1.2s;
 }
 
 .home-mascot--left {
@@ -1626,7 +1742,11 @@ a {
   font-weight: 800;
   white-space: nowrap;
   animation: bubblePop 360ms cubic-bezier(0.22, 1, 0.36, 1) 260ms both;
-  backdrop-filter: blur(12px);
+  /* `backdrop-filter: blur(12px)` is one of the most expensive paint ops in
+     the compositor. Over a mascot that bobs every frame, the blur region
+     was being recomputed continuously. The frosted-glass feel is kept by
+     the multi-stop gradient + the soft white border, so the backdrop blur
+     adds no value here and just steals GPU bandwidth. Removed. */
 }
 
 /* Tail at the bottom-right of the bubble pointing down toward the robot. */

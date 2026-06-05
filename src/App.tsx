@@ -8,6 +8,7 @@ import { IslandDetailPage } from "./pages/IslandDetailPage";
 import { TeacherPage } from "./pages/TeacherPage";
 import { RewardsPage } from "./pages/RewardsPage";
 import { AccountPage } from "./pages/AccountPage";
+import { MissionsPage } from "./pages/MissionsPage";
 
 /* -------------------------------------------------------------------- */
 /* Route-level code splitting.                                            */
@@ -68,6 +69,7 @@ export function App() {
         />
         <Route path="/logros" element={<RewardsPage />} />
         <Route path="/mi-cuenta" element={<AccountPage />} />
+        <Route path="/misiones" element={<MissionsPage />} />
       </Route>
 
       <Route element={<ProtectedRoute roles={["admin-general"]} />}>

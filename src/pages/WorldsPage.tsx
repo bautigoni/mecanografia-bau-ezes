@@ -50,7 +50,14 @@ function prefetchImage(src: string) {
 /* ------------------------------------------------------------------ */
 /* World-map layout helpers                                            */
 /* ------------------------------------------------------------------ */
-const TRACK_PADDING_VW = 26;
+/* Right-edge padding past the last island. Has to cover the island's
+   20vw footprint + hover/selected lift + a visual gutter so the last
+   island doesn't sit flush against the scroll edge (which would let
+   the right half of the island get clipped by .worlds-scene's
+   overflow:hidden + the body padding). 40vw is enough for the 20vw
+   island plus the lift margin and ~5–6vw of visual breathing room on
+   every viewport. */
+const TRACK_PADDING_VW = 40;
 
 function trackWidth(worlds: World[]) {
   if (!worlds.length) return 100;
@@ -356,7 +363,7 @@ export function WorldsPage() {
 
         {menuOpen && (
           <div className="world-menu__panel" aria-label="Menú de estudiante">
-            <button type="button" onClick={() => navigate("/mundos")}>
+            <button type="button" onClick={() => navigate("/misiones")}>
               <Flag size={19} />
               <span>Misiones</span>
             </button>
@@ -410,7 +417,11 @@ export function WorldsPage() {
                 <stop offset="100%" stopColor="#ffd9f1" stopOpacity="0.34" />
               </linearGradient>
               <filter id="world-route-glow" x="-18%" y="-32%" width="136%" height="164%">
-                <feGaussianBlur stdDeviation="1.25" result="blur" />
+                {/* stdDeviation 1.25 → 0.8: a tighter blur is dramatically
+                    cheaper to re-rasterize on every `routeShimmer` tick, and
+                    the glow stays visible because the gradient itself is
+                    pastel. */}
+                <feGaussianBlur stdDeviation="0.8" result="blur" />
                 <feColorMatrix
                   in="blur" result="tint" type="matrix"
                   values="0.72 0 0 0 0.28  0 0.5 0 0 0.22  0 0 0.95 0 0.5  0 0 0 0.88 0"
@@ -529,22 +540,30 @@ export function WorldsPage() {
 
       <div className={selectedWorld ? "world-transition is-active" : "world-transition"} />
 
-      <img
-        className="home-mascot home-mascot--left"
-        src={assets.mascotFemaleLaptop}
-        alt=""
-        decoding="async"
-        loading="lazy"
-      />
-      <div className="home-mascot-wrap home-mascot-wrap--right">
-        <span className="home-speech-bubble">¡Vamos!</span>
+      {/* The mascot float lives on `.home-mascot-float` (a small, filter-free
+          wrapper). The <img> below carries the two drop-shadows and stays
+          still, so the rasterizer is no longer forced to re-blur the alpha
+          channel of a 14–24rem tall PNG on every frame. */}
+      <span className="home-mascot-float home-mascot-float--left">
         <img
-          className="home-mascot home-mascot--right"
-          src={assets.mascotMaleProud}
+          className="home-mascot home-mascot--left"
+          src={assets.mascotFemaleLaptop}
           alt=""
           decoding="async"
           loading="lazy"
         />
+      </span>
+      <div className="home-mascot-wrap home-mascot-wrap--right">
+        <span className="home-speech-bubble">¡Vamos!</span>
+        <span className="home-mascot-float home-mascot-float--right">
+          <img
+            className="home-mascot home-mascot--right"
+            src={assets.mascotMaleProud}
+            alt=""
+            decoding="async"
+            loading="lazy"
+          />
+        </span>
       </div>
 
       <Toast message={message} />
