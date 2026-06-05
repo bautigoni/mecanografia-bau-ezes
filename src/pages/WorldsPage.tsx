@@ -137,11 +137,14 @@ export function WorldsPage() {
   const pendingNav = useRef<number | null>(null);
   const sceneRef = useRef<HTMLDivElement | null>(null);
 
-  /* Build the user context once per render so course-filtering is live. */
-  const context = getUserContext(user);
-  const progress = loadProgress();
-  const visibleWorlds = getWorldsForUser(context, progress);
-  const worldStates = getWorldStatesForUser(context, progress);
+  /* Build the user context + world model once per user (not on every render).
+     Rebuilding all 15 worlds + reading localStorage on each hover/menu toggle
+     was a real cost; memoizing removes it. Progress is stable within a mount
+     (this page never writes it). */
+  const context = useMemo(() => getUserContext(user), [user]);
+  const progress = useMemo(() => loadProgress(), [user]);
+  const visibleWorlds = useMemo(() => getWorldsForUser(context, progress), [context, progress]);
+  const worldStates = useMemo(() => getWorldStatesForUser(context, progress), [context, progress]);
 
   /* Track widths and SVG path — memoized so the heavy SVG path string is
      rebuilt only when the visible set changes, not on every hover/focus
@@ -309,9 +312,9 @@ export function WorldsPage() {
   }
 
   /* Real running star total for the menu chip (was a hardcoded "1280"). */
-  const totalEarnedStars = visibleWorlds.reduce(
-    (sum, w) => sum + worldStarProgress(w.id, progress).earnedStars,
-    0,
+  const totalEarnedStars = useMemo(
+    () => visibleWorlds.reduce((sum, w) => sum + worldStarProgress(w.id, progress).earnedStars, 0),
+    [visibleWorlds, progress],
   );
 
   return (
@@ -479,20 +482,21 @@ export function WorldsPage() {
                   }`}
                   aria-disabled={isLocked}
                 >
-                  <span className="world-icon-badge" aria-hidden="true">
-                    {isLocked ? (
-                      <Lock size={24} strokeWidth={2.3} />
-                    ) : (
-                      <>
-                        <span className="world-icon-badge__num">M{world.displayNumber}</span>
-                        <BadgeIcon size={20} strokeWidth={2.1} className="world-icon-badge__icon" />
-                      </>
-                    )}
-                  </span>
-                  <span className={starsClass} aria-hidden="true">
-                    <Star size={14} strokeWidth={2.4} className="world-stars-chip__icon" />
-                    {starInfo.earnedStars}/{starInfo.totalStars}
-                  </span>
+                  {/* Number + theme badge only on reachable islands. Locked
+                      islands show just a padlock centred on the island. */}
+                  {!isLocked && (
+                    <span className="world-icon-badge" aria-hidden="true">
+                      <span className="world-icon-badge__num">M{world.displayNumber}</span>
+                      <BadgeIcon size={20} strokeWidth={2.1} className="world-icon-badge__icon" />
+                    </span>
+                  )}
+                  {/* No star chip on blocked islands. */}
+                  {!isLocked && (
+                    <span className={starsClass} aria-hidden="true">
+                      <Star size={14} strokeWidth={2.4} className="world-stars-chip__icon" />
+                      {starInfo.earnedStars}/{starInfo.totalStars}
+                    </span>
+                  )}
                   {/* The tick is decorative — the button's aria-label already
                       announces "completado". */}
                   {isCompleted && (
@@ -501,10 +505,12 @@ export function WorldsPage() {
                     </span>
                   )}
                   <img src={world.thumbnail} alt="" loading="eager" decoding="async" />
-                  {/* Locked islands are hidden behind a frosted veil so the
-                      real art can't be previewed — a "default" mystery island
-                      with a padlock. */}
-                  {isLocked && <span className="world-island__frost" aria-hidden="true" />}
+                  {/* Locked islands are greyed out with a padlock in the centre. */}
+                  {isLocked && (
+                    <span className="world-island__lock" aria-hidden="true">
+                      <Lock size={30} strokeWidth={2.5} />
+                    </span>
+                  )}
                   {/* Celebratory sparkle burst when this island is unlocked. */}
                   {justUnlocked.has(world.slug) && (
                     <span className="world-island__burst" aria-hidden="true">

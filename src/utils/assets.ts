@@ -25,11 +25,13 @@ export const assets = {
   mascotFemaleWave: "/assets/edutic-art/mascot-women-wave.webp",
   mascotFemaleLaptop: "/assets/edutic-art/mascot-women-laptop.webp",
 
-  worldsIsland1: "/assets/processed/worlds-island1-transparent.webp",
-  worldsIsland2: "/assets/processed/worlds-island2-transparent.webp",
-  worldsIsland3: "/assets/processed/worlds-island3-transparent.webp",
-  worldsIsland4: "/assets/processed/worlds-island4-transparent.webp",
-  worldsIsland5: "/assets/edutic-art/world-island5.webp",
+  /* Small, high-quality map thumbnails (see Images-new/process_map_thumbs.py).
+     The big detail art lives elsewhere; the map only needs these. */
+  worldsIsland1: "/typely_islands_thumb_webp/worlds-island1-transparent.webp",
+  worldsIsland2: "/typely_islands_thumb_webp/worlds-island2-transparent.webp",
+  worldsIsland3: "/typely_islands_thumb_webp/worlds-island3-transparent.webp",
+  worldsIsland4: "/typely_islands_thumb_webp/worlds-island4-transparent.webp",
+  worldsIsland5: "/typely_islands_thumb_webp/world-island5.webp",
   island1: "/assets/edutic-art/island1.webp",
   island2: "/assets/edutic-art/island2.webp",
   island3: "/assets/edutic-art/island3.webp",
@@ -76,16 +78,16 @@ export const assets = {
 /* 1) WORLD MAP IMAGE — the floating island art on the worlds-selection map.
       Transparent islands shown small in the sky (from /typely_islands_webp). */
 export const expansionIslandThumbs: string[] = [
-  "/typely_islands_webp/background-island1.webp",  // crystal
-  "/typely_islands_webp/background-island2.webp",  // garden / library
-  "/typely_islands_webp/background-island3.webp",  // frozen / clockwork
-  "/typely_islands_webp/background-island4.webp",  // autumn / artist
-  "/typely_islands_webp/background-island5.webp",  // jungle / ruins
-  "/typely_islands_webp/background-island6.webp",  // candyland
-  "/typely_islands_webp/background-island7.webp",  // desert / canyon
-  "/typely_islands_webp/background-island8.webp",  // rainbow / playground
-  "/typely_islands_webp/background-island9.webp",  // alchemy / lab
-  "/typely_islands_webp/background-island10.webp", // lagoon
+  "/typely_islands_thumb_webp/background-island1.webp",  // crystal
+  "/typely_islands_thumb_webp/background-island2.webp",  // garden / library
+  "/typely_islands_thumb_webp/background-island3.webp",  // frozen / clockwork
+  "/typely_islands_thumb_webp/background-island4.webp",  // autumn / artist
+  "/typely_islands_thumb_webp/background-island5.webp",  // jungle / ruins
+  "/typely_islands_thumb_webp/background-island6.webp",  // candyland
+  "/typely_islands_thumb_webp/background-island7.webp",  // desert / canyon
+  "/typely_islands_thumb_webp/background-island8.webp",  // rainbow / playground
+  "/typely_islands_thumb_webp/background-island9.webp",  // alchemy / lab
+  "/typely_islands_thumb_webp/background-island10.webp", // lagoon
 ];
 
 /* 2) ISLAND DETAIL BACKGROUND — the full 16:9 scene WITH painted platforms,
