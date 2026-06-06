@@ -43,6 +43,9 @@ export const assets = {
   shipRight: "/assets/edutic-art/spaceships/ship-right.webp",
   shipDiagonalLeft: "/assets/edutic-art/spaceships/ship-diagonal-left.webp",
   shipDiagonalRight: "/assets/edutic-art/spaceships/ship-diagonal-right.webp",
+  /* 3D level button images (pre-rendered at base perspective, no number). */
+  levelButton: "/assets/level.png",
+  levelButtonPressed: "/assets/pressed_level.png",
 
   /* Island 5 props — used by SkillLevelView for the mouse-skill levels. */
   i5Star:    "/assets/edutic-art/island5/star.webp",

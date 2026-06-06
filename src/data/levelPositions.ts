@@ -33,20 +33,34 @@ import type { Activity } from "./activities";
 export type LevelPosition = {
   x: number;
   y: number;
+  /** Uniform scale (1 = normal). */
+  scale?: number;
+  /** 3D tilt backward/forward in degrees. Positive = top tilts away, like lying on the ground. */
+  rotateX?: number;
+  /** 3D tilt left/right in degrees. */
+  rotateY?: number;
+  /** 2D spin rotation in degrees. */
+  rotateZ?: number;
+  /** Perspective depth in px. Lower = stronger 3D effect (camera closer). Default ~500. */
+  perspective?: number;
 };
 
 /* Per-island level marker positions, placed by hand with the visual editor
-   over each island's painted platforms. Coordinates are % of the level-map
-   box (see header). Each island keeps its own level count (6, 7 or 8) and the
-   order matches the level order (index 0 = level 1, index 1 = level 2, …). */
+   over each island's painted platforms. Coordinates are percentages of the
+   ISLAND IMAGE itself — NOT the viewport. islandDetailPage translates them
+   to container-relative at render time, which keeps nodes aligned to the
+   painted platforms on every screen size regardless of object-fit cropping.
+
+   Each island keeps its own level count (6, 7 or 8) and the order matches
+   the level order (index 0 = level 1, index 1 = level 2, …). */
 export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = {
   island1: [
-    { x: 33, y: 70.7 },
-    { x: 26.4, y: 50.2 },
+    { x: 31, y: 66.5 },
+    { x: 26.2, y: 50.2 },
     { x: 38.7, y: 40.3 },
     { x: 56.8, y: 33.7 },
     { x: 68.5, y: 45.6 },
-    { x: 54.4, y: 67.5 },
+    { x: 55.7, y: 61.1, rotateX: -2.5, perspective: 80 },
     { x: 68.8, y: 74.7 },
   ],
 

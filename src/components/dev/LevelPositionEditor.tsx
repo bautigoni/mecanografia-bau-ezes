@@ -1,23 +1,22 @@
-import { Copy, Crosshair, Grid3x3, RotateCcw, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Crosshair, Grid3x3, RotateCcw, X } from "lucide-react";
 import type { LevelPosition } from "../../data/levelPositions";
 
 /* =====================================================================
    LevelPositionEditor — DEV-ONLY level marker placement helper.
 
-   This overlay is rendered ONLY in dev builds (guarded by
-   import.meta.env.DEV in IslandDetailPage) and ONLY when the editor is
-   toggled on. It never ships to students/production.
+   Renders the in-map grid + crosshair, a fixed HUD panel with position
+   array, and 3D perspective controls (scale, rotateX/Y/Z, perspective
+   depth) for the currently selected level node.
 
-   It draws:
-     - an optional 10% grid + axis labels over the level map,
-     - a crosshair with a live x/y % readout that follows the cursor,
-     - a fixed HUD panel with the current positions as JSON and buttons
-       to copy them (array form for levelPositions.ts, or full JSON).
-
-   It is purely presentational: dragging the markers and click-to-copy
-   are handled by IslandDetailPage (which owns the markers and the map
-   ref). This component just forwards pointer coordinates back up via
-   onCursorMove / onCopyAt.
+   Keyboard shortcuts (toggle-based — press once to enter, again to exit):
+     ←↑↓→            move position by 0.5 %           (Shift → 5 %)
+     S                toggle SCALE mode   ↑↓ adjust
+     X                toggle ROTATE X mode   ↑↓ adjust (tilt fwd/back)
+     Y                toggle ROTATE Y mode   ←→ adjust (tilt left/right)
+     Z                toggle ROTATE Z mode   ←→ adjust (spin)
+     P                toggle PERSPECTIVE mode   ↑↓ adjust (depth)
+     Escape           deselect node + exit mode
+     Ctrl/Cmd + C     copy config array to clipboard + console
 ===================================================================== */
 
 export interface EditorLevel {
@@ -29,21 +28,25 @@ interface LevelPositionEditorProps {
   worldSlug: string;
   positions: LevelPosition[];
   levels: EditorLevel[];
-  /** Live cursor position in map %, or null when the pointer is away. */
   cursor: LevelPosition | null;
-  /** Last clicked coordinate (copied to clipboard), shown in the HUD. */
   lastClick: LevelPosition | null;
   gridOn: boolean;
+  selectedIndex: number;
+  perspMode: "scale" | "rotateX" | "rotateY" | "rotateZ" | "persp" | null;
+  numScale: number;
+  onNumScaleChange: (v: number) => void;
+  onSelectIndex: (index: number) => void;
   onToggleGrid: () => void;
   onReset: () => void;
   onClose: () => void;
-  /** Forward raw client coords; the page converts them to map %. */
   onCursorMove: (clientX: number, clientY: number) => void;
   onCopyAt: (clientX: number, clientY: number) => void;
+  onUpdatePerspective: (index: number, field: "scale" | "rotateX" | "rotateY" | "rotateZ" | "perspective", value: number) => void;
   onToast: (text: string) => void;
 }
 
 const GRID_LINES = [10, 20, 30, 40, 50, 60, 70, 80, 90];
+const R1 = (v: number) => Math.round(v * 10) / 10;
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -66,9 +69,20 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
+function posString(p: LevelPosition): string {
+  const parts: string[] = [];
+  if (p.scale !== undefined && p.scale !== 1) parts.push(`scale: ${R1(p.scale)}`);
+  if (p.rotateX !== undefined && p.rotateX !== 0) parts.push(`rotateX: ${R1(p.rotateX)}`);
+  if (p.rotateY !== undefined && p.rotateY !== 0) parts.push(`rotateY: ${R1(p.rotateY)}`);
+  if (p.rotateZ !== undefined && p.rotateZ !== 0) parts.push(`rotateZ: ${R1(p.rotateZ)}`);
+  if (p.perspective !== undefined && p.perspective !== 500) parts.push(`perspective: ${R1(p.perspective)}`);
+  let line = `{ x: ${p.x}, y: ${p.y}`;
+  if (parts.length > 0) line += `, ${parts.join(", ")}`;
+  return line + " },";
+}
+
 function arrayLiteral(positions: LevelPosition[]): string {
-  const rows = positions.map((p) => `  { x: ${p.x}, y: ${p.y} },`).join("\n");
-  return `[\n${rows}\n]`;
+  return `[\n${positions.map((p) => `  ${posString(p)}`).join("\n")}\n]`;
 }
 
 function fullJson(worldSlug: string, positions: LevelPosition[], levels: EditorLevel[]): string {
@@ -81,10 +95,47 @@ function fullJson(worldSlug: string, positions: LevelPosition[], levels: EditorL
         levelNumber: levels[i]?.levelNumber ?? i + 1,
         x: p.x,
         y: p.y,
+        ...(p.scale !== undefined && p.scale !== 1 ? { scale: R1(p.scale) } : {}),
+        ...(p.rotateX !== undefined && p.rotateX !== 0 ? { rotateX: R1(p.rotateX) } : {}),
+        ...(p.rotateY !== undefined && p.rotateY !== 0 ? { rotateY: R1(p.rotateY) } : {}),
+        ...(p.rotateZ !== undefined && p.rotateZ !== 0 ? { rotateZ: R1(p.rotateZ) } : {}),
+        ...(p.perspective !== undefined && p.perspective !== 500 ? { perspective: R1(p.perspective) } : {}),
       })),
     },
     null,
     2,
+  );
+}
+
+function TinySlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label className="lpe-slider">
+      <span className="lpe-slider__label">{label}</span>
+      <input
+        type="range"
+        className="lpe-slider__input"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      <span className="lpe-slider__val">{R1(value)}</span>
+    </label>
   );
 }
 
@@ -95,13 +146,41 @@ export function LevelPositionEditor({
   cursor,
   lastClick,
   gridOn,
+  selectedIndex,
+  perspMode,
+  numScale,
+  onNumScaleChange,
+  onSelectIndex,
   onToggleGrid,
   onReset,
   onClose,
   onCursorMove,
   onCopyAt,
+  onUpdatePerspective,
   onToast,
 }: LevelPositionEditorProps) {
+  const sel = selectedIndex >= 0 && selectedIndex < positions.length ? positions[selectedIndex] : null;
+
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if ((e.target as HTMLElement).closest(".lpe-hud")) return;
+    onCursorMove(e.clientX, e.clientY);
+  }
+  function handlePointerLeave() {
+    onCursorMove(-99999, -99999);
+  }
+  function handleClick(e: React.MouseEvent<HTMLDivElement>) {
+    if ((e.target as HTMLElement).closest(".lpe-hud")) return;
+    onCopyAt(e.clientX, e.clientY);
+  }
+
+  const modeLabel =
+    perspMode === "scale" ? "ESCALA" :
+    perspMode === "rotateX" ? "ROTATE X (inclinar fwd/back)" :
+    perspMode === "rotateY" ? "ROTATE Y (inclinar izq/der)" :
+    perspMode === "rotateZ" ? "ROTATE Z (girar)" :
+    perspMode === "persp" ? "PERSPECTIVA (profundidad)" :
+    "posicion";
+
   async function copyArray() {
     const ok = await copyText(`${arrayLiteral(positions)}`);
     onToast(ok ? "Arreglo copiado · pegalo en levelPositions.ts" : "No se pudo copiar.");
@@ -113,9 +192,7 @@ export function LevelPositionEditor({
 
   return (
     <>
-      {/* In-map layer: grid + crosshair + click/move capture. Sits below the
-          markers (z-index) so dragging a marker still works; clicks on empty
-          map area copy that coordinate. */}
+      {/* In-map layer: grid + crosshair + click/move capture. */}
       <div className="lpe-layer" aria-hidden="true">
         {gridOn && (
           <svg className="lpe-grid" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -138,13 +215,11 @@ export function LevelPositionEditor({
           </>
         )}
 
-        {/* Capture surface — pointer events land here only where there is no
-            marker on top, so empty-area clicks copy coordinates. */}
         <div
           className="lpe-capture"
-          onPointerMove={(e) => onCursorMove(e.clientX, e.clientY)}
-          onPointerLeave={() => onCursorMove(-99999, -99999)}
-          onClick={(e) => onCopyAt(e.clientX, e.clientY)}
+          onPointerMove={handlePointerMove}
+          onPointerLeave={handlePointerLeave}
+          onClick={handleClick}
         />
       </div>
 
@@ -158,12 +233,23 @@ export function LevelPositionEditor({
         </div>
 
         <p className="lpe-hud__hint">
-          Arrastrá cada número hasta su plataforma. Hacé clic en el mapa para copiar una coordenada.
+          Arrastra cada numero hasta su plataforma. Clic en un nodo para editar su perspectiva 3D.
         </p>
 
         <div className="lpe-hud__readout">
           <span>Cursor: {cursor ? `x ${cursor.x} · y ${cursor.y}` : "—"}</span>
-          <span>Último clic: {lastClick ? `x ${lastClick.x} · y ${lastClick.y}` : "—"}</span>
+          <span>Ultimo clic: {lastClick ? `x ${lastClick.x} · y ${lastClick.y}` : "—"}</span>
+          <span>
+            Nodo seleccionado:{" "}
+            {sel ? `Nivel ${selectedIndex + 1}  x ${sel.x} · y ${sel.y}` : "ninguno"}
+          </span>
+          <span>
+            Modo:{" "}
+            <strong className={`lpe-mode-badge ${perspMode ? "is-on" : ""}`}>
+              {modeLabel}
+            </strong>
+            {" "}(teclea S / X / Y / Z / P para cambiar)
+          </span>
         </div>
 
         <div className="lpe-hud__toggles">
@@ -174,6 +260,88 @@ export function LevelPositionEditor({
             <RotateCcw size={14} /> Restaurar
           </button>
         </div>
+
+        {/* ── Global number size ── */}
+        <label className="lpe-slider">
+          <span className="lpe-slider__label">NumSize</span>
+          <input
+            type="range"
+            className="lpe-slider__input"
+            min={0.5}
+            max={2.5}
+            step={0.05}
+            value={numScale}
+            onChange={(e) => onNumScaleChange(Number(e.target.value))}
+          />
+          <span className="lpe-slider__val">{R1(numScale)}</span>
+        </label>
+
+        {/* ── 3D Perspective controls (visible only when a node is selected) ── */}
+        {sel && (
+          <div className="lpe-perspective">
+            <strong className="lpe-perspective__title">
+              Perspectiva 3D — Nivel {selectedIndex + 1}
+            </strong>
+            <TinySlider
+              label="Scale"
+              value={sel.scale ?? 1}
+              min={0.1}
+              max={2.5}
+              step={0.01}
+              onChange={(v) => onUpdatePerspective(selectedIndex, "scale", v)}
+            />
+            <TinySlider
+              label="Rotate X"
+              value={sel.rotateX ?? 0}
+              min={-85}
+              max={85}
+              step={0.5}
+              onChange={(v) => onUpdatePerspective(selectedIndex, "rotateX", v)}
+            />
+            <TinySlider
+              label="Rotate Y"
+              value={sel.rotateY ?? 0}
+              min={-85}
+              max={85}
+              step={0.5}
+              onChange={(v) => onUpdatePerspective(selectedIndex, "rotateY", v)}
+            />
+            <TinySlider
+              label="Rotate Z"
+              value={sel.rotateZ ?? 0}
+              min={-180}
+              max={180}
+              step={0.5}
+              onChange={(v) => onUpdatePerspective(selectedIndex, "rotateZ", v)}
+            />
+            <TinySlider
+              label="Perspective"
+              value={sel.perspective ?? 500}
+              min={50}
+              max={2000}
+              step={10}
+              onChange={(v) => onUpdatePerspective(selectedIndex, "perspective", v)}
+            />
+          </div>
+        )}
+
+        {/* ── Keyboard shortcut cheatsheet ── */}
+        <details className="lpe-kbd">
+          <summary className="lpe-kbd__summary">Atajos de teclado</summary>
+          <table className="lpe-kbd__table">
+            <tbody>
+              <tr><td><kbd><ArrowLeft size={10} /></kbd><kbd><ArrowRight size={10} /></kbd><kbd><ArrowUp size={10} /></kbd><kbd><ArrowDown size={10} /></kbd></td><td>Mover nodo (posicion)</td></tr>
+              <tr><td><kbd>S</kbd></td><td><strong>Toggle modo ESCALA</strong> (↑↓)</td></tr>
+              <tr><td><kbd>X</kbd></td><td><strong>Toggle modo ROTATE X</strong> (↑↓) — inclina adelante/atras como apoyado en el piso</td></tr>
+              <tr><td><kbd>Y</kbd></td><td><strong>Toggle modo ROTATE Y</strong> (←→) — inclina izquierda/derecha</td></tr>
+              <tr><td><kbd>Z</kbd></td><td><strong>Toggle modo ROTATE Z</strong> (←→) — gira sobre su centro</td></tr>
+              <tr><td><kbd>P</kbd></td><td><strong>Toggle modo PERSPECTIVA</strong> (↑↓) — profundidad 3D</td></tr>
+              <tr><td><kbd>Shift</kbd> + flechas</td><td>Multiplica el paso por 10</td></tr>
+              <tr><td><kbd>Escape</kbd></td><td>Deseleccionar nodo + salir de modo</td></tr>
+              <tr><td><kbd>Ctrl</kbd> + <kbd>C</kbd></td><td>Copiar config a portapapeles + consola</td></tr>
+            </tbody>
+          </table>
+        </details>
 
         <pre className="lpe-hud__json">{arrayLiteral(positions)}</pre>
 

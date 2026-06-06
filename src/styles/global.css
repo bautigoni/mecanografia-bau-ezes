@@ -1892,9 +1892,22 @@ a {
 
 /* Level nodes pop in one after another after the island lands.
    The overshoot is subtle so each platform feels like it's "landing"
-   rather than springing. */
+   rather than springing. Disabled during editing so nodes sit still
+   and can be placed precisely. */
 .level-node {
   animation: nodePop 560ms cubic-bezier(0.22, 1.2, 0.34, 1) both;
+}
+.is-editing-levels .level-node {
+  animation: none;
+}
+.is-editing-levels .level-node:hover {
+  transform: translate(-50%, -50%) !important;
+}
+.is-editing-levels .level-node__icon {
+  animation: none !important;
+}
+.is-editing-levels .level-node__img {
+  animation: none !important;
 }
 .level-node:nth-child(1) { animation-delay: 620ms; }
 .level-node:nth-child(2) { animation-delay: 700ms; }
@@ -2186,7 +2199,7 @@ a {
 .csv-import__result li.err { background: rgba(255, 159, 202, 0.22); }
 .csv-import__result code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; color: #17355f; }
 .csv-import__result em { color: #b3265b; font-style: normal; }
-===================================================================== */
+
 .is-editing-levels { cursor: crosshair; }
 /* While placing markers, clear the panels that overlay the map so every
    platform (including those near the edges) is reachable for dragging. */
@@ -2243,13 +2256,40 @@ a {
 /* Markers become draggable handles in editor mode. */
 .level-node.is-editable { cursor: grab; touch-action: none; }
 .level-node.is-editable.is-dragging { cursor: grabbing; z-index: 12; }
+.level-node.is-editor-selected { z-index: 11; }
+.level-node.is-editor-selected .level-node__icon {
+  filter: drop-shadow(0 0 14px rgba(255, 210, 80, 0.95)) drop-shadow(0 10px 16px rgba(44, 63, 130, 0.34)) !important;
+}
+.level-node.is-editor-selected .level-node__img {
+  filter: drop-shadow(0 0 14px rgba(255, 210, 80, 0.95)) drop-shadow(0 10px 16px rgba(44, 63, 130, 0.34)) !important;
+}
+/* Selection ring lives on the perspective wrapper so it scales with the node. */
+.level-node.is-editor-selected .level-node__perspective--custom::after {
+  position: absolute;
+  inset: -0.5rem;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 210, 80, 0.65);
+  box-shadow: 0 0 10px rgba(255, 210, 80, 0.35);
+  content: "";
+  pointer-events: none;
+}
+/* For nodes without custom perspective, the ring goes on the button directly. */
+.level-node.is-editor-selected:not(:has(.level-node__perspective--custom))::after {
+  position: absolute;
+  inset: -0.5rem;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 210, 80, 0.65);
+  box-shadow: 0 0 10px rgba(255, 210, 80, 0.35);
+  content: "";
+  pointer-events: none;
+}
 .level-node.is-editable .level-node__platform { outline: 2px dashed rgba(255, 255, 255, 0.85); outline-offset: 3px; }
 .level-node__coord {
   position: absolute;
   left: 50%;
-  bottom: -1.2rem;
+  bottom: -2.8rem;
   transform: translateX(-50%);
-  padding: 0.05rem 0.35rem;
+  padding: 0.05rem 0.4rem;
   border-radius: 0.4rem;
   font-family: var(--font-display);
   font-weight: 800;
@@ -2257,6 +2297,61 @@ a {
   color: #fff;
   background: rgba(89, 50, 212, 0.9);
   white-space: nowrap;
+}
+
+/* 3D perspective layer — absolutely fills the button, carries CSS 3D transforms. */
+.level-node__layer {
+  display: contents;
+}
+.level-node__layer--custom {
+  display: block;
+  position: absolute;
+  inset: 0;
+  transform-origin: center center;
+}
+
+/* Nested wrapper that applies the base perspective to the number text,
+   so it sits in the same 3D plane as the pre-rendered image. */
+.level-node__num-layer {
+  position: absolute;
+  inset: 0;
+  transform-origin: center center;
+}
+
+/* Selection ring on the image layer (scales with the node). */
+.level-node.is-editor-selected .level-node__layer--custom::after {
+  position: absolute;
+  inset: -0.5rem;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 210, 80, 0.65);
+  box-shadow: 0 0 10px rgba(255, 210, 80, 0.35);
+  content: "";
+  pointer-events: none;
+}
+.level-node.is-editor-selected:not(:has(.level-node__layer--custom))::after {
+  position: absolute;
+  inset: -0.5rem;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 210, 80, 0.65);
+  box-shadow: 0 0 10px rgba(255, 210, 80, 0.35);
+  content: "";
+  pointer-events: none;
+}
+.level-node__perspective--custom {
+  display: block;
+  position: absolute;
+  inset: 0;
+  transform-origin: center center;
+}
+.level-node__perspective--custom .level-node__img {
+  transform: translate(-50%, -50%);
+}
+/* Keep old icon classes for backward compat */
+.level-node__perspective--custom .level-node__icon {
+  transform: translate(-50%, -50%);
+}
+.level-node__perspective--custom .level-node__icon--medal {
+  transform: translate(-50%, -42%);
 }
 
 /* Fixed HUD panel. */
@@ -2276,12 +2371,28 @@ a {
   background: linear-gradient(165deg, rgba(255, 255, 255, 0.97), rgba(244, 248, 255, 0.94));
   box-shadow: 0 22px 50px rgba(54, 86, 134, 0.28);
   backdrop-filter: blur(14px);
+  /* Override inherited pointer-events: none from .level-map so buttons and
+     sliders inside the HUD actually receive clicks. */
+  pointer-events: auto;
 }
 .lpe-hud__head { display: flex; align-items: center; justify-content: space-between; }
 .lpe-hud__head strong { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-display); color: #17355f; }
 .lpe-hud__close { border: 0; background: transparent; color: #8a93b8; cursor: pointer; }
 .lpe-hud__hint { margin: 0; color: #61709e; font-weight: 700; font-size: 0.78rem; }
 .lpe-hud__readout { display: grid; gap: 0.15rem; font-weight: 800; font-size: 0.8rem; color: #45558a; }
+.lpe-mode-badge {
+  display: inline-block;
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.3rem;
+  font-weight: 900;
+  font-size: 0.68rem;
+  background: rgba(123, 108, 255, 0.1);
+  color: #7c71ff;
+}
+.lpe-mode-badge.is-on {
+  background: linear-gradient(135deg, #7c71ff, #5932d4);
+  color: #fff;
+}
 .lpe-hud__toggles { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .lpe-chip {
   display: inline-flex; align-items: center; gap: 0.35rem;
@@ -2306,6 +2417,86 @@ a {
   font-weight: 800; font-size: 0.8rem; cursor: pointer;
 }
 .lpe-btn--primary { color: #fff; border-color: transparent; background: linear-gradient(135deg, #54e8c6, #536bff); }
+
+/* ── Perspective controls inside the editor HUD ── */
+.lpe-perspective {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border-radius: 0.8rem;
+  background: rgba(123, 108, 255, 0.08);
+  border: 1px solid rgba(123, 108, 255, 0.18);
+}
+.lpe-perspective__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #5932d4;
+}
+.lpe-slider {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr 2.8rem;
+  align-items: center;
+  gap: 0.3rem;
+}
+.lpe-slider__label {
+  font-weight: 750;
+  font-size: 0.7rem;
+  color: #61709e;
+}
+.lpe-slider__input {
+  width: 100%;
+  height: 0.3rem;
+  accent-color: #7c71ff;
+  cursor: pointer;
+}
+.lpe-slider__val {
+  font-weight: 800;
+  font-size: 0.72rem;
+  color: #17355f;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Keyboard shortcut cheatsheet inside editor HUD ── */
+.lpe-kbd {
+  font-size: 0.7rem;
+  color: #45558a;
+}
+.lpe-kbd__summary {
+  font-weight: 750;
+  cursor: pointer;
+  color: #61709e;
+}
+.lpe-kbd__table {
+  width: 100%;
+  margin-top: 0.25rem;
+  border-collapse: collapse;
+}
+.lpe-kbd__table td {
+  padding: 0.12rem 0.2rem;
+  vertical-align: middle;
+}
+.lpe-kbd__table td:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+.lpe-kbd kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.15rem;
+  border-radius: 0.22rem;
+  border: 1px solid rgba(123, 108, 255, 0.32);
+  background: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.6rem;
+  color: #5932d4;
+  vertical-align: middle;
+}
 
 /* =====================================================================
    COMPACT ISLAND UI — floating header + selected-level popover.
@@ -2514,38 +2705,121 @@ a {
   filter: brightness(1.05);
 }
 
-/* ---- Image level badges (replace the old CSS number platform) ---- */
-.level-node__icon {
+/* ---- 3D level button images (replace the old icon badges) ---- */
+.level-node__img {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: clamp(5.6rem, 7vw, 7.6rem);
+  width: clamp(6.6rem, 8.2vw, 9rem);
   height: auto;
   transform: translate(-50%, -50%);
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
-  filter: drop-shadow(0 10px 16px rgba(44, 63, 130, 0.34));
+  filter: drop-shadow(0 12px 18px rgba(44, 63, 130, 0.36));
 }
-/* Completed badges bake a star row UNDER the disc, so they are taller —
-   anchor a touch higher + scale up so the numbered disc still sits centred
-   on the painted platform (same spot the old number badge occupied). */
-.level-node__icon--medal {
-  width: clamp(6.8rem, 8.4vw, 9.2rem);
-  transform: translate(-50%, -42%);
+.level-node__img--pressed {
+  /* Same dimensions, switched in via JS hover state */
 }
-.level-node--actual .level-node__icon {
-  animation: levelIconPulse 1.9s ease-in-out infinite;
+.level-node__img--hidden {
+  opacity: 0;
 }
-@keyframes levelIconPulse {
-  0%, 100% { filter: drop-shadow(0 10px 16px rgba(44, 63, 130, 0.34)); }
-  50% {
-    filter: drop-shadow(0 0 18px rgba(99, 144, 255, 0.85)) drop-shadow(0 10px 16px rgba(44, 63, 130, 0.34));
-    transform: translate(-50%, -53%) scale(1.05);
-  }
+
+/* Level number overlaid on the button surface, inside the 3D perspective. */
+.level-node__number {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  font-family: var(--font-display);
+  font-weight: 900;
+  color: #fff;
+  line-height: 1;
+  text-align: center;
+  text-shadow:
+    0 0 0.8rem rgba(255, 255, 255, 0.95),
+    0 0 1.8rem rgba(255, 255, 255, 0.55),
+    0 0 3rem rgba(255, 255, 255, 0.3),
+    0 3px 10px rgba(20, 30, 70, 0.3);
+  pointer-events: none;
+  user-select: none;
+  transition: transform 120ms ease;
 }
-.level-node.is-selected .level-node__icon {
-  filter: drop-shadow(0 0 18px rgba(124, 113, 255, 0.95)) drop-shadow(0 10px 16px rgba(44, 63, 130, 0.34));
+.level-node:hover .level-node__number {
+  transform: translate(-50%, calc(-50% + 3px));
+}
+.is-editing-levels .level-node:hover .level-node__number {
+  transform: translate(-50%, -50%);
+}
+.level-node__number--completed {
+  color: #ffd552;
+  text-shadow: 0 3px 12px rgba(180, 140, 30, 0.5);
+}
+.level-node__number--blocked {
+  color: rgba(255, 255, 255, 0.55);
+  text-shadow: 0 2px 6px rgba(40, 40, 60, 0.3);
+}
+
+/* Completion checkmark (positioned on the platform). */
+.level-node__check {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  display: grid;
+  width: 2.2rem;
+  height: 2.2rem;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(145deg, #95ee86, #44bd69);
+  box-shadow:
+    0 10px 16px rgba(49, 145, 89, 0.22),
+    0 0 16px rgba(113, 232, 125, 0.32);
+}
+.level-node__check svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+/* Blocked lock icon (positioned on the platform). */
+.level-node__lock {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  display: grid;
+  width: 2.2rem;
+  height: 2.2rem;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(145deg, rgba(158, 158, 171, 0.96), rgba(102, 104, 121, 0.96));
+  filter: drop-shadow(0 3px 6px rgba(42, 45, 76, 0.2));
+}
+
+/* Star rating under the platform (3-star row). */
+.level-node__rating {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + clamp(2.2rem, 2.5vw, 2.8rem));
+  z-index: 4;
+  display: inline-flex;
+  gap: 0.12rem;
+  margin-top: 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 0.62rem;
+  padding: 0.22rem 0.38rem;
+  color: #ffd552;
+  background: rgba(56, 48, 96, 0.72);
+  box-shadow:
+    0 9px 14px rgba(38, 37, 89, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transform: translateX(-50%);
+  backdrop-filter: blur(10px);
 }
 
 .level-node__platform {
@@ -2582,20 +2856,7 @@ a {
   content: "";
 }
 
-.level-node__number {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  color: white;
-  font-size: clamp(2rem, 2.6vw, 2.8rem);
-  font-weight: 950;
-  line-height: 1;
-  text-align: center;
-  text-shadow: 0 3px 10px rgba(26, 35, 86, 0.22);
-  transform: translateY(-0.02em);
-}
+
 
 .level-node__check {
   position: absolute;
