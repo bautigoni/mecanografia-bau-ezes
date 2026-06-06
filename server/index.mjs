@@ -30,7 +30,7 @@ const app = express();
 app.use(express.json());
 
 app.post("/api/invitations/send", async (req, res) => {
-  const { email, name, role, link } = req.body ?? {};
+  const { email, name, role, link, school } = req.body ?? {};
   if (!email || !link) {
     return res.status(400).json({ ok: false, error: "Missing email or link" });
   }
@@ -41,7 +41,8 @@ app.post("/api/invitations/send", async (req, res) => {
 
   // Strip angle brackets from admin-entered fields so they can't inject markup.
   const safeName = name ? String(name).replace(/[<>]/g, "") : "";
-  const safeRole = role ? String(role).replace(/[<>]/g, "") : "docente";
+  const safeRole = role ? String(role).replace(/[<>]/g, "") : "Docente";
+  const safeSchool = school ? String(school).replace(/[<>]/g, "") : "";
 
   try {
     const resend = new Resend(RESEND_API_KEY);
@@ -61,7 +62,7 @@ app.post("/api/invitations/send", async (req, res) => {
         </td></tr>
         <tr><td style="padding:32px 30px 6px;">
           <h1 style="margin:0 0 10px;font-size:22px;color:#17355f;">¡Hola${safeName ? " " + safeName : ""}! 👋</h1>
-          <p style="margin:0 0 6px;font-size:15px;line-height:1.6;color:#4a5891;">Te invitaron a <strong>Typely</strong> como <strong>${safeRole}</strong>. Aceptá tu invitación y empezá a acompañar a tus alumnos en su aventura.</p>
+          <p style="margin:0 0 6px;font-size:15px;line-height:1.6;color:#4a5891;">Te invitaron a <strong>Typely</strong> como <strong>${safeRole}</strong>${safeSchool ? ` en <strong>${safeSchool}</strong>` : ""}. Aceptá tu invitación y empezá a acompañar a tus alumnos en su aventura.</p>
         </td></tr>
         <tr><td align="center" style="padding:18px 30px 6px;">
           <a href="${link}" style="display:inline-block;background:linear-gradient(135deg,#54e8c6,#25c8df,#536bff);color:#ffffff;text-decoration:none;font-size:16px;font-weight:800;padding:15px 40px;border-radius:999px;box-shadow:0 10px 22px rgba(83,107,255,0.35);">Acceder a Typely&nbsp;→</a>

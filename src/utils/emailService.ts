@@ -11,8 +11,18 @@
  * keeps the invitation as "pending" + shows a copyable link instead.
  * ===================================================================== */
 
-import type { Invitation } from "../types";
-import { buildInvitationLink } from "./storage";
+import type { Invitation, Role } from "../types";
+import { buildInvitationLink, getSiteById } from "./storage";
+
+/* Friendly Spanish labels so the email reads "Docente" / "Admin de sede"
+   instead of the internal role ids ("profesor" / "admin-sede"). */
+const ROLE_LABELS: Partial<Record<Role, string>> = {
+  profesor: "Docente",
+  "admin-sede": "Admin de sede",
+  "admin-general": "Admin general",
+  superadmin: "Superadmin",
+  alumno: "Alumno",
+};
 
 const ENDPOINT =
   (import.meta.env.VITE_INVITE_API_URL as string | undefined)?.trim() ||
@@ -32,10 +42,12 @@ export async function sendInvitationEmail(invitation: Invitation): Promise<SendR
   const link = buildInvitationLink(invitation.token);
 
   // Only the public, non-sensitive fields are sent to our own backend.
+  const school = invitation.siteId ? getSiteById(invitation.siteId)?.name : undefined;
   const payload = {
     email: invitation.email,
     name: invitation.name,
-    role: invitation.role,
+    role: ROLE_LABELS[invitation.role] ?? invitation.role,
+    school,
     token: invitation.token,
     link,
   };
