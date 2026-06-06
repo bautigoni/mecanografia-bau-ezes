@@ -325,6 +325,23 @@ export function getTeacherStudents(activeUser: ActiveUser | null) {
   return data.users.filter((user) => classRoom.studentIds.includes(user.id));
 }
 
+/** All classes a teacher teaches (teacherIds includes them). Falls back to the
+ *  single class on their user record if none reference them explicitly. */
+export function getClassesForTeacher(activeUser: ActiveUser | null): ClassRoom[] {
+  if (!activeUser) return [];
+  const data = getDemoData();
+  const byTeacher = data.classes.filter((c) => c.teacherIds.includes(activeUser.id));
+  if (byTeacher.length) return byTeacher;
+  if (activeUser.classId) return data.classes.filter((c) => c.id === activeUser.classId);
+  return [];
+}
+
+/** Look up a single user by id (used by the per-student detail screen). */
+export function getUserById(userId?: string): EduTicUser | undefined {
+  if (!userId) return undefined;
+  return getDemoData().users.find((u) => u.id === userId);
+}
+
 export function addUserToClass(user: EduTicUser, classId?: string) {
   const data = getDemoData();
   const classes: ClassRoom[] = classId

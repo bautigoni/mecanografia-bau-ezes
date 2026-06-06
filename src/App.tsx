@@ -6,6 +6,8 @@ import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { WorldsPage } from "./pages/WorldsPage";
 import { IslandDetailPage } from "./pages/IslandDetailPage";
 import { TeacherPage } from "./pages/TeacherPage";
+import { TeacherClassPage } from "./pages/TeacherClassPage";
+import { TeacherStudentPage } from "./pages/TeacherStudentPage";
 import { RewardsPage } from "./pages/RewardsPage";
 import { AccountPage } from "./pages/AccountPage";
 import { MissionsPage } from "./pages/MissionsPage";
@@ -96,6 +98,8 @@ export function App() {
 
       <Route element={<ProtectedRoute roles={["profesor"]} />}>
         <Route path="/profesor" element={<TeacherPage />} />
+        <Route path="/profesor/curso/:classId" element={<TeacherClassPage />} />
+        <Route path="/profesor/alumno/:studentId" element={<TeacherStudentPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/login" replace />} />

@@ -9277,6 +9277,112 @@ h3, h4 {
   background: linear-gradient(135deg, #d8ffe4, #fff7d6);
 }
 
+/* ── Teacher screens (per-class + per-student) ── */
+.tch-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.tch-chip--flying { color: #1f8a6e; background: rgba(91, 232, 186, 0.22); }
+.tch-chip--atRisk { color: #c43757; background: rgba(255, 122, 140, 0.2); }
+.tch-chip--idle { color: #6a78a8; background: rgba(120, 140, 190, 0.16); }
+.tch-chip--neutral { color: #4a5891; background: rgba(83, 107, 255, 0.14); }
+
+.tch-people { display: grid; gap: 0.5rem; }
+.tch-people__row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  padding: 0.55rem 0.7rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.7);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+.tch-people__row:hover { transform: translateY(-1px); box-shadow: 0 10px 20px rgba(54, 86, 134, 0.12); }
+.tch-people__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tch-people__main strong { color: #17355f; font-size: 0.92rem; }
+.tch-people__main small { color: #6a78a8; font-size: 0.78rem; }
+.tch-people__avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  background: linear-gradient(145deg, #54e8c6, #536bff);
+}
+
+.tch-table { display: grid; gap: 0.45rem; }
+.tch-table__row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  padding: 0.55rem 0.75rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.7);
+}
+.tch-table__name { display: flex; flex-direction: column; min-width: 7rem; flex: 1; }
+.tch-table__name strong { color: #17355f; font-size: 0.9rem; }
+.tch-table__name small { color: #6a78a8; font-size: 0.76rem; }
+.tch-table__bar { flex: 1; min-width: 6rem; margin: 0; }
+.tch-table__pct { font-weight: 900; color: #1f8a6e; font-size: 0.85rem; min-width: 3rem; text-align: right; }
+.tch-table__actions { display: flex; gap: 0.35rem; margin-left: auto; }
+.tch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid rgba(116, 154, 211, 0.3);
+  border-radius: 0.7rem;
+  padding: 0.38rem 0.62rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #4a5891;
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+.tch-btn:hover { transform: translateY(-1px); background: #fff; box-shadow: 0 8px 16px rgba(54, 86, 134, 0.14); }
+.tch-btn--primary { color: #fff; border-color: transparent; background: linear-gradient(135deg, #54e8c6, #25c8df, #536bff); }
+
+.tch-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 999px;
+  padding: 0.5rem 0.95rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: #17355f;
+  background: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+}
+.tch-back:hover { background: #fff; }
+
+.tch-stat-grid {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+.tch-detail { display: grid; gap: 0.3rem; color: #4a5891; font-weight: 700; }
+.tch-detail strong { color: #17355f; }
+.tch-detail p { margin: 0; }
+
 /* Responsive: collapse sidebar to top bar on small screens */
 @media (max-width: 920px) {
   .dash-shell { grid-template-columns: 1fr; }

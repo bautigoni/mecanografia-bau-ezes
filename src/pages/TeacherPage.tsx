@@ -1,14 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
-import { BookOpen, GraduationCap, Home, LineChart, Power, PowerOff, TrendingUp, Users } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  ArrowRight,
+  BookOpen,
+  GraduationCap,
+  Home,
+  KeyRound,
+  Sparkles,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
 import { DashboardShell, KpiCard, type DashNavItem } from "../components/dashboard/DashboardShell";
 import { useAuth } from "../hooks/useAuth";
-import { worlds } from "../data/worlds";
-import { getEnabledWorldsForClass, getTeacherStudents, updateTeacherWorldSelection } from "../utils/storage";
+import { getClassesForTeacher, getStudentsInClass, resetUserPassword } from "../utils/storage";
+import { STATUS_LABEL, studentStatus } from "../utils/studentStatus";
 import { assets } from "../utils/assets";
-import { api } from "../utils/api";
+import type { EduTicUser } from "../types";
 
 const NAV: DashNavItem[] = [
   { id: "inicio", label: "Inicio", icon: Home },
@@ -16,126 +25,89 @@ const NAV: DashNavItem[] = [
   { id: "estudiantes", label: "Estudiantes", icon: Users },
 ];
 
-interface ApiStudentRow {
-  id: string;
-  fullName: string;
-  email: string;
-  username?: string;
-  classId?: string | null;
-  progress: Array<{ worldId: string; levelNumber: number; bestAccuracy: number; bestWpm: number | null; attempts: number; lastAttemptAt: string }>;
-}
-
-function summariseAccuracy(rows: ApiStudentRow[]): number {
-  if (!rows.length) return 0;
-  let total = 0;
-  for (const s of rows) {
-    if (!s.progress.length) continue;
-    const max = s.progress.reduce((m, p) => Math.max(m, p.bestAccuracy), 0);
-    total += max;
-  }
-  return Math.round(total / rows.length);
+function StatusChip({ student }: { student: EduTicUser }) {
+  const st = studentStatus(student);
+  return <span className={`tch-chip tch-chip--${st}`}>{STATUS_LABEL[st]}</span>;
 }
 
 export function TeacherPage() {
-  const { user, logout, usingApi } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [section, setSection] = useState("inicio");
   const [message, setMessage] = useState("");
-  const [apiStudents, setApiStudents] = useState<ApiStudentRow[] | null>(null);
+  const [version, setVersion] = useState(0);
 
-  /* Prefer the API when the session is API-backed. Falls back to
-     localStorage if the request fails (offline demo mode, fresh deploy). */
-  useEffect(() => {
-    if (!usingApi) {
-      setApiStudents(null);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const rows = (await api.listUsers({ role: "alumno" })) as ApiStudentRow[];
-        if (!cancelled) setApiStudents(rows);
-      } catch {
-        if (!cancelled) setApiStudents(null);
+  const classes = useMemo(() => getClassesForTeacher(user), [user, version]);
+
+  /* Every student across the teacher's classes (de-duplicated), tagged with
+     their course name. Pure localStorage — the per-attempt history would need
+     the backend. */
+  const students = useMemo(() => {
+    const seen = new Set<string>();
+    const list: Array<EduTicUser & { className: string; classId: string }> = [];
+    for (const c of classes) {
+      for (const s of getStudentsInClass(c.id)) {
+        if (seen.has(s.id)) continue;
+        seen.add(s.id);
+        list.push({ ...s, className: c.name, classId: c.id });
       }
-    })();
-    return () => { cancelled = true; };
-  }, [usingApi]);
+    }
+    return list;
+  }, [classes, version]);
 
-  const localStudents = useMemo(() => getTeacherStudents(user), [user]);
-  const students: ApiStudentRow[] = apiStudents
-    ? apiStudents.map((s) => ({ ...s }))
-    : localStudents.map((s) => ({
-        id: s.id,
-        fullName: s.name,
-        email: s.email ?? "",
-        classId: s.classId,
-        progress: s.stats
-          ? [
-              {
-                worldId: "island1",
-                levelNumber: 1,
-                bestAccuracy: s.stats.precision,
-                bestWpm: s.stats.speed,
-                attempts: 1,
-                lastAttemptAt: new Date().toISOString(),
-              },
-            ]
-          : [],
-      }));
-  const classId = user?.classId ?? "clase-3a";
-  const allWorldIds = useMemo(() => worlds.map((w) => w.id), []);
-  const [enabled, setEnabled] = useState<Set<string>>(() => new Set(getEnabledWorldsForClass(classId) ?? allWorldIds));
+  const avgPrecision = students.length
+    ? Math.round(students.reduce((a, s) => a + (s.stats?.precision ?? 0), 0) / students.length)
+    : 0;
+  const atRisk = students.filter((s) => studentStatus(s) === "atRisk");
+  const flying = students.filter((s) => studentStatus(s) === "flying");
+  const firstName = (user?.name ?? "Profe").split(" ")[0];
 
-  function toggleWorld(worldId: string) {
-    const next = !enabled.has(worldId);
-    const updated = updateTeacherWorldSelection(classId, worldId, next, allWorldIds);
-    setEnabled(new Set(updated));
-    setMessage(next ? "Isla habilitada para la clase." : "Isla deshabilitada para la clase.");
-  }
   function leave() {
     void logout();
     navigate("/login");
   }
-
-  const enabledWorlds = worlds.filter((w) => enabled.has(w.id));
-  const avgPrecision = summariseAccuracy(students);
-  const firstName = (user?.name ?? "Profe").split(" ")[0];
-
-  const kpis = (
-    <div className="kpi-grid">
-      <KpiCard icon={GraduationCap} label="Mis cursos" value={enabledWorlds.length} tone="violet" onClick={() => setSection("cursos")} />
-      <KpiCard icon={BookOpen} label="Islas totales" value={`${enabledWorlds.length} / ${worlds.length}`} tone="green" />
-      <KpiCard icon={Users} label="Estudiantes" value={students.length} tone="pink" onClick={() => setSection("estudiantes")} />
-      <KpiCard icon={TrendingUp} label="Progreso promedio" value={`${avgPrecision}%`} tone="blue" />
-    </div>
-  );
+  function resetPw(s: EduTicUser) {
+    const pw = resetUserPassword(s.id);
+    if (pw) {
+      setMessage(`Clave temporal de ${s.name}: ${s.username} / ${pw}`);
+      setVersion((v) => v + 1);
+    }
+  }
 
   const hero = (
     <>
       <span className="dash-eyebrow"><Home size={18} /> Docente</span>
       <h1>Hola, <span className="grad">{firstName}</span> 👋</h1>
-      <p>Gestioná tus cursos, revisá el progreso de tus estudiantes y acompañalos en su aprendizaje.</p>
+      <p>Entrá a cada curso para ver a tus alumnos, asignar niveles y seguir su progreso.</p>
     </>
   );
 
-  const courseCards = (
-    <div className="course-grid">
-      {enabledWorlds.map((w) => (
-        <div key={w.id} className="course-card">
-          <div className="course-card__top">
-            <img className="course-card__thumb" src={w.thumbnail} alt="" decoding="async" loading="lazy" />
-            <div>
-              <strong>{w.title}</strong>
-              <span>{w.levels.length} niveles</span>
-            </div>
-          </div>
-          <div className="progress-track"><div className="progress-track__fill" style={{ width: `${avgPrecision}%` }} /></div>
-          <span className="kpi-card__trend">{avgPrecision}% progreso de la clase</span>
-        </div>
-      ))}
+  const kpis = (
+    <div className="kpi-grid">
+      <KpiCard icon={BookOpen} label="Mis cursos" value={classes.length} tone="violet" onClick={() => setSection("cursos")} />
+      <KpiCard icon={Users} label="Estudiantes" value={students.length} tone="pink" onClick={() => setSection("estudiantes")} />
+      <KpiCard icon={TrendingUp} label="Precisión promedio" value={`${avgPrecision}%`} tone="blue" />
+      <KpiCard icon={Sparkles} label="Van volando" value={flying.length} tone="green" />
     </div>
   );
+
+  function PeopleMini({ list, empty }: { list: typeof students; empty: string }) {
+    if (list.length === 0) return <div className="empty-state empty-state--compact"><h3>{empty}</h3></div>;
+    return (
+      <div className="tch-people">
+        {list.slice(0, 5).map((s) => (
+          <button key={s.id} type="button" className="tch-people__row" onClick={() => navigate(`/profesor/alumno/${s.id}`)}>
+            <span className="tch-people__avatar">{s.name.charAt(0).toUpperCase()}</span>
+            <span className="tch-people__main">
+              <strong>{s.name}</strong>
+              <small>{s.className} · {Math.round(s.stats?.precision ?? 0)}% precisión</small>
+            </span>
+            <ArrowRight size={16} />
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <DashboardShell
@@ -157,93 +129,78 @@ export function TeacherPage() {
           {kpis}
           <div className="dash-grid-2">
             <section className="dash-section">
-              <div className="dash-section__head"><h2><BookOpen size={20} /> Mis cursos</h2></div>
-              {enabledWorlds.length === 0
-                ? <div className="empty-state empty-state--compact"><h3>Sin cursos habilitados</h3><p>Activá islas en "Mis cursos".</p></div>
-                : courseCards}
+              <div className="dash-section__head"><h2>🆘 Necesitan ayuda</h2></div>
+              <PeopleMini list={atRisk} empty="Nadie en riesgo por ahora 🎉" />
             </section>
             <section className="dash-section">
-              <div className="dash-section__head"><h2><LineChart size={20} /> Progreso de estudiantes</h2></div>
-              {students.length === 0 ? (
-                <div className="empty-state empty-state--compact"><h3>Sin estudiantes</h3></div>
-              ) : (
-                <div>
-                  {students.map((s) => {
-                    const max = s.progress.reduce((m, p) => Math.max(m, p.bestAccuracy), 0);
-                    return (
-                      <div key={s.id} className="progress-row">
-                        <span className="progress-row__name">{s.fullName}</span>
-                        <div className="progress-track"><div className="progress-track__fill" style={{ width: `${max}%` }} /></div>
-                        <span className="progress-row__pct">{max}%</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="dash-section__head"><h2>🚀 Van volando</h2></div>
+              <PeopleMini list={flying} empty="Todavía sin destacados" />
             </section>
           </div>
           <section className="dash-section">
-            <div className="dash-tip">
-              <img src={assets.mascotFemaleLaptop} alt="" decoding="async" />
-              <div className="dash-tip__body">
-                <h3>¡Excelente trabajo! 💡</h3>
-                <p>Revisar el progreso a diario motiva a tus estudiantes y mejora sus resultados.</p>
-                <Button variant="secondary" onClick={() => setSection("cursos")}>Ver mis cursos</Button>
+            <div className="dash-section__head"><div><h2><BookOpen size={20} /> Mis cursos</h2><p>Entrá a un curso para gestionarlo.</p></div></div>
+            {classes.length === 0 ? (
+              <div className="empty-state empty-state--compact"><h3>Todavía no tenés cursos asignados</h3></div>
+            ) : (
+              <div className="people-card-grid">
+                {classes.map((c) => {
+                  const roster = getStudentsInClass(c.id);
+                  const avg = roster.length ? Math.round(roster.reduce((a, s) => a + (s.stats?.precision ?? 0), 0) / roster.length) : 0;
+                  return (
+                    <button key={c.id} type="button" className="people-card people-card--button" onClick={() => navigate(`/profesor/curso/${c.id}`)}>
+                      <span className="people-card__avatar people-card__avatar--green"><BookOpen size={20} /></span>
+                      <div><strong>{c.name}</strong><span>{roster.length} alumnos · {avg}% precisión</span></div>
+                    </button>
+                  );
+                })}
               </div>
-            </div>
+            )}
           </section>
         </>
       )}
 
       {section === "cursos" && (
         <section className="dash-section">
-          <div className="dash-section__head">
-            <div><h2><BookOpen size={20} /> Islas de la clase</h2><p>Elegí qué islas pueden ver tus alumnos. Se guarda automáticamente.</p></div>
-          </div>
-          <div className="island-toggle-grid">
-            {worlds.map((world) => {
-              const isOn = enabled.has(world.id);
-              return (
-                <article key={world.id} className={`island-toggle-card ${isOn ? "is-on" : "is-off"}`}>
-                  <div className="island-toggle-card__thumb">
-                    <img src={world.thumbnail} alt="" decoding="async" loading="lazy" />
-                    <span className="island-toggle-card__order">#{world.order}</span>
-                  </div>
-                  <div className="island-toggle-card__body">
-                    <strong>{world.title}</strong>
-                    <span className="island-toggle-card__topic">{world.topic}</span>
-                    <span className="island-toggle-card__meta">{world.levels.length} niveles</span>
-                  </div>
-                  <button
-                    type="button"
-                    className={`island-toggle-card__switch ${isOn ? "is-on" : "is-off"}`}
-                    onClick={() => toggleWorld(world.id)}
-                    aria-pressed={isOn}
-                  >
-                    {isOn ? <Power size={16} /> : <PowerOff size={16} />}
-                    {isOn ? "Habilitada" : "Deshabilitada"}
+          <div className="dash-section__head"><div><h2><BookOpen size={20} /> Mis cursos</h2><p>Tocá un curso para ver sus alumnos y asignar niveles.</p></div></div>
+          {classes.length === 0 ? (
+            <div className="empty-state empty-state--compact"><h3>Todavía no tenés cursos asignados</h3></div>
+          ) : (
+            <div className="people-card-grid">
+              {classes.map((c) => {
+                const roster = getStudentsInClass(c.id);
+                const avg = roster.length ? Math.round(roster.reduce((a, s) => a + (s.stats?.precision ?? 0), 0) / roster.length) : 0;
+                return (
+                  <button key={c.id} type="button" className="people-card people-card--button" onClick={() => navigate(`/profesor/curso/${c.id}`)} title="Abrir curso">
+                    <span className="people-card__avatar people-card__avatar--green"><BookOpen size={20} /></span>
+                    <div><strong>{c.name}</strong><span>{roster.length} alumnos · {avg}% precisión</span></div>
                   </button>
-                </article>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
 
       {section === "estudiantes" && (
         <section className="dash-section">
-          <div className="dash-section__head"><div><h2><Users size={20} /> Mis estudiantes</h2><p>Avance básico para acompañar a cada uno.</p></div></div>
+          <div className="dash-section__head"><div><h2><Users size={20} /> Mis estudiantes</h2><p>Todos tus alumnos, de todos tus cursos.</p></div></div>
           {students.length === 0 ? (
             <div className="empty-state empty-state--compact"><h3>Sin estudiantes</h3></div>
           ) : (
-            <div>
+            <div className="tch-table">
               {students.map((s) => {
-                const max = s.progress.reduce((m, p) => Math.max(m, p.bestAccuracy), 0);
+                const pct = Math.round(s.stats?.precision ?? 0);
                 return (
-                  <div key={s.id} className="progress-row">
-                    <span className="progress-row__name">{s.fullName}</span>
-                    <div className="progress-track"><div className="progress-track__fill" style={{ width: `${max}%` }} /></div>
-                    <span className="progress-row__pct">{max}%</span>
+                  <div key={s.id} className="tch-table__row">
+                    <span className="tch-people__avatar">{s.name.charAt(0).toUpperCase()}</span>
+                    <span className="tch-table__name"><strong>{s.name}</strong><small>{s.className}</small></span>
+                    <div className="progress-track tch-table__bar"><div className="progress-track__fill" style={{ width: `${pct}%` }} /></div>
+                    <span className="tch-table__pct">{pct}%</span>
+                    <StatusChip student={s} />
+                    <div className="tch-table__actions">
+                      <button type="button" className="tch-btn" onClick={() => navigate(`/profesor/alumno/${s.id}`)}>Ver</button>
+                      <button type="button" className="tch-btn" onClick={() => resetPw(s)} title="Restablecer contraseña"><KeyRound size={14} /></button>
+                    </div>
                   </div>
                 );
               })}
