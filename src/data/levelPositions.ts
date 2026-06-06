@@ -55,7 +55,7 @@ export type LevelPosition = {
    the level order (index 0 = level 1, index 1 = level 2, …). */
 export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = {
   island1: [
-    { x: 31, y: 66.5 },
+    { x: 31.1, y: 68.86, scale: 1.4, rotateX: -6 },
     { x: 26.2, y: 50.2 },
     { x: 38.7, y: 40.3 },
     { x: 56.8, y: 33.7 },
