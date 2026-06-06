@@ -501,10 +501,16 @@ export function createTeacher(input: { name: string; email?: string; siteId?: st
     name: input.name.trim(),
     username: credentials.username,
     password: credentials.password,
-    email: input.email?.trim() || undefined,
+    // Normalised so a later Google sign-in with the same address matches.
+    email: input.email ? normalizeEmail(input.email) : undefined,
     role: "profesor",
     siteId: input.siteId,
     classId: input.classId,
+    // Same forced-change flow as a sede admin: the generated password is
+    // temporary and must be changed on first sign-in.
+    mustChangePassword: true,
+    temporaryPassword: true,
+    passwordResetAt: new Date().toISOString(),
   };
   addUserToClass(teacher, input.classId);
   return teacher;

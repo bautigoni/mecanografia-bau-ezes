@@ -172,7 +172,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginGoogle = useCallback(async (credential: string): Promise<GoogleLoginResult> => {
     const payload = parseJwtCredential(credential);
     if (!payload || !payload.email) return { ok: false, reason: "INVALID_TOKEN" };
-    if (!isEmailDomainAllowed(payload.email)) return { ok: false, reason: "DOMAIN_NOT_ALLOWED" };
+    /* NOTE: the domain allowlist is NOT applied up front anymore. An account
+       that an admin already created (any email, including @gmail.com) must be
+       able to sign in with Google. The allowlist only gates UNKNOWN emails. */
     try {
       const { user: apiUser } = await api.google(credential);
       const au = toActiveUser({ ...apiUser, mustChangePassword: false });
@@ -182,17 +184,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUsingApi(true);
       return { ok: true, user: au };
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) return { ok: false, reason: "USER_NOT_FOUND" };
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return { ok: false, reason: "INVALID_TOKEN" };
-      // Network error → local fallback
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        return { ok: false, reason: "INVALID_TOKEN" };
+      }
+      // 404 (server: no such user) or network error → look in the local user
+      // list. A matching account is ALWAYS allowed regardless of its domain.
       const nextUser = loginByGoogleEmail(payload.email);
-      if (!nextUser) return { ok: false, reason: "USER_NOT_FOUND" };
-      const au: ActiveUser = { ...nextUser, mustChangePassword: false };
-      setDemoMode(false);
-      setActiveUser(au);
-      setUser(au);
-      setUsingApi(false);
-      return { ok: true, user: au };
+      if (nextUser) {
+        const au: ActiveUser = { ...nextUser, mustChangePassword: false };
+        setDemoMode(false);
+        setActiveUser(au);
+        setUser(au);
+        setUsingApi(false);
+        return { ok: true, user: au };
+      }
+      // Unknown email: a non-allowlisted domain gets the clearer message.
+      if (!isEmailDomainAllowed(payload.email)) return { ok: false, reason: "DOMAIN_NOT_ALLOWED" };
+      return { ok: false, reason: "USER_NOT_FOUND" };
     }
   }, []);
 
