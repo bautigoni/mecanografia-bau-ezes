@@ -1063,11 +1063,11 @@ a {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
-  /* `vector-effect: non-scaling-stroke` was disabling the SVG path cache,
-     which meant every tick of the `routeShimmer` `stroke-dashoffset`
-     animation re-rasterized the filter region (feGaussianBlur +
-     feColorMatrix) for the whole track. Letting the stroke scale with the
-     path lets the browser cache the filtered output between dashes. */
+  /* The SVG is stretched non-uniformly (viewBox is hundreds of vw wide, drawn
+     with preserveAspectRatio="none"). Without non-scaling-stroke the stroke
+     width is scaled by that distortion, so the trail blew up into wide diagonal
+     beams. Keeping it pixel-sized restores the thin, consistent magical trail. */
+  vector-effect: non-scaling-stroke;
 }
 
 /* Soft coloured aura that blooms under the whole route. */
@@ -1659,7 +1659,6 @@ a {
   position: absolute;
   z-index: 5;
   bottom: clamp(-0.7rem, -1.4vh, -0.2rem);
-  left: 0;
   width: auto;
   max-width: 18vw;
   height: clamp(14rem, 32vh, 24rem);
