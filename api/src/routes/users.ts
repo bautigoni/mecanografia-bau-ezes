@@ -99,7 +99,10 @@ export async function userRoutes(app: FastifyInstance) {
       if (e instanceof ForbiddenError) return reply.code(e.status).send({ error: e.message });
       throw e;
     }
-    if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, data.sedeId ?? null)) {
+    // An admin-sede always creates within their OWN sede — never trust/require
+    // a client-sent sedeId for them. Superadmin/admin-general may target any.
+    const targetSede = actor.role === "admin-sede" ? (actor.sede ?? null) : (data.sedeId ?? null);
+    if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, targetSede)) {
       return reply.code(403).send({ error: "No podés crear usuarios en otra sede." });
     }
     const chosen = !!data.password;
@@ -114,7 +117,7 @@ export async function userRoutes(app: FastifyInstance) {
           email: data.email,
           username: data.username ?? makeUsername(data.fullName),
           role: data.role,
-          sedeId: data.sedeId ?? null,
+          sedeId: targetSede,
           classId: data.classId ?? null,
           grade: data.grade ?? "libre",
           passwordHash,
