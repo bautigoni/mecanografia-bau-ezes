@@ -55,9 +55,16 @@ must keep its dark futuristic ecosystem style. Do not make generic
 corporate dashboards unless asked.
 
 ## 11. Make responsive and usable interfaces
-All popups/modals must scroll when content exceeds viewport height.
-Buttons must remain reachable. Avoid UI that covers important interactive
-elements.
+The UI must work on three device classes: **common monitors** (default
+desktop layout), **small laptops / Chromebooks** (wide but short — the
+constraint is height, handled by the `@media (max-height: …)` blocks), and
+**phones** (handled by the consolidated "RESPONSIVE PASS" appended at the end
+of `src/styles/global.css` — width-only `≤768/600/430` queries). Add new
+phone rules there so they win the cascade without editing desktop styles, and
+keep desktop/Chromebook untouched. All popups/modals must scroll when content
+exceeds viewport height; buttons must stay reachable; never let fixed UI cover
+important interactive elements. Prefer fluid units (`clamp`, `vw/vh`) over
+per-pixel hacks. See CLAUDE.md §6.
 
 ## 12. Keep animations smooth and purposeful
 Use `animejs` / `framer-motion` only where useful. Avoid janky scroll,

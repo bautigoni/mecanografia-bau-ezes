@@ -33,3 +33,6 @@ pnpm-debug.log*
 
 # Claude/agent scratch
 .claude
+
+# Local asset backups (not shipped)
+_backups/
