@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   Building2,
@@ -22,16 +22,7 @@ import { Toast } from "../components/common/Toast";
 import { DashboardShell, KpiCard, type DashNavItem } from "../components/dashboard/DashboardShell";
 import { useAuth } from "../hooks/useAuth";
 import type { EduTicUser, Site } from "../types";
-import {
-  createSedeAdmin,
-  createSite,
-  deleteSedeAdmin,
-  getDemoData,
-  getEcosystemCounts,
-  resetUserPassword,
-  updateSedeAdmin,
-  updateSite,
-} from "../utils/storage";
+import { api, ApiError } from "../utils/api";
 import { fileToResizedDataUrl } from "../utils/image";
 import { assets } from "../utils/assets";
 
@@ -58,10 +49,12 @@ const EMPTY_SITE: SiteDraft = { name: "", city: "", photo: "" };
 interface AdminDraft {
   name: string;
   email: string;
+  username: string;
+  password: string;
   siteId: string;
   active: boolean;
 }
-const EMPTY_ADMIN: AdminDraft = { name: "", email: "", siteId: "", active: true };
+const EMPTY_ADMIN: AdminDraft = { name: "", email: "", username: "", password: "", siteId: "", active: true };
 
 export function AdminGeneralPage() {
   const { user, logout } = useAuth();
@@ -85,12 +78,52 @@ export function AdminGeneralPage() {
   /** Admin pending hard-delete confirmation (id + name for the dialog). */
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
 
-  const data = useMemo(() => getDemoData(), [message]);
-  const counts = useMemo(() => getEcosystemCounts(), [message]);
+  /* Live ecosystem state, loaded from the API (Postgres = source of truth). */
+  const [sites, setSites] = useState<Site[]>([]);
+  const [users, setUsers] = useState<EduTicUser[]>([]);
+  const [classes, setClasses] = useState<{ id: string; siteId: string }[]>([]);
+
+  const reload = useCallback(async () => {
+    try {
+      const [s, u, c] = await Promise.all([api.listSedes(), api.listUsers(), api.listClasses()]);
+      setSites(s.map((x) => ({ id: x.id, name: x.name, city: x.city, photo: x.photo ?? undefined, active: x.active })));
+      setUsers(
+        u.map((x) => ({
+          id: x.id,
+          name: x.fullName,
+          username: x.username ?? "",
+          email: x.email,
+          role: x.role,
+          siteId: x.sedeId ?? undefined,
+          active: x.active,
+        }) as EduTicUser),
+      );
+      setClasses(c.map((x) => ({ id: x.id, siteId: x.sedeId })));
+    } catch (e) {
+      setMessage(e instanceof ApiError ? e.message : "No se pudieron cargar los datos.");
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const data = useMemo(() => ({ sites, users, classes }), [sites, users, classes]);
+  const counts = useMemo(
+    () => ({
+      sedes: sites.length,
+      sedeAdmins: users.filter((u) => u.role === "admin-sede").length,
+      teachers: users.filter((u) => u.role === "profesor").length,
+      students: users.filter((u) => u.role === "alumno").length,
+      classes: classes.length,
+    }),
+    [sites, users, classes],
+  );
 
   function refresh(toast?: string) {
     setVersion((v) => v + 1);
     if (toast) setMessage(toast);
+    void reload();
   }
 
   /* ---- Sede form ---- */
@@ -116,18 +149,22 @@ export function AdminGeneralPage() {
       setMessage(err instanceof Error ? err.message : "No se pudo cargar la imagen.");
     }
   }
-  function submitSite(event: FormEvent) {
+  async function submitSite(event: FormEvent) {
     event.preventDefault();
-    if (editingSiteId) {
-      updateSite(editingSiteId, { name: siteDraft.name, city: siteDraft.city, photo: siteDraft.photo || undefined });
-      refresh("Sede actualizada.");
-    } else {
-      const site = createSite(siteDraft);
-      refresh(`Sede creada: ${site.name}`);
+    try {
+      if (editingSiteId) {
+        await api.updateSede(editingSiteId, { name: siteDraft.name, city: siteDraft.city, photo: siteDraft.photo || undefined });
+        refresh("Sede actualizada.");
+      } else {
+        const site = await api.createSede({ name: siteDraft.name, city: siteDraft.city, photo: siteDraft.photo || undefined });
+        refresh(`Sede creada: ${site.name}`);
+      }
+      setShowSiteForm(false);
+      setEditingSiteId("");
+      setSiteDraft(EMPTY_SITE);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo guardar la sede.");
     }
-    setShowSiteForm(false);
-    setEditingSiteId("");
-    setSiteDraft(EMPTY_SITE);
   }
 
   /* ---- Admin create / edit ---- */
@@ -143,6 +180,8 @@ export function AdminGeneralPage() {
     setAdminDraft({
       name: admin.name,
       email: admin.email ?? "",
+      username: admin.username ?? "",
+      password: "",
       siteId: admin.siteId ?? data.sites[0]?.id ?? "",
       active: admin.active !== false,
     });
@@ -153,7 +192,7 @@ export function AdminGeneralPage() {
     setEditingAdminId("");
     setTempPassword("");
   }
-  function submitAdmin(event: FormEvent) {
+  async function submitAdmin(event: FormEvent) {
     event.preventDefault();
     if (!adminDraft.email.trim()) {
       setMessage("El email del administrador es obligatorio.");
@@ -163,43 +202,92 @@ export function AdminGeneralPage() {
       setMessage("Elegí una sede para el administrador.");
       return;
     }
-    if (editingAdminId) {
-      updateSedeAdmin(editingAdminId, {
-        name: adminDraft.name,
-        email: adminDraft.email,
-        siteId: adminDraft.siteId,
-        active: adminDraft.active,
-      });
-      closeAdminModal();
-      refresh("Admin de sede actualizado.");
-    } else {
-      const admin = createSedeAdmin({
-        name: adminDraft.name,
-        email: adminDraft.email,
-        siteId: adminDraft.siteId,
-      });
-      closeAdminModal();
-      refresh(`Admin creado · usuario ${admin.username} · clave temporal ${admin.password}`);
+    if (adminDraft.password && adminDraft.password.length < 6) {
+      setMessage("La contraseña debe tener al menos 6 caracteres (o dejala vacía para una temporal).");
+      return;
+    }
+    try {
+      if (editingAdminId) {
+        await api.updateUser(editingAdminId, {
+          fullName: adminDraft.name,
+          email: adminDraft.email,
+          sedeId: adminDraft.siteId,
+          active: adminDraft.active,
+        });
+        closeAdminModal();
+        refresh("Admin de sede actualizado.");
+      } else {
+        const res = await api.createUser({
+          fullName: adminDraft.name,
+          email: adminDraft.email,
+          role: "admin-sede",
+          sedeId: adminDraft.siteId,
+          username: adminDraft.username || undefined,
+          password: adminDraft.password || undefined,
+        });
+        closeAdminModal();
+        refresh(
+          res.temporaryPassword
+            ? `Admin creado · usuario ${res.user.username ?? adminDraft.email} · clave temporal ${res.temporaryPassword}`
+            : `Admin creado · usuario ${res.user.username ?? adminDraft.email} · ya puede iniciar sesión con la contraseña elegida`,
+        );
+      }
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo guardar el admin.");
     }
   }
-  function doResetPassword() {
+  /** Invite the admin by email instead of creating them directly — they set
+   *  their own password from the link. */
+  async function inviteAdmin() {
+    if (!adminDraft.email.trim()) {
+      setMessage("Ingresá el email para enviar la invitación.");
+      return;
+    }
+    if (!adminDraft.siteId) {
+      setMessage("Elegí una sede para el administrador.");
+      return;
+    }
+    try {
+      const res = await api.createInvitation({
+        email: adminDraft.email,
+        name: adminDraft.name || undefined,
+        role: "admin-sede",
+        sedeId: adminDraft.siteId,
+      });
+      closeAdminModal();
+      refresh(
+        res.emailed
+          ? `Invitación enviada a ${res.invitation.email}`
+          : "Invitación creada. Copiá el enlace para compartirlo.",
+      );
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo enviar la invitación.");
+    }
+  }
+  async function doResetPassword() {
     if (!editingAdminId) return;
-    const next = resetUserPassword(editingAdminId);
-    if (next) {
-      setTempPassword(next);
+    try {
+      const res = await api.resetUserPassword(editingAdminId);
+      setTempPassword(res.temporaryPassword);
       refresh();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo restablecer la contraseña.");
     }
   }
   function askDeleteCurrentAdmin() {
     if (!editingAdminId) return;
     setConfirmDelete({ id: editingAdminId, name: adminDraft.name || "este admin" });
   }
-  function confirmDeleteAdmin() {
+  async function confirmDeleteAdmin() {
     if (!confirmDelete) return;
-    deleteSedeAdmin(confirmDelete.id);
-    setConfirmDelete(null);
-    closeAdminModal();
-    refresh("Admin de sede eliminado.");
+    try {
+      await api.deleteUser(confirmDelete.id);
+      setConfirmDelete(null);
+      closeAdminModal();
+      refresh("Admin de sede eliminado.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo eliminar el admin.");
+    }
   }
 
   const sedeAdmins = data.users.filter((u) => u.role === "admin-sede");
@@ -575,6 +663,33 @@ export function AdminGeneralPage() {
                 </select>
               </label>
 
+              {!editingAdminId && (
+                <div className="flex flex-col gap-4 p-4 rounded-xl bg-white/40 border border-white/50">
+                  <p className="text-xs text-muted font-semibold">
+                    Opcional: definí usuario y contraseña ahora, o dejalos vacíos y usá <b>Invitar por email</b> para que el admin elija su propia contraseña.
+                  </p>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-sm font-bold text-text">Usuario (opcional)</span>
+                    <input
+                      className={INPUT_CLS}
+                      placeholder="se genera automático si lo dejás vacío"
+                      value={adminDraft.username}
+                      onChange={(e) => setAdminDraft({ ...adminDraft, username: e.target.value })}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-sm font-bold text-text">Contraseña (opcional)</span>
+                    <input
+                      type="text"
+                      className={INPUT_CLS}
+                      placeholder="mín. 6 — vacío = clave temporal"
+                      value={adminDraft.password}
+                      onChange={(e) => setAdminDraft({ ...adminDraft, password: e.target.value })}
+                    />
+                  </label>
+                </div>
+              )}
+
               {editingAdminId && (
                 <>
                   <label className="flex items-center gap-3 cursor-pointer">
@@ -608,9 +723,16 @@ export function AdminGeneralPage() {
                 </>
               )}
 
-              <Button type="submit" className={BTN_SM}>
-                {editingAdminId ? <><Pencil size={16} /> Guardar cambios</> : <><Plus size={16} /> Crear admin</>}
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                <Button type="submit" className={BTN_SM}>
+                  {editingAdminId ? <><Pencil size={16} /> Guardar cambios</> : <><Plus size={16} /> Crear admin</>}
+                </Button>
+                {!editingAdminId && (
+                  <Button type="button" variant="secondary" className={BTN_SM} onClick={inviteAdmin}>
+                    <UserCog size={16} /> Invitar por email
+                  </Button>
+                )}
+              </div>
               {editingAdminId && (
                 <button
                   type="button"

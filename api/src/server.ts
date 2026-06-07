@@ -17,6 +17,7 @@ import { userRoutes } from "./routes/users.js";
 import { progressRoutes } from "./routes/progress.js";
 import { importRoutes } from "./routes/import.js";
 import { invitationRoutes } from "./routes/invitations.js";
+import { classRoutes } from "./routes/classes.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const ORIGIN = process.env.CORS_ORIGIN ?? "https://mecanografia.bauhub.online";
@@ -44,6 +45,7 @@ async function main() {
   await app.register(progressRoutes);
   await app.register(importRoutes);
   await app.register(invitationRoutes);
+  await app.register(classRoutes);
 
   /* Top-level error handler: never leak stack traces, always Spanish. */
   app.setErrorHandler((err, _req, reply) => {

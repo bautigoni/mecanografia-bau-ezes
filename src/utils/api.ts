@@ -96,6 +96,37 @@ export interface ApiActiveUser {
   mustChangePassword?: boolean;
 }
 
+export interface ApiSede {
+  id: string;
+  name: string;
+  city: string;
+  photo?: string | null;
+  active?: boolean;
+}
+
+export interface ApiUser {
+  id: string;
+  email: string;
+  fullName: string;
+  username?: string | null;
+  role: "superadmin" | "admin-general" | "admin-sede" | "profesor" | "alumno";
+  sedeId?: string | null;
+  classId?: string | null;
+  grade?: string | null;
+  active?: boolean;
+  mustChangePassword?: boolean;
+  lastLoginAt?: string | null;
+}
+
+export interface ApiClass {
+  id: string;
+  name: string;
+  grade: string;
+  sedeId: string;
+  studentCount: number;
+  teacherCount: number;
+}
+
 export const api = {
   async login(emailOrUsername: string, password: string): Promise<{ user: ApiActiveUser; access: string }> {
     const res = await call<{ user: ApiActiveUser; access: string }>("/auth/login", {
@@ -139,15 +170,46 @@ export const api = {
       return null;
     }
   },
-  /* Sede + class management. */
-  listSedes: () => call<unknown[]>("/sedes"),
+  /* ---- Sedes ---- */
+  listSedes: () => call<ApiSede[]>("/sedes"),
+  mySede: () => call<ApiSede>("/sedes/mine"),
+  createSede: (payload: { name: string; city?: string; photo?: string }) =>
+    call<ApiSede>("/sedes", { method: "POST", json: payload }),
+  updateSede: (id: string, payload: Partial<{ name: string; city: string; photo?: string; active: boolean }>) =>
+    call<ApiSede>(`/sedes/${id}`, { method: "PATCH", json: payload }),
+  deleteSede: (id: string) => call<{ ok: true }>(`/sedes/${id}`, { method: "DELETE" }),
+
+  /* ---- Users ---- */
   listUsers: (q: { role?: string; sedeId?: string } = {}) => {
     const params = new URLSearchParams();
     if (q.role) params.set("role", q.role);
     if (q.sedeId) params.set("sedeId", q.sedeId);
     const qs = params.toString();
-    return call<unknown[]>(`/users${qs ? `?${qs}` : ""}`);
+    return call<ApiUser[]>(`/users${qs ? `?${qs}` : ""}`);
   },
+  createUser: (payload: {
+    fullName: string;
+    email: string;
+    role: "admin-sede" | "profesor" | "alumno" | "admin-general" | "superadmin";
+    username?: string;
+    password?: string;
+    sedeId?: string | null;
+    classId?: string | null;
+  }) =>
+    call<{ user: { id: string; email: string; name: string; username?: string; role: string; sedeId?: string | null; classId?: string | null }; temporaryPassword: string | null }>(
+      "/users",
+      { method: "POST", json: payload },
+    ),
+  updateUser: (id: string, payload: Partial<{ fullName: string; email: string; sedeId: string | null; classId: string | null; active: boolean }>) =>
+    call<ApiUser>(`/users/${id}`, { method: "PATCH", json: payload }),
+  deleteUser: (id: string) => call<{ ok: true }>(`/users/${id}`, { method: "DELETE" }),
+  resetUserPassword: (id: string) => call<{ temporaryPassword: string }>(`/users/${id}/reset-password`, { method: "POST" }),
+
+  /* ---- Classes (cursos) ---- */
+  listClasses: (sedeId?: string) => call<ApiClass[]>(`/classes${sedeId ? `?sedeId=${sedeId}` : ""}`),
+  createClass: (payload: { name: string; sedeId?: string; grade?: string }) =>
+    call<ApiClass>("/classes", { method: "POST", json: payload }),
+  deleteClass: (id: string) => call<{ ok: true }>(`/classes/${id}`, { method: "DELETE" }),
   /* Progress. */
   postProgressComplete: (payload: {
     worldId: string;

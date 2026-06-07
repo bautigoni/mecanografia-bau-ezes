@@ -29,6 +29,10 @@ const createUserSchema = z.object({
   fullName: z.string().trim().min(1),
   email: z.string().trim().toLowerCase().email(),
   username: z.string().trim().min(1).optional(),
+  // When provided, the account is created with this exact password (no
+  // forced change). When omitted, a temporary password is generated and
+  // returned once. Lets the superadmin set user+password directly.
+  password: z.string().min(6).optional(),
   role: z.enum(["superadmin", "admin-general", "admin-sede", "profesor", "alumno"]),
   sedeId: z.string().uuid().optional().nullable(),
   classId: z.string().uuid().optional().nullable(),
@@ -98,23 +102,31 @@ export async function userRoutes(app: FastifyInstance) {
     if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, data.sedeId ?? null)) {
       return reply.code(403).send({ error: "No podés crear usuarios en otra sede." });
     }
-    const tempPassword = makeTempPassword();
-    const passwordHash = await hashPassword(tempPassword);
-    const [row] = await db
-      .insert(schema.users)
-      .values({
-        fullName: data.fullName,
-        email: data.email,
-        username: data.username ?? makeUsername(data.fullName),
-        role: data.role,
-        sedeId: data.sedeId ?? null,
-        classId: data.classId ?? null,
-        grade: data.grade ?? "libre",
-        passwordHash,
-        mustChangePassword: true,
-        temporaryPassword: true,
-      })
-      .returning();
+    const chosen = !!data.password;
+    const effectivePassword = data.password ?? makeTempPassword();
+    const passwordHash = await hashPassword(effectivePassword);
+    let row;
+    try {
+      [row] = await db
+        .insert(schema.users)
+        .values({
+          fullName: data.fullName,
+          email: data.email,
+          username: data.username ?? makeUsername(data.fullName),
+          role: data.role,
+          sedeId: data.sedeId ?? null,
+          classId: data.classId ?? null,
+          grade: data.grade ?? "libre",
+          passwordHash,
+          mustChangePassword: !chosen,
+          temporaryPassword: !chosen,
+        })
+        .returning();
+    } catch (e: any) {
+      // Unique violation on email/username → friendly message.
+      if (e?.code === "23505") return reply.code(409).send({ error: "Ya existe un usuario con ese email o usuario." });
+      throw e;
+    }
     if (!row) return reply.code(500).send({ error: "No se pudo crear el usuario." });
     if (data.classId) {
       if (data.role === "alumno") {
@@ -124,8 +136,9 @@ export async function userRoutes(app: FastifyInstance) {
       }
     }
     return reply.send({
-      user: { id: row.id, email: row.email, name: row.fullName, role: row.role, sedeId: row.sedeId, classId: row.classId },
-      temporaryPassword: tempPassword,
+      user: { id: row.id, email: row.email, name: row.fullName, username: row.username, role: row.role, sedeId: row.sedeId, classId: row.classId },
+      // Only surface a password when WE generated it; a chosen one is not echoed.
+      temporaryPassword: chosen ? null : effectivePassword,
     });
   });
 

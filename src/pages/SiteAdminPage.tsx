@@ -22,23 +22,18 @@ import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
 import { DashboardShell, KpiCard, type DashNavItem } from "../components/dashboard/DashboardShell";
 import { useAuth } from "../hooks/useAuth";
-import {
-  createClass,
-  createStudent,
-  createTeacher,
-  deleteStudent,
-  getClassesBySite,
-  getDemoData,
-  getSiteById,
-  getStudentsInClass,
-  getTeachersInClass,
-  getUsersBySite,
-  removeStudentFromClass,
-  resetUserPassword,
-  updateUserName,
-} from "../utils/storage";
 import { assets } from "../utils/assets";
-import { api } from "../utils/api";
+import { api, ApiError, type ApiClass } from "../utils/api";
+
+/** Mapped user row used across the page (compatible with the old shape). */
+interface UserRow {
+  id: string;
+  name: string;
+  username: string;
+  email?: string;
+  classId?: string | null;
+  stats?: { precision: number };
+}
 
 const NAV: DashNavItem[] = [
   { id: "inicio", label: "Inicio", icon: Home },
@@ -63,11 +58,24 @@ const inviteStatusCls: Record<string, string> = {
   expired: "bg-muted/20 text-muted",
 };
 
+/** Builds a unique synthetic local-part for accounts created without a real
+ *  email (students, optionally teachers). Random suffix avoids collisions. */
+function slugEmail(name: string): string {
+  const base =
+    name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "")
+      .slice(0, 12) || "alumno";
+  return `${base}.${Math.random().toString(36).slice(2, 6)}`;
+}
+
 export function SiteAdminPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const siteId = user?.siteId;
-  const site = getSiteById(siteId);
+  const [site, setSite] = useState<{ name: string; city: string } | null>(null);
 
   const [section, setSection] = useState("inicio");
   const [search, setSearch] = useState("");
@@ -87,9 +95,42 @@ export function SiteAdminPage() {
   const [studentEdit, setStudentEdit] = useState<{ id: string; name: string } | null>(null);
   const [resetInfo, setResetInfo] = useState<{ id: string; password: string } | null>(null);
 
-  const classes = useMemo(() => getClassesBySite(siteId), [siteId, message]);
-  const teachers = useMemo(() => getUsersBySite(siteId, "profesor"), [siteId, message]);
-  const students = useMemo(() => getUsersBySite(siteId, "alumno"), [siteId, message]);
+  /* Live state from the API (Postgres = source of truth). */
+  const [classes, setClasses] = useState<ApiClass[]>([]);
+  const [teachers, setTeachers] = useState<UserRow[]>([]);
+  const [students, setStudents] = useState<UserRow[]>([]);
+
+  const mapUser = useCallback(
+    (x: { id: string; fullName: string; username?: string | null; email: string; classId?: string | null }): UserRow => ({
+      id: x.id,
+      name: x.fullName,
+      username: x.username ?? "",
+      email: x.email,
+      classId: x.classId ?? null,
+    }),
+    [],
+  );
+
+  const reloadData = useCallback(async () => {
+    try {
+      const [c, t, s] = await Promise.all([
+        api.listClasses(siteId),
+        api.listUsers({ role: "profesor" }),
+        api.listUsers({ role: "alumno" }),
+      ]);
+      setClasses(c);
+      setTeachers(t.map(mapUser));
+      setStudents(s.map(mapUser));
+    } catch (e) {
+      setMessage(e instanceof ApiError ? e.message : "No se pudieron cargar los datos.");
+    }
+  }, [siteId, mapUser]);
+
+  useEffect(() => {
+    void reloadData();
+    api.mySede().then((sd) => setSite({ name: sd.name, city: sd.city })).catch(() => setSite(null));
+  }, [reloadData]);
+
   const [invitations, setInvitations] = useState<
     Array<{ id: string; email: string; name?: string | null; role: string; status: string; createdAt: string }>
   >([]);
@@ -110,17 +151,18 @@ export function SiteAdminPage() {
 
   const openCourse = openCourseId ? classes.find((c) => c.id === openCourseId) ?? null : null;
   const courseStudents = useMemo(
-    () => getStudentsInClass(openCourseId ?? undefined),
-    [openCourseId, message],
+    () => (openCourseId ? students.filter((s) => s.classId === openCourseId) : []),
+    [openCourseId, students],
   );
   const courseTeachers = useMemo(
-    () => getTeachersInClass(openCourseId ?? undefined),
-    [openCourseId, message],
+    () => (openCourseId ? teachers.filter((t) => t.classId === openCourseId) : []),
+    [openCourseId, teachers],
   );
 
   function refresh(toast: string) {
     setVersion((v) => v + 1);
     setMessage(toast);
+    void reloadData();
   }
 
   /* ---- Course-detail handlers (manage students inside a course) ---- */
@@ -130,56 +172,103 @@ export function SiteAdminPage() {
     setResetInfo(null);
     setCourseStudentDraft("");
   }
-  function addStudentToCourse(e: FormEvent) {
+  async function addStudentToCourse(e: FormEvent) {
     e.preventDefault();
     if (!openCourseId || !courseStudentDraft.trim()) return;
-    const s = createStudent({ name: courseStudentDraft, siteId, classId: openCourseId });
-    setCourseStudentDraft("");
-    refresh(`Alumno agregado: ${s.username} / ${s.password}`);
-  }
-  function saveStudentName() {
-    if (!studentEdit || !studentEdit.name.trim()) return;
-    updateUserName(studentEdit.id, studentEdit.name);
-    setStudentEdit(null);
-    refresh("Nombre del alumno actualizado.");
-  }
-  function resetStudentPassword(id: string, username?: string) {
-    const password = resetUserPassword(id);
-    if (password) {
-      setResetInfo({ id, password });
-      refresh(`Contraseña restablecida para ${username ?? "el alumno"}.`);
+    try {
+      const res = await api.createUser({
+        fullName: courseStudentDraft,
+        email: `${slugEmail(courseStudentDraft)}@alumno.typely.local`,
+        role: "alumno",
+        sedeId: siteId,
+        classId: openCourseId,
+      });
+      setCourseStudentDraft("");
+      refresh(`Alumno agregado: ${res.user.username} / ${res.temporaryPassword}`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo agregar el alumno.");
     }
   }
-  function removeStudent(id: string) {
-    if (!openCourseId) return;
-    removeStudentFromClass(id, openCourseId);
-    refresh("Alumno quitado del curso.");
+  async function saveStudentName() {
+    if (!studentEdit || !studentEdit.name.trim()) return;
+    try {
+      await api.updateUser(studentEdit.id, { fullName: studentEdit.name });
+      setStudentEdit(null);
+      refresh("Nombre del alumno actualizado.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo actualizar el nombre.");
+    }
   }
-  function deleteStudentAccount(id: string) {
-    deleteStudent(id);
-    setStudentEdit(null);
-    refresh("Alumno eliminado.");
+  async function resetStudentPassword(id: string, username?: string) {
+    try {
+      const res = await api.resetUserPassword(id);
+      setResetInfo({ id, password: res.temporaryPassword });
+      refresh(`Contraseña restablecida para ${username ?? "el alumno"}.`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo restablecer la contraseña.");
+    }
+  }
+  async function removeStudent(id: string) {
+    try {
+      await api.updateUser(id, { classId: null });
+      refresh("Alumno quitado del curso.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo quitar el alumno.");
+    }
+  }
+  async function deleteStudentAccount(id: string) {
+    try {
+      await api.deleteUser(id);
+      setStudentEdit(null);
+      refresh("Alumno eliminado.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo eliminar el alumno.");
+    }
   }
 
-  function submitClass(e: FormEvent) {
+  async function submitClass(e: FormEvent) {
     e.preventDefault();
     if (!siteId) return;
-    const created = createClass({ name: classDraft, siteId });
-    setClassDraft("");
-    setSelectedClass((prev) => prev || created.id);
-    refresh(`Curso creado: ${created.name}`);
+    try {
+      const created = await api.createClass({ name: classDraft, sedeId: siteId });
+      setClassDraft("");
+      setSelectedClass((prev) => prev || created.id);
+      refresh(`Curso creado: ${created.name}`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo crear el curso.");
+    }
   }
-  function submitTeacher(e: FormEvent) {
+  async function submitTeacher(e: FormEvent) {
     e.preventDefault();
-    const t = createTeacher({ name: teacherDraft.name, email: teacherDraft.email, siteId, classId: selectedClass || undefined });
-    setTeacherDraft({ name: "", email: "" });
-    refresh(`Docente creado: ${t.username} / ${t.password}`);
+    try {
+      const res = await api.createUser({
+        fullName: teacherDraft.name,
+        email: teacherDraft.email || `${slugEmail(teacherDraft.name)}@docente.typely.local`,
+        role: "profesor",
+        sedeId: siteId,
+        classId: selectedClass || undefined,
+      });
+      setTeacherDraft({ name: "", email: "" });
+      refresh(`Docente creado: ${res.user.username} / ${res.temporaryPassword}`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo crear el docente.");
+    }
   }
-  function submitStudent(e: FormEvent) {
+  async function submitStudent(e: FormEvent) {
     e.preventDefault();
-    const s = createStudent({ name: studentDraft, siteId, classId: selectedClass || undefined });
-    setStudentDraft("");
-    refresh(`Alumno creado: ${s.username} / ${s.password}`);
+    try {
+      const res = await api.createUser({
+        fullName: studentDraft,
+        email: `${slugEmail(studentDraft)}@alumno.typely.local`,
+        role: "alumno",
+        sedeId: siteId,
+        classId: selectedClass || undefined,
+      });
+      setStudentDraft("");
+      refresh(`Alumno creado: ${res.user.username} / ${res.temporaryPassword}`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo crear el alumno.");
+    }
   }
   async function submitInvite(e: FormEvent) {
     e.preventDefault();
@@ -276,8 +365,7 @@ export function SiteAdminPage() {
     navigate("/login");
   }
 
-  const allUsers = getDemoData().users;
-  const studentsInClass = (classId: string) => allUsers.filter((u) => u.role === "alumno" && u.classId === classId);
+  const studentsInClass = (classId: string) => students.filter((s) => s.classId === classId);
   const pendingInvites = invitations.filter((i) => i.status === "pending").length;
 
   const kpis = (
@@ -380,7 +468,7 @@ export function SiteAdminPage() {
                       </span>
                       <div className="flex flex-col min-w-0">
                         <strong className="text-sm text-text truncate">{c.name}</strong>
-                        <span className="text-xs text-muted truncate">{studentsInClass(c.id).length} alumnos · {c.teacherIds.length} docentes</span>
+                        <span className="text-xs text-muted truncate">{c.studentCount} alumnos · {c.teacherCount} docentes</span>
                       </div>
                     </button>
                   ))}
@@ -455,7 +543,7 @@ export function SiteAdminPage() {
                     </span>
                     <div className="flex flex-col min-w-0">
                       <strong className="text-sm text-text truncate">{c.name}</strong>
-                      <span className="text-xs text-muted truncate">{studentsInClass(c.id).length} alumnos · {c.teacherIds.length} docentes</span>
+                      <span className="text-xs text-muted truncate">{c.studentCount} alumnos · {c.teacherCount} docentes</span>
                     </div>
                   </button>
                 ))}

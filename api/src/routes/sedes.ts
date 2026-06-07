@@ -28,6 +28,19 @@ export async function sedeRoutes(app: FastifyInstance) {
     return db.select().from(schema.sedes).orderBy(schema.sedes.name);
   });
 
+  /* The signed-in user's own sede (any authenticated role). The sede-admin
+   * dashboard uses this for its header — it cannot call the superadmin-only
+   * /api/sedes list. */
+  app.get("/api/sedes/mine", async (req, reply) => {
+    const auth = req.headers.authorization;
+    if (!auth?.startsWith("Bearer ")) return reply.code(401).send({ error: "Sin sesión." });
+    const claims = await verifyAccessToken(auth.slice("Bearer ".length));
+    if (!claims.sede) return reply.code(404).send({ error: "Sin sede asignada." });
+    const [row] = await db.select().from(schema.sedes).where(eq(schema.sedes.id, claims.sede)).limit(1);
+    if (!row) return reply.code(404).send({ error: "Sede no encontrada." });
+    return reply.send(row);
+  });
+
   app.post("/api/sedes", async (req, reply) => {
     await requireSuperadmin(req);
     const parsed = sedeSchema.safeParse(req.body);
