@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
+import { InvitePage } from "./pages/InvitePage";
 import { WorldsPage } from "./pages/WorldsPage";
 import { IslandDetailPage } from "./pages/IslandDetailPage";
 import { TeacherPage } from "./pages/TeacherPage";
@@ -55,6 +56,8 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       {/* Forced password change after a temporary-password sign-in. */}
       <Route path="/cambiar-contrasena" element={<ChangePasswordPage />} />
+      {/* Invitation acceptance (opened from the email link). */}
+      <Route path="/invite/:token" element={<InvitePage />} />
 
       {/* Student game experience — exclusive to students. Admins/teachers
           are redirected to their own dashboards, never the game map. */}

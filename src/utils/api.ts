@@ -159,6 +159,28 @@ export const api = {
     endedAt: string;
   }) => call("/progress/complete", { method: "POST", json: payload }),
 
+  /* Invitations — create (+ email via Resend), list, public lookup, accept. */
+  createInvitation: (payload: { email: string; name?: string; role?: "admin-sede" | "profesor"; sedeId?: string; classId?: string }) =>
+    call<{ invitation: { id: string; email: string; name?: string | null; role: string; status: string; createdAt: string }; emailed: boolean; link: string }>(
+      "/invitations",
+      { method: "POST", json: payload },
+    ),
+  listInvitations: () =>
+    call<Array<{ id: string; email: string; name?: string | null; role: string; status: string; sedeId?: string | null; createdAt: string }>>("/invitations"),
+  getInvitation: (token: string) =>
+    call<{ invitation: { email: string; name?: string | null; role: string; status: string; sedeName?: string } }>(
+      `/invitations/by-token/${encodeURIComponent(token)}`,
+    ),
+  acceptInvitation: async (token: string, password: string): Promise<{ user: ApiActiveUser; access: string }> => {
+    const res = await call<{ user: ApiActiveUser; access: string }>(`/invitations/${encodeURIComponent(token)}/accept`, {
+      method: "POST",
+      json: { password },
+      retry: false,
+    });
+    setAccessToken(res.access);
+    return res;
+  },
+
   /* Bulk CSV import. Sends raw CSV; the API parses + creates accounts. */
   importUsersCsv: (csv: string) => call<{
     created: number;

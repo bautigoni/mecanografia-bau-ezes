@@ -53,6 +53,10 @@ interface AuthContextValue {
   loginDemo: () => ActiveUser;
   completePasswordChange: (newPassword: string) => Promise<ActiveUser | null>;
   loginGoogle: (credential: string) => Promise<GoogleLoginResult>;
+  /** Adopt a session created out-of-band (e.g. accepting an invitation,
+   *  which logs the user in server-side). The access token + refresh cookie
+   *  are already set by the api client; this syncs the React/local state. */
+  adoptSession: (apiUser: ApiActiveUser) => ActiveUser;
   logout: () => Promise<void>;
 }
 
@@ -204,6 +208,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const adoptSession = useCallback((apiUser: ApiActiveUser): ActiveUser => {
+    const au = toActiveUser(apiUser);
+    setDemoMode(false);
+    setActiveUser(au);
+    setUser(au);
+    setUsingApi(true);
+    return au;
+  }, []);
+
   const logout = useCallback(async () => {
     setDemoMode(false);
     if (usingApi) {
@@ -214,8 +227,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [usingApi]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, logout }),
-    [user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, logout],
+    () => ({ user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, logout }),
+    [user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

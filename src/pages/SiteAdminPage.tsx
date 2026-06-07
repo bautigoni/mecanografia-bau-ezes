@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
   Copy,
@@ -23,25 +23,20 @@ import { Toast } from "../components/common/Toast";
 import { DashboardShell, KpiCard, type DashNavItem } from "../components/dashboard/DashboardShell";
 import { useAuth } from "../hooks/useAuth";
 import {
-  buildInvitationLink,
   createClass,
-  createInvitation,
   createStudent,
   createTeacher,
   deleteStudent,
   getClassesBySite,
   getDemoData,
-  getInvitationsBySite,
   getSiteById,
   getStudentsInClass,
   getTeachersInClass,
   getUsersBySite,
   removeStudentFromClass,
   resetUserPassword,
-  setInvitationStatus,
   updateUserName,
 } from "../utils/storage";
-import { sendInvitationEmail } from "../utils/emailService";
 import { assets } from "../utils/assets";
 import { api } from "../utils/api";
 
@@ -95,7 +90,22 @@ export function SiteAdminPage() {
   const classes = useMemo(() => getClassesBySite(siteId), [siteId, message]);
   const teachers = useMemo(() => getUsersBySite(siteId, "profesor"), [siteId, message]);
   const students = useMemo(() => getUsersBySite(siteId, "alumno"), [siteId, message]);
-  const invitations = useMemo(() => getInvitationsBySite(siteId), [siteId, message]);
+  const [invitations, setInvitations] = useState<
+    Array<{ id: string; email: string; name?: string | null; role: string; status: string; createdAt: string }>
+  >([]);
+  /** Raw invite links by invitation id, captured at creation time so the
+   *  admin can re-copy them (the server never returns the raw token again). */
+  const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
+  const reloadInvites = useCallback(async () => {
+    try {
+      setInvitations(await api.listInvitations());
+    } catch {
+      /* keep current list on error */
+    }
+  }, []);
+  useEffect(() => {
+    void reloadInvites();
+  }, [reloadInvites]);
   const [selectedClass, setSelectedClass] = useState(classes[0]?.id ?? "");
 
   const openCourse = openCourseId ? classes.find((c) => c.id === openCourseId) ?? null : null;
@@ -173,19 +183,35 @@ export function SiteAdminPage() {
   }
   async function submitInvite(e: FormEvent) {
     e.preventDefault();
-    const invitation = createInvitation({ email: inviteDraft.email, name: inviteDraft.name, role: "profesor", siteId, invitedBy: user?.id });
-    setInviteDraft({ email: "", name: "" });
-    refresh(`Invitación creada para ${invitation.email}`);
-    const result = await sendInvitationEmail(invitation);
-    if (result.ok) {
-      setInvitationStatus(invitation.id, "sent");
-      refresh(`Invitación enviada a ${invitation.email}`);
-    } else {
-      refresh("Invitación lista. Copiá el enlace para compartirlo.");
+    try {
+      const res = await api.createInvitation({
+        email: inviteDraft.email,
+        name: inviteDraft.name || undefined,
+        role: "profesor",
+      });
+      setInviteDraft({ email: "", name: "" });
+      setInviteLinks((prev) => ({ ...prev, [res.invitation.id]: res.link }));
+      await reloadInvites();
+      try {
+        await navigator.clipboard.writeText(res.link);
+      } catch {
+        /* clipboard may be unavailable */
+      }
+      refresh(
+        res.emailed
+          ? `Invitación enviada por email a ${res.invitation.email}`
+          : "Invitación creada. Enlace copiado para compartir.",
+      );
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo crear la invitación.");
     }
   }
-  async function copyInviteLink(token: string) {
-    const link = buildInvitationLink(token);
+  async function copyInviteLink(id: string) {
+    const link = inviteLinks[id];
+    if (!link) {
+      setMessage("El enlace solo se puede copiar al crear la invitación. Reenviá una nueva si lo necesitás.");
+      return;
+    }
     try {
       await navigator.clipboard.writeText(link);
       setMessage("Enlace de invitación copiado.");
@@ -616,7 +642,7 @@ export function SiteAdminPage() {
                   <span className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 ${inviteStatusCls[inv.status] ?? "bg-white/40 text-muted"}`}>
                     {inv.status}
                   </span>
-                  <Button variant="secondary" className="min-h-[2.25rem] px-3 text-sm" onClick={() => copyInviteLink(inv.token)}>
+                  <Button variant="secondary" className="min-h-[2.25rem] px-3 text-sm" onClick={() => copyInviteLink(inv.id)}>
                     <Copy size={16} /> Copiar enlace
                   </Button>
                 </div>

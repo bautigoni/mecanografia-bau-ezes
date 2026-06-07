@@ -47,6 +47,8 @@ services:
       RESEND_API_KEY_FILE: /run/secrets/resend_api_key
       GOOGLE_CLIENT_ID: "${VITE_GOOGLE_CLIENT_ID:-}"
       INVITE_FROM: "${INVITE_FROM:-Typely <no-reply@example.com>}"
+      # Absolute origin used to build invitation links inside emails.
+      PUBLIC_ORIGIN: "${PUBLIC_ORIGIN:-https://typely.bauhub.online}"
     secrets:
       - database_url
       - jwt_secret
