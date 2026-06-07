@@ -53,6 +53,13 @@ function getShipAsset(from: LevelPosition, to?: LevelPosition) {
   return dx >= 0 ? assets.shipDiagonalRight : assets.shipDiagonalLeft;
 }
 
+/* ---- Status-pill colour map (state → Tailwind classes) ---- */
+const STATUS_PILL_CLASSES: Record<string, string> = {
+  actual: "bg-accent-sky text-white",
+  completado: "bg-mint text-white",
+  bloqueado: "bg-rose/80 text-white",
+};
+
 export function IslandDetailPage() {
   const { islandId } = useParams();
   const navigate = useNavigate();
@@ -128,7 +135,7 @@ export function IslandDetailPage() {
     if (!popoverOpen) return;
     function onDocPointerDown(event: PointerEvent) {
       const el = event.target as HTMLElement | null;
-      if (el && (el.closest(".level-node") || el.closest(".level-popover"))) return;
+      if (el && (el.closest("[data-level-node]") || el.closest("[data-level-popover]"))) return;
       setPopoverOpen(false);
     }
     document.addEventListener("pointerdown", onDocPointerDown);
@@ -521,17 +528,17 @@ export function IslandDetailPage() {
 
   return (
     <main
-      className={`island-detail scene-contain page-fade ${bgReady ? "is-bg-ready" : "is-bg-loading"} ${editorOn ? "is-editing-levels" : ""}`}
+      className={`relative min-h-dvh overflow-hidden bg-cover bg-center animate-page-fade ${editorOn ? "cursor-crosshair" : ""}`}
       style={{ "--scene-bg": `url("${islandBgPath}")` } as CSSProperties}
     >
       {/* Aspect-ratio-locked stage: the image and every level node share the
           same 16:9 coordinate system, so % positions land on the real
           painted platforms on every screen size. */}
-      <div className="island-stage" aria-hidden="false">
-        <div className="island-stage__frame">
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="false">
+        <div className="relative w-full h-full max-w-[1600px] max-h-[900px]">
           {/* Full-scene background fills viewport, lowest z-index */}
           <img
-            className="island-stage__bg scene-full-image"
+            className={`absolute inset-0 w-full h-full object-cover ${bgReady ? "animate-island-zoom" : "opacity-0"}`}
             src={islandBgPath}
             alt={world.title}
             decoding="async"
@@ -570,7 +577,7 @@ export function IslandDetailPage() {
           {/* Level map — always renders. Matches island container bounds when
               available, otherwise fills the viewport (old background approach). */}
           <section
-            className="level-map"
+            className="absolute inset-0 pointer-events-none z-10"
             aria-label="Niveles del mundo"
             ref={mapRef}
             style={
@@ -609,7 +616,7 @@ export function IslandDetailPage() {
             )}
 
             <img
-              className="level-ship"
+              className="absolute w-[clamp(3rem,6vw,4.5rem)] pointer-events-none z-20 animate-ship-hover"
               src={shipAsset}
               alt="Nave de los estudiantes en el nivel actual"
               decoding="async"
@@ -660,11 +667,30 @@ export function IslandDetailPage() {
 
               const numSize = `${1.2 * numScale}rem`;
 
+              /* State-driven visual classes for the node button. */
+              const stateClass =
+                level.state === "Completado"
+                  ? "drop-shadow-[0_0_8px_rgba(89,205,183,0.55)]"
+                  : level.state === "Bloqueado"
+                    ? "opacity-60 saturate-50"
+                    : "";
+
               return (
                 <button
                   key={level.title}
                   type="button"
-                  className={`level-node level-node--${level.state.toLowerCase()} ${isSelected ? "is-selected" : ""} ${editorOn ? "is-editable" : ""} ${dragIndex === index ? "is-dragging" : ""} ${editorOn && editorSelectedIndex === index ? "is-editor-selected" : ""}`}
+                  data-level-node=""
+                  className={[
+                    "absolute -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto",
+                    "w-[clamp(3.2rem,6.5vw,4.8rem)] h-[clamp(3.2rem,6.5vw,4.8rem)]",
+                    "rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-sky",
+                    "transition-opacity duration-150",
+                    isSelected ? "animate-platform-pulse" : "",
+                    editorOn ? "cursor-move" : "cursor-pointer",
+                    dragIndex === index ? "opacity-70 cursor-grabbing" : "",
+                    editorOn && editorSelectedIndex === index ? "ring-2 ring-accent ring-offset-2 ring-offset-transparent" : "",
+                    stateClass,
+                  ].filter(Boolean).join(" ")}
                   style={cssPos}
                   onClick={() => handleNodeClick(index)}
                   onDoubleClick={() => handleNodeDoubleClick(index)}
@@ -677,18 +703,18 @@ export function IslandDetailPage() {
                 >
                   {/* Image layer: only the delta from base. */}
                   <span
-                    className={`level-node__layer ${hasDelta ? "level-node__layer--custom" : ""}`}
+                    className="absolute inset-0"
                     style={hasDelta ? { transform: imgTransform } : undefined}
                   >
                     <img
-                      className={`level-node__img ${!editorOn && hoveredIndex === index ? "level-node__img--hidden" : ""}`}
+                      className={`w-full h-full object-contain ${!editorOn && hoveredIndex === index ? "hidden" : ""}`}
                       src={assets.levelButton}
                       alt=""
                       decoding="async"
                       draggable={false}
                     />
                     <img
-                      className={`level-node__img level-node__img--pressed ${!editorOn && hoveredIndex === index ? "" : "level-node__img--hidden"}`}
+                      className={`w-full h-full object-contain ${!editorOn && hoveredIndex === index ? "" : "hidden"}`}
                       src={assets.levelButtonPressed}
                       alt=""
                       decoding="async"
@@ -697,9 +723,14 @@ export function IslandDetailPage() {
                   </span>
 
                   {/* Number layer: fixed base perspective + scale. */}
-                  <span className="level-node__layer level-node__layer--custom level-node__layer--top" style={{ transform: numTransform }}>
+                  <span className="absolute inset-0 flex items-center justify-center" style={{ transform: numTransform }}>
                     <span
-                      className={`level-node__number ${isCompleted ? "level-node__number--completed" : ""} ${isBlocked ? "level-node__number--blocked" : ""}`}
+                      className={[
+                        "font-display font-black select-none",
+                        isCompleted ? "text-mint" : "",
+                        isBlocked ? "text-muted" : "",
+                        !isCompleted && !isBlocked ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" : "",
+                      ].filter(Boolean).join(" ")}
                       style={{ fontSize: numSize }}
                     >
                       {level.levelNumber}
@@ -708,17 +739,17 @@ export function IslandDetailPage() {
 
                   {/* Status indicators — no perspective, positioned flat on the button. */}
                   {isCompleted && (
-                    <span className="level-node__check" aria-hidden="true">
+                    <span className="absolute -top-1 -right-1 text-mint drop-shadow-sm" aria-hidden="true">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     </span>
                   )}
                   {isBlocked && (
-                    <span className="level-node__lock" aria-hidden="true">
+                    <span className="absolute -top-1 -right-1 text-rose bg-white/70 rounded-full p-0.5" aria-hidden="true">
                       <Lock size={14} />
                     </span>
                   )}
                   {isCompleted && (
-                    <span className="level-node__rating">
+                    <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-0.5 text-yellow-400 drop-shadow-sm">
                       {Array.from({ length: 3 }).map((_, i) => (
                         <Star key={i} size={14} fill={i < level.stars ? "currentColor" : "none"} />
                       ))}
@@ -726,7 +757,7 @@ export function IslandDetailPage() {
                   )}
 
                   {editorOn && (
-                    <span className="level-node__coord" aria-hidden="true">
+                    <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[9px] text-white bg-black/60 px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none" aria-hidden="true">
                       {position.x} · {position.y}
                       {hasDelta ? `  s${storedScale.toFixed(1)}  rx${storedRx} ry${storedRy} rz${storedRz}` : ""}
                     </span>
@@ -739,28 +770,37 @@ export function IslandDetailPage() {
                 Opens on tap, closes on tap-outside. Hidden while editing. */}
             {!editorOn && popoverOpen && (
               <div
-                className="level-popover"
-                data-place={popoverRight ? "right" : "left"}
-                data-v={popoverVBand}
+                data-level-popover=""
+                className="absolute z-30 pointer-events-auto animate-popover-in"
                 style={{
                   left: `${selectedPos.x}%`,
                   top: `${selectedPos.y}%`,
                   transform: `translate(${popoverTx}, ${popoverTy})`,
                 }}
               >
-                <div className="level-popover__card">
-                  <span className="level-popover__tail" aria-hidden="true" />
-                  <div className="level-popover__top">
-                    <strong className="level-popover__num">{selectedLevel.title}</strong>
-                    <span className={`status-pill status-pill--${popoverState}`}>{selectedLevel.state}</span>
+                <div className="glass-card p-4 rounded-2xl min-w-[14rem] relative">
+                  {/* Tail — rotated square pointing toward the node */}
+                  <span
+                    className={[
+                      "absolute w-3 h-3 glass-card rotate-45",
+                      popoverRight ? "-left-1.5" : "-right-1.5",
+                      popoverVBand === "top" ? "top-3" : popoverVBand === "bottom" ? "bottom-3" : "top-1/2 -translate-y-1/2",
+                    ].filter(Boolean).join(" ")}
+                    aria-hidden="true"
+                  />
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <strong className="font-display font-bold text-text text-base">{selectedLevel.title}</strong>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${STATUS_PILL_CLASSES[popoverState] ?? "bg-accent text-white"}`}>
+                      {selectedLevel.state}
+                    </span>
                   </div>
-                  <h3 className="level-popover__name">{selectedLevel.name}</h3>
-                  <span className="level-popover__stars" aria-hidden="true">
+                  <h3 className="text-sm text-muted mb-2">{selectedLevel.name}</h3>
+                  <span className="flex gap-0.5 text-yellow-400 mb-3" aria-hidden="true">
                     {Array.from({ length: 3 }).map((_, i) => (
                       <Star key={i} size={15} fill={i < selectedLevel.stars ? "currentColor" : "none"} />
                     ))}
                   </span>
-                  <Button className="level-popover__cta" onClick={openLevel}>
+                  <Button className="w-full" onClick={openLevel}>
                     {selectedLevel.state === "Bloqueado" ? (
                       <><Lock size={17} /> <span>Bloqueado</span></>
                     ) : selectedLevel.state === "Completado" ? (
@@ -776,7 +816,12 @@ export function IslandDetailPage() {
         </div>
       </div>
 
-      <button type="button" className="world-back-button" onClick={() => navigate("/mundos")}>
+      {/* Back to worlds map */}
+      <button
+        type="button"
+        className="fixed top-4 left-4 z-30 glass-surface rounded-xl px-3 py-2 flex items-center gap-2 text-text font-bold shadow-card hover:brightness-105 transition cursor-pointer animate-hud-in"
+        onClick={() => navigate("/mundos")}
+      >
         <ArrowLeft size={23} />
         <span>Volver a mundos</span>
       </button>
@@ -784,7 +829,7 @@ export function IslandDetailPage() {
       {EDITOR_AVAILABLE && (
         <button
           type="button"
-          className={`level-editor-toggle ${editorOn ? "is-on" : ""}`}
+          className={`fixed bottom-4 left-4 z-30 glass-surface rounded-xl px-3 py-2 flex items-center gap-2 text-text font-bold shadow-card hover:brightness-105 transition cursor-pointer ${editorOn ? "bg-accent/20 ring-2 ring-accent" : ""}`}
           onClick={() => setEditorOn((v) => !v)}
           title="Editor de posiciones de niveles (solo dev)"
         >
@@ -795,19 +840,19 @@ export function IslandDetailPage() {
 
       {/* Compact floating island header — sits in the top-safe area and never
           covers the level nodes. Replaces the old large title/progress panel. */}
-      <header className="island-hud">
-        <span className="island-hud__badge">
+      <header className="fixed top-0 left-1/2 -translate-x-1/2 z-20 glass-strong rounded-b-2xl px-5 py-3 flex items-center gap-4 shadow-card animate-hud-in max-w-[92vw]">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/20 text-violet-700 font-bold text-sm whitespace-nowrap">
           <Star size={15} fill="currentColor" />
           Mundo {worldNumber}
         </span>
-        <div className="island-hud__body">
-          <h1>{world.title}</h1>
-          <div className="island-hud__meta">
-            <span className="island-hud__stars">
+        <div className="flex flex-col min-w-0">
+          <h1 className="font-display font-black text-text text-lg truncate">{world.title}</h1>
+          <div className="flex items-center gap-3 text-sm">
+            <span className="inline-flex items-center gap-1 text-yellow-500 font-bold">
               <Star size={14} fill="currentColor" />
               {starProgress.earnedStars}/{starProgress.totalStars}
             </span>
-            <span className="island-hud__hint">
+            <span className="text-muted">
               {!isLastWorld && !starProgress.isUnlockedNext
                 ? `Faltan ${Math.max(0, starProgress.requiredStars - starProgress.earnedStars)}★ para el próximo mundo`
                 : "Tocá un nivel para jugar"}
@@ -817,7 +862,7 @@ export function IslandDetailPage() {
         {canGoToNextWorld && nextWorld && (
           <button
             type="button"
-            className="island-hud__next"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-white font-bold shadow-btn animate-next-pulse hover:brightness-105 transition cursor-pointer whitespace-nowrap"
             onClick={() => navigate(nextWorld.route)}
             aria-label={`Ir al siguiente mundo: ${nextWorld.title}`}
             title={`Ir a ${nextWorld.title}`}
@@ -828,7 +873,12 @@ export function IslandDetailPage() {
         )}
       </header>
 
-      <button type="button" className="profile-bubble" aria-label="Mi cuenta" onClick={() => navigate("/mi-cuenta")}>
+      <button
+        type="button"
+        className="fixed bottom-4 right-4 z-30 glass-surface rounded-full w-16 h-16 flex flex-col items-center justify-center gap-0.5 text-text font-bold text-[10px] shadow-card cursor-pointer hover:brightness-105 transition animate-bubble-pop"
+        aria-label="Mi cuenta"
+        onClick={() => navigate("/mi-cuenta")}
+      >
         <UserRound size={25} />
         <span>Perfil</span>
       </button>

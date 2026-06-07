@@ -750,12 +750,15 @@ export function GameplayPage() {
   }
 
   return (
-    <main className={`gameplay-page gameplay-shell page-fade ${isErrorActive ? "is-error" : ""} ${isIdleHintActive ? "is-idle-hint" : ""}`} style={{ backgroundImage: `url("${getGameplayBackground(activity.worldId)}")` }}>
+    <main
+      className={`flex flex-col h-dvh overflow-hidden container-type-[inline-size] animate-page-fade relative bg-cover bg-center ${isErrorActive ? "animate-error-shake" : ""}`}
+      style={{ backgroundImage: `url("${getGameplayBackground(activity.worldId)}")` }}
+    >
       {/* Hidden capture field — drives beforeinput/composition so accented
           characters work on touch & Spanish-layout keyboards. */}
       <input
         ref={captureInputRef}
-        className="gameplay-capture"
+        className="sr-only"
         type="text"
         defaultValue=""
         autoCapitalize="off"
@@ -775,16 +778,20 @@ export function GameplayPage() {
           window.setTimeout(() => captureInputRef.current?.focus({ preventScroll: true }), 30);
         }}
       />
-      <button className="game-exit" type="button" onClick={() => navigate(`/worlds/${activity.worldId}`)}>
+      <button
+        className="absolute top-4 right-4 z-20 glass rounded-full w-12 h-12 flex items-center justify-center gap-1 text-text font-bold text-sm shadow-btn hover:scale-105 transition-transform"
+        type="button"
+        onClick={() => navigate(`/worlds/${activity.worldId}`)}
+      >
         <X size={20} />
-        Salir
+        <span className="sr-only">Salir</span>
       </button>
 
-      <section className="game-stage" aria-label={activity.title}>
-        <div className="game-status">
+      <section className="grid place-items-center gap-4 flex-1 min-h-0 px-4" aria-label={activity.title}>
+        <div className="glass rounded-xl px-4 py-2 font-bold text-sm flex items-center gap-3 text-text">
           <span>Nivel {activity.levelNumber}</span>
           <strong>{activity.title}</strong>
-          <em>{activity.subtitle}</em>
+          <em className="font-normal text-muted">{activity.subtitle}</em>
         </div>
 
         {(() => {
@@ -804,46 +811,73 @@ export function GameplayPage() {
           const showTypedPreview =
             activity.inputType !== "letter" && activity.inputType !== "symbol";
           const isLongTarget = target.length > 14 || target.includes("@");
+
+          const targetCardSize =
+            variant === "letter" ? "text-7xl sm:text-8xl" :
+            variant === "symbol" ? "text-6xl sm:text-7xl" :
+            variant === "phrase" ? "text-2xl sm:text-3xl" :
+            "text-3xl sm:text-4xl";
+
           return (
             <>
-              <div className={`target-card target--${variant} ${isLongTarget ? "target--long" : ""} ${isErrorActive ? "is-error" : ""} ${isIdleHintActive ? "is-idle-hint" : ""}`}>
-                <span>Objetivo {visibleObjective} / {totalObjectives}</span>
-                <strong ref={targetScrollRef}>{target}</strong>
+              <div
+                className={`glass-card px-8 py-6 sm:px-12 sm:py-8 flex flex-col items-center gap-3 text-center max-w-3xl w-full ${isLongTarget ? "text-xl sm:text-2xl" : targetCardSize} ${isErrorActive ? "animate-error-shake" : ""} ${isIdleHintActive ? "animate-target-pulse" : ""}`}
+              >
+                <span className="text-sm font-bold text-muted uppercase tracking-wide">
+                  Objetivo {visibleObjective} / {totalObjectives}
+                </span>
+                <strong
+                  ref={targetScrollRef}
+                  className="font-display font-bold text-text overflow-x-auto whitespace-nowrap max-w-full"
+                >
+                  {target}
+                </strong>
                 {locationHint && !isCompleted && (
-                  <small className="key-location-hint">{locationHint}</small>
+                  <small className="text-sm text-muted font-medium">{locationHint}</small>
                 )}
                 {commaHint && !isCompleted && (
-                  <small className="comma-hint">Después de una coma va un espacio antes de la siguiente palabra.</small>
+                  <small className="text-sm text-accent-strong font-semibold">
+                    Después de una coma va un espacio antes de la siguiente palabra.
+                  </small>
                 )}
                 {combo && !isCompleted && (
-                  <div className="combo-hint" aria-label={`Combinación: ${combo.join(" + ")}`}>
-                    <span>Para escribir {expectedChar || "este símbolo"}</span>
+                  <div
+                    className="bg-gradient-to-r from-amber-100 to-yellow-100 border border-amber-300 rounded-full px-4 py-2 flex items-center gap-2 flex-wrap justify-center shadow-sm"
+                    aria-label={`Combinación: ${combo.join(" + ")}`}
+                  >
+                    <span className="text-sm font-bold text-amber-900">
+                      Para escribir {expectedChar || "este símbolo"}
+                    </span>
                     {combo.map((step, i) => (
-                      <span key={`${step}-${i}`} className="combo-hint__step">
-                        {i > 0 && <span className="combo-hint__plus">+</span>}
-                        <kbd>{step}</kbd>
+                      <span key={`${step}-${i}`} className="flex items-center gap-1">
+                        {i > 0 && <span className="text-amber-700 font-bold">+</span>}
+                        <kbd className="bg-white rounded px-2 py-0.5 text-sm font-bold text-text shadow-sm border border-amber-200">
+                          {step}
+                        </kbd>
                       </span>
                     ))}
                   </div>
                 )}
                 {altCombos && !isCompleted && (
-                  <div className="combo-hint combo-hint--alt" aria-label="Otras formas">
-                    <span>o también</span>
+                  <div className="flex items-center gap-2 flex-wrap justify-center text-sm" aria-label="Otras formas">
+                    <span className="text-muted font-medium">o también</span>
                     {altCombos.map((alt, idx) => (
-                      <span key={idx} className="combo-hint__alt">
+                      <span key={idx} className="flex items-center gap-1">
                         {alt.map((step, i) => (
-                          <span key={`${step}-${i}`} className="combo-hint__step">
-                            {i > 0 && <span className="combo-hint__plus">+</span>}
-                            <kbd>{step}</kbd>
+                          <span key={`${step}-${i}`} className="flex items-center gap-1">
+                            {i > 0 && <span className="text-muted font-bold">+</span>}
+                            <kbd className="bg-white/70 rounded px-2 py-0.5 text-xs font-bold text-text shadow-sm border border-white/60">
+                              {step}
+                            </kbd>
                           </span>
                         ))}
-                        {idx < altCombos.length - 1 && <span className="combo-hint__sep">·</span>}
+                        {idx < altCombos.length - 1 && <span className="text-muted mx-1">·</span>}
                       </span>
                     ))}
                   </div>
                 )}
                 {(activity.requiresShift || activity.requiresAccent) && !isCompleted && (
-                  <small style={{ display: "block", marginTop: 6, opacity: 0.75 }}>
+                  <small className="text-sm text-muted opacity-75 block mt-1">
                     {activity.requiresShift && "Usá Shift para mayúsculas y símbolos. "}
                     {activity.requiresAccent && "Respetá tildes y la ñ."}
                   </small>
@@ -851,22 +885,33 @@ export function GameplayPage() {
               </div>
 
               {showTypedPreview && (
-                <div className="typed-preview" aria-live="polite">
-                  <span className="typed-preview__label">Lo que estás escribiendo</span>
+                <div className="glass-surface px-6 py-4 flex flex-col items-center gap-2 max-w-2xl w-full" aria-live="polite">
+                  <span className="text-xs font-bold text-muted uppercase tracking-wider">
+                    Lo que estás escribiendo
+                  </span>
                   <span
                     ref={typedScrollRef}
-                    className={`typed-preview__value ${typed ? "" : "is-empty"}`}
+                    className={`font-mono text-2xl sm:text-3xl text-text font-bold overflow-x-auto whitespace-nowrap max-w-full flex items-center ${!typed ? "text-muted italic text-lg" : ""}`}
                   >
                     {typed
                       ? Array.from(typed).map((ch, i) =>
                           ch === " " ? (
-                            <span key={i} className="typed-space" aria-label="espacio" />
+                            <span
+                              key={i}
+                              className="inline-block w-4 h-8 border-b-2 border-dashed border-muted/50 mx-0.5"
+                              aria-label="espacio"
+                            />
                           ) : (
-                            <span key={i} className="typed-char">{ch}</span>
+                            <span key={i} className="inline-block">{ch}</span>
                           ),
                         )
                       : "Empezá a escribir…"}
-                    {typed && <span className="typed-preview__caret" aria-hidden="true" />}
+                    {typed && (
+                      <span
+                        className="inline-block w-0.5 h-8 bg-accent-strong ml-0.5 animate-caret-blink"
+                        aria-hidden="true"
+                      />
+                    )}
                   </span>
                 </div>
               )}
@@ -874,7 +919,7 @@ export function GameplayPage() {
           );
         })()}
 
-        <div className="game-metrics">
+        <div className="flex items-center gap-4 text-sm font-bold text-text">
           <span>Errores: {errors}</span>
           <span>Precisión: {accuracy}%</span>
         </div>
@@ -887,53 +932,108 @@ export function GameplayPage() {
         const leftPhrase = isIdleHintActive && locationHint ? locationHint : phrasePool[targetIndex % phrasePool.length];
         const rightPhrase = phrasePool[(targetIndex + Math.max(1, Math.floor(phrasePool.length / 2))) % phrasePool.length];
         return (
-          <div className="game-mascots" aria-hidden="true">
-            <figure className="game-mascot game-mascot--left">
-              <div className={`game-mascot__bubble ${errored ? "is-warn" : ""}`}>{leftPhrase}</div>
-              <img src={assets.mascotFemaleWave} alt="" decoding="async" />
+          <div className="flex justify-between items-end px-4 pb-2 pointer-events-none" aria-hidden="true">
+            <figure className="flex flex-col items-center gap-2 max-w-[140px]">
+              <div
+                className={`glass-surface rounded-2xl rounded-br-sm px-3 py-2 text-sm font-bold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
+              >
+                {leftPhrase}
+              </div>
+              <img
+                src={assets.mascotFemaleWave}
+                alt=""
+                decoding="async"
+                className="w-20 h-20 object-contain animate-mascot-float"
+              />
             </figure>
-            <figure className="game-mascot game-mascot--right">
-              <div className={`game-mascot__bubble ${errored ? "is-warn" : ""}`}>{rightPhrase}</div>
-              <img src={assets.mascotMaleJump} alt="" decoding="async" />
+            <figure className="flex flex-col items-center gap-2 max-w-[140px]">
+              <div
+                className={`glass-surface rounded-2xl rounded-bl-sm px-3 py-2 text-sm font-bold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
+              >
+                {rightPhrase}
+              </div>
+              <img
+                src={assets.mascotMaleJump}
+                alt=""
+                decoding="async"
+                className="w-20 h-20 object-contain animate-mascot-float"
+                style={{ animationDelay: "1s" }}
+              />
             </figure>
           </div>
         );
       })()}
 
-      <section className="visual-keyboard" aria-label="Teclado visual">
-        {keyboardRows.map((row) => (
-          <div className={`keyboard-row keyboard-row--${row.tone}`} key={row.id}>
-            {row.keys.map((key) => {
-              const isTarget = !isCompleted && expectedKeys.has(key);
-              const isCombo = isTarget && expectedKeys.size > 1;
-              const isFindHint = isTarget && isIdleHintActive;
-              const isPressed = lastKey === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  className={`key key--${row.tone} ${key === "Space" ? "key--space" : ""} ${key === "Backspace" || key === "Shift" || key === "Enter" ? "key--wide" : ""} ${isTarget ? "is-target" : ""} ${isCombo ? "is-target-combo" : ""} ${isFindHint ? "is-find-hint" : ""} ${isPressed ? "is-pressed" : ""}`}
-                  tabIndex={-1}
-                >
-                  {key === "Space" ? "Espacio" : key}
-                </button>
-              );
-            })}
-          </div>
-        ))}
+      <section className="px-4 pb-2" aria-label="Teclado visual">
+        <div className="flex flex-col gap-1.5 max-w-4xl mx-auto">
+          {keyboardRows.map((row) => {
+            const rowToneClasses: Record<string, string> = {
+              num: "bg-white/60",
+              top: "bg-white/70",
+              home: "bg-white/80",
+              bot: "bg-white/70",
+              mod: "bg-white/60",
+            };
+            return (
+              <div
+                key={row.id}
+                className={`flex justify-center gap-1.5 ${rowToneClasses[row.tone] || ""} rounded-xl p-1.5`}
+              >
+                {row.keys.map((key) => {
+                  const isTarget = !isCompleted && expectedKeys.has(key);
+                  const isCombo = isTarget && expectedKeys.size > 1;
+                  const isFindHint = isTarget && isIdleHintActive;
+                  const isPressed = lastKey === key;
+                  const isSpace = key === "Space";
+                  const isWide = key === "Backspace" || key === "Shift" || key === "Enter";
+
+                  const keyClasses = [
+                    "relative rounded-lg font-bold text-text shadow-sm transition-all duration-100",
+                    "flex items-center justify-center select-none",
+                    "bg-white border-2 border-white/80",
+                    isSpace ? "w-48 sm:w-64 text-sm" : isWide ? "w-16 sm:w-20 text-xs" : "w-9 h-9 sm:w-11 sm:h-11 text-sm",
+                    isTarget && !isCombo ? "bg-accent text-white border-accent-strong shadow-lg scale-105 animate-target-pulse" : "",
+                    isCombo ? "bg-accent-strong text-white border-accent-strong shadow-lg scale-110 animate-target-pulse" : "",
+                    isFindHint ? "animate-key-find ring-4 ring-accent-pink/50" : "",
+                    isPressed ? "animate-key-pop scale-90" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+
+                  return (
+                    <button key={key} type="button" className={keyClasses} tabIndex={-1}>
+                      {key === "Space" ? "Espacio" : key}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </section>
 
-      <section className="instruction-panel" aria-live="polite">
-        <div>
-          <h1>{activity.instruction}</h1>
-          <p>{feedback}</p>
+      <section
+        className="glass-strong px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mx-4 mb-4 rounded-2xl shadow-card"
+        aria-live="polite"
+      >
+        <div className="text-center sm:text-left">
+          <h1 className="font-display font-bold text-lg text-text">{activity.instruction}</h1>
+          <p className="text-sm text-muted font-medium">{feedback}</p>
         </div>
-        <div className="instruction-actions">
-          <button type="button" onClick={listen}>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={listen}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm text-text bg-white/80 border border-white/60 shadow-sm hover:scale-105 transition-transform"
+          >
             <Volume2 size={21} />
             Escuchar consigna
           </button>
-          <button type="button" onClick={retry}>
+          <button
+            type="button"
+            onClick={retry}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm text-text bg-white/80 border border-white/60 shadow-sm hover:scale-105 transition-transform"
+          >
             <RotateCcw size={20} />
             Reintentar
           </button>
@@ -941,34 +1041,53 @@ export function GameplayPage() {
       </section>
 
       {isCompleted && (
-        <div className="level-complete-overlay" role="dialog" aria-modal="true" aria-labelledby="level-complete-title">
-          <div className="level-complete-card">
-            <div className="level-complete-burst" aria-hidden="true">
-              <span>★</span><span>✦</span><span>✧</span><span>★</span><span>✦</span><span>✧</span>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 animate-overlay-fade"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="level-complete-title"
+        >
+          <div className="glass-card-smooth px-8 py-10 flex flex-col items-center gap-4 max-w-md w-full mx-4 relative animate-card-pop">
+            <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-3xl" aria-hidden="true">
+              <span className="absolute top-4 left-8 text-3xl text-amber-400 animate-sparkle-burst" style={{ animationDelay: "0s" }}>★</span>
+              <span className="absolute top-12 right-12 text-2xl text-pink-400 animate-sparkle-burst" style={{ animationDelay: "0.1s" }}>✦</span>
+              <span className="absolute bottom-16 left-12 text-2xl text-accent-sky animate-sparkle-burst" style={{ animationDelay: "0.2s" }}>✧</span>
+              <span className="absolute bottom-8 right-8 text-3xl text-amber-400 animate-sparkle-burst" style={{ animationDelay: "0.3s" }}>★</span>
+              <span className="absolute top-1/2 left-4 text-2xl text-pink-400 animate-sparkle-burst" style={{ animationDelay: "0.4s" }}>✦</span>
+              <span className="absolute top-1/3 right-4 text-2xl text-accent-sky animate-sparkle-burst" style={{ animationDelay: "0.5s" }}>✧</span>
             </div>
-            <div className="level-complete-trophy" aria-hidden="true">🏆</div>
-            <h2 id="level-complete-title">¡Nivel completado!</h2>
-            <p>Sumaste {accuracy}% de precisión.</p>
-            <div className="level-complete-stars" aria-hidden="true">
-              {[1, 2, 3].map((index) => (
-                <span
-                  key={index}
-                  className={`level-complete-star ${getStarsFromAccuracy(accuracy) >= index ? "is-on" : ""}`}
-                  style={{ animationDelay: `${0.18 + index * 0.18}s` }}
-                >
-                  ★
-                </span>
-              ))}
+            <div className="text-6xl animate-trophy" aria-hidden="true">🏆</div>
+            <h2 id="level-complete-title" className="font-display font-bold text-3xl text-text">
+              ¡Nivel completado!
+            </h2>
+            <p className="text-muted font-bold text-lg">Sumaste {accuracy}% de precisión.</p>
+            <div className="flex items-center gap-3" aria-hidden="true">
+              {[1, 2, 3].map((index) => {
+                const isOn = getStarsFromAccuracy(accuracy) >= index;
+                return (
+                  <span
+                    key={index}
+                    className={`text-5xl ${isOn ? "text-amber-400 animate-star-pop" : "text-gray-300"}`}
+                    style={{ animationDelay: `${0.18 + index * 0.18}s` }}
+                  >
+                    ★
+                  </span>
+                );
+              })}
             </div>
-            <div className="level-complete-actions">
-              <button type="button" className="level-complete-action level-complete-action--ghost" onClick={retry}>
+            <div className="flex items-center gap-3 mt-4">
+              <button
+                type="button"
+                onClick={retry}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-text bg-white/80 border border-white/60 shadow-sm hover:scale-105 transition-transform"
+              >
                 <RotateCcw size={18} />
                 Reintentar
               </button>
               <button
                 type="button"
-                className="level-complete-action level-complete-action--primary"
                 onClick={() => navigate(`/worlds/${activity.worldId}`)}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-accent to-accent-strong shadow-btn hover:scale-105 transition-transform"
               >
                 <ArrowRight size={20} />
                 Volver a la isla

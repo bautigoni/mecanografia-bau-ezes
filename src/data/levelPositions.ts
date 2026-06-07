@@ -4,8 +4,8 @@ import type { Activity } from "./activities";
    LEVEL MARKER POSITIONS  ·  single source of truth
    ---------------------------------------------------------------------
    Each entry is the position of a level marker over its island artwork,
-   expressed as PERCENTAGES of the level map container (the `.level-map`
-   box in IslandDetailPage, which covers the whole island stage):
+    expressed as PERCENTAGES of the level map container (the level-map
+    <section> in IslandDetailPage, which covers the whole island stage):
 
      x → horizontal %, 0 = left edge, 100 = right edge
      y → vertical %,   0 = top edge,  100 = bottom edge

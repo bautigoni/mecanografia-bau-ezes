@@ -53,7 +53,7 @@ function prefetchImage(src: string) {
 /* Right-edge padding past the last island. Has to cover the island's
    20vw footprint + hover/selected lift + a visual gutter so the last
    island doesn't sit flush against the scroll edge (which would let
-   the right half of the island get clipped by .worlds-scene's
+   the right half of the island get clipped by the scene's
    overflow:hidden + the body padding). 40vw is enough for the 20vw
    island plus the lift margin and ~5–6vw of visual breathing room on
    every viewport. */
@@ -80,6 +80,27 @@ function buildRoute(points: { x: number; y: number }[]): string {
   }
   return d;
 }
+
+/* ------------------------------------------------------------------ */
+/* Per-island theme gradients (replaces BEM `world-island--islandN`)   */
+/* ------------------------------------------------------------------ */
+const islandTheme: Record<World["slug"], { ring: string; glow: string; badge: string }> = {
+  island1:  { ring: "from-sky-300 to-blue-400",       glow: "rgba(51,199,240,0.45)", badge: "from-sky-400 to-blue-500" },
+  island2:  { ring: "from-emerald-300 to-teal-400",    glow: "rgba(34,199,184,0.45)", badge: "from-emerald-400 to-teal-500" },
+  island3:  { ring: "from-violet-300 to-purple-400",   glow: "rgba(156,113,255,0.45)", badge: "from-violet-400 to-purple-500" },
+  island4:  { ring: "from-indigo-300 to-blue-500",     glow: "rgba(83,107,255,0.45)",  badge: "from-indigo-400 to-blue-600" },
+  island5:  { ring: "from-cyan-300 to-sky-400",        glow: "rgba(51,199,240,0.45)", badge: "from-cyan-400 to-sky-500" },
+  island6:  { ring: "from-teal-300 to-emerald-400",    glow: "rgba(89,203,183,0.45)", badge: "from-teal-400 to-emerald-500" },
+  island7:  { ring: "from-lime-300 to-green-400",      glow: "rgba(132,204,22,0.40)", badge: "from-lime-400 to-green-500" },
+  island8:  { ring: "from-amber-300 to-orange-400",    glow: "rgba(251,191,36,0.45)", badge: "from-amber-400 to-orange-500" },
+  island9:  { ring: "from-rose-300 to-pink-400",       glow: "rgba(255,159,202,0.45)", badge: "from-rose-400 to-pink-500" },
+  island10: { ring: "from-fuchsia-300 to-pink-400",    glow: "rgba(217,70,239,0.40)", badge: "from-fuchsia-400 to-pink-500" },
+  island11: { ring: "from-blue-300 to-indigo-400",     glow: "rgba(99,102,241,0.45)", badge: "from-blue-400 to-indigo-500" },
+  island12: { ring: "from-sky-300 to-cyan-400",        glow: "rgba(56,189,248,0.45)", badge: "from-sky-400 to-cyan-500" },
+  island13: { ring: "from-pink-300 to-rose-400",       glow: "rgba(255,127,160,0.45)", badge: "from-pink-400 to-rose-500" },
+  island14: { ring: "from-yellow-300 to-amber-400",    glow: "rgba(250,204,21,0.45)", badge: "from-yellow-400 to-amber-500" },
+  island15: { ring: "from-violet-400 to-fuchsia-400",  glow: "rgba(168,85,247,0.50)", badge: "from-violet-500 to-fuchsia-500" },
+};
 
 /* ------------------------------------------------------------------ */
 /* Badge + label dictionaries                                          */
@@ -326,34 +347,64 @@ export function WorldsPage() {
 
   return (
     <main
-      className={
-        selectedWorld ? "worlds-page page-fade is-entering-world" : "worlds-page page-fade"
-      }
+      className={[
+        "relative min-h-dvh overflow-hidden bg-cover bg-center animate-page-fade",
+        "transition-opacity duration-500",
+        selectedWorld ? "opacity-60" : "opacity-100",
+      ].join(" ")}
       style={{ backgroundImage: `url("${assets.homeBg}")` }}
     >
-      <div className="worlds-atmosphere" aria-hidden="true" />
+      {/* Atmospheric radial-gradient overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 60% at 50% 30%, rgba(51,199,240,0.14), transparent 60%)," +
+            "radial-gradient(ellipse 60% 50% at 20% 70%, rgba(156,113,255,0.10), transparent 55%)," +
+            "radial-gradient(ellipse 60% 50% at 80% 80%, rgba(255,159,202,0.10), transparent 55%)",
+        }}
+        aria-hidden="true"
+      />
 
+      {/* ── Loader (preparando…) ── */}
       {!worldsReady && (
-        <div className="worlds-loader" role="status" aria-live="polite">
-          <div className="worlds-loader__card">
-            <span className="worlds-loader__halo" aria-hidden="true" />
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/70 animate-loader-in"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="glass-card-smooth relative flex flex-col items-center gap-5 p-10">
+            <span
+              className="absolute inset-0 rounded-3xl blur-2xl animate-loader-halo pointer-events-none"
+              style={{
+                background:
+                  "radial-gradient(circle at 50% 40%, rgba(51,199,240,0.35), transparent 65%)",
+              }}
+              aria-hidden="true"
+            />
             <img
-              className="worlds-loader__mascot"
+              className="w-28 h-auto animate-mascot-float drop-shadow-lg"
               src={assets.mascotMaleProud}
               alt=""
               decoding="async"
             />
-            <span className="worlds-loader__spinner" aria-hidden="true" />
-            <p>Preparando tu aventura…</p>
+            {/* Spinner ring */}
+            <span
+              className="w-8 h-8 rounded-full border-[3px] border-white/30 border-t-white animate-loader-spin"
+              aria-hidden="true"
+            />
+            <p className="text-white font-display font-bold text-lg">
+              Preparando tu aventura…
+            </p>
           </div>
         </div>
       )}
 
       {/* ── Hamburger menu ── */}
-      <div className={menuOpen ? "world-menu is-open" : "world-menu"}>
+      <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-2">
         <button
           type="button"
-          className="world-menu__trigger"
+          className="glass w-11 h-11 grid place-items-center rounded-full border-0 cursor-pointer text-text shadow-md transition-transform hover:scale-105 active:scale-95"
           aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
@@ -362,31 +413,58 @@ export function WorldsPage() {
         </button>
 
         {menuOpen && (
-          <div className="world-menu__panel" aria-label="Menú de estudiante">
-            <button type="button" onClick={() => navigate("/misiones")}>
+          <div
+            className="glass-surface grid gap-1 p-3 rounded-2xl animate-menu-reveal min-w-[12rem]"
+            aria-label="Menú de estudiante"
+          >
+            <button
+              type="button"
+              className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-text font-semibold text-sm cursor-pointer bg-transparent border-0 hover:bg-white/40 transition-colors text-left w-full"
+              onClick={() => navigate("/misiones")}
+            >
               <Flag size={19} />
               <span>Misiones</span>
             </button>
-            <button type="button" onClick={() => navigate("/logros")}>
+            <button
+              type="button"
+              className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-text font-semibold text-sm cursor-pointer bg-transparent border-0 hover:bg-white/40 transition-colors text-left w-full"
+              onClick={() => navigate("/logros")}
+            >
               <Medal size={19} />
               <span>Logros</span>
             </button>
-            <button type="button" onClick={() => navigate("/mi-cuenta")}>
+            <button
+              type="button"
+              className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-text font-semibold text-sm cursor-pointer bg-transparent border-0 hover:bg-white/40 transition-colors text-left w-full"
+              onClick={() => navigate("/mi-cuenta")}
+            >
               <UserRound size={19} />
               <span>Mi cuenta</span>
             </button>
-            <button type="button" onClick={() => navigate("/logros")}>
+            <button
+              type="button"
+              className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-text font-semibold text-sm cursor-pointer bg-transparent border-0 hover:bg-white/40 transition-colors text-left w-full"
+              onClick={() => navigate("/logros")}
+            >
               <Star size={19} />
               <span>{totalEarnedStars} estrellas</span>
             </button>
             {/* Superadmin-only shortcut to the teacher/admin panel. */}
             {context.isSuperAdmin && (
-              <button type="button" onClick={() => navigate("/profesor")}>
+              <button
+                type="button"
+                className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-text font-semibold text-sm cursor-pointer bg-transparent border-0 hover:bg-white/40 transition-colors text-left w-full"
+                onClick={() => navigate("/profesor")}
+              >
                 <GraduationCap size={19} />
                 <span>Panel docente</span>
               </button>
             )}
-            <button type="button" onClick={leave}>
+            <button
+              type="button"
+              className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-text font-semibold text-sm cursor-pointer bg-transparent border-0 hover:bg-white/40 transition-colors text-left w-full"
+              onClick={leave}
+            >
               <LogOut size={19} />
               <span>Salir</span>
             </button>
@@ -396,14 +474,17 @@ export function WorldsPage() {
 
       {/* ── Horizontally scrollable world journey ── */}
       <section
-        className="worlds-scene"
+        className="relative w-full h-dvh overflow-x-auto overflow-y-hidden scroll-smooth"
         aria-label="Selección de mundos"
         ref={sceneRef}
       >
-        <div className="worlds-track" style={{ width: `${trackWidthVw}vw` }}>
+        <div
+          className="relative h-full"
+          style={{ width: `${trackWidthVw}vw` }}
+        >
           {/* Magical trail SVG */}
           <svg
-            className="world-map-path"
+            className="absolute top-0 left-0 pointer-events-none h-full"
             viewBox={`0 0 ${trackWidthVw} 100`}
             aria-hidden="true"
             preserveAspectRatio="none"
@@ -432,18 +513,62 @@ export function WorldsPage() {
                 </feMerge>
               </filter>
             </defs>
-            <path className="world-map-path__halo"    d={ROUTE_D} />
-            <path className="world-map-path__base"    d={ROUTE_D} />
-            <path className="world-map-path__dots"    d={ROUTE_D} />
-            <path className="world-map-path__shimmer" d={ROUTE_D} />
+            {/* Wide soft halo behind the route */}
+            <path
+              d={ROUTE_D}
+              fill="none"
+              stroke="url(#world-route-gradient)"
+              strokeWidth="5"
+              strokeLinecap="round"
+              strokeDasharray="0"
+              opacity="0.35"
+              filter="url(#world-route-glow)"
+            />
+            {/* Solid base line */}
+            <path
+              d={ROUTE_D}
+              fill="none"
+              stroke="url(#world-route-gradient)"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+            {/* Dotted overlay */}
+            <path
+              d={ROUTE_D}
+              fill="none"
+              stroke="white"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeDasharray="1.5 4"
+              opacity="0.55"
+            />
+            {/* Shimmer highlight */}
+            <path
+              d={ROUTE_D}
+              fill="none"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeDasharray="6 40"
+              opacity="0.7"
+              className="animate-route-shimmer"
+              style={{ strokeDashoffset: 0 }}
+            />
           </svg>
 
           {/* Sparkles between islands */}
           {routeSparkles.map((spark, idx) => (
             <span
               key={idx}
-              className="world-route-spark"
-              style={{ left: `${spark.x}vw`, top: `${spark.y}%`, animationDelay: `${spark.delay}s` }}
+              className="absolute w-2.5 h-2.5 rounded-full animate-spark-twinkle pointer-events-none"
+              style={{
+                left: `${spark.x}vw`,
+                top: `${spark.y}%`,
+                animationDelay: `${spark.delay}s`,
+                background:
+                  "radial-gradient(circle, rgba(255,255,255,0.95), rgba(201,184,255,0.5) 60%, transparent 80%)",
+                boxShadow: "0 0 6px 2px rgba(201,184,255,0.5)",
+              }}
               aria-hidden="true"
             />
           ))}
@@ -461,30 +586,43 @@ export function WorldsPage() {
               : isCurrent
                 ? "Seguir jugando"
                 : "Jugar";
-            const starsClass = isCompleted
-              ? "world-stars-chip world-stars-chip--complete"
-              : isLocked
-                ? "world-stars-chip world-stars-chip--locked"
-                : "world-stars-chip";
+            const theme = islandTheme[world.slug];
 
             return (
               <div
                 key={world.id}
-                className="world-island-wrap"
+                className="absolute"
                 style={{ left: `${world.map.x}vw`, top: `${world.map.y}%` }}
               >
                 <button
                   type="button"
                   className={[
-                    "world-island",
-                    `world-island--${world.slug}`,
-                    `world-island--${state}`,
-                    isCurrent ? "is-current" : "",
-                    justUnlocked.has(world.slug) ? "is-unlocking" : "",
-                    selectedWorld === world.id ? "is-selected" : "",
+                    /* Base island styles */
+                    "relative w-[20vw] max-w-[14rem] aspect-square rounded-full border-0 p-0",
+                    "cursor-pointer transition-all duration-300 ease-out",
+                    "hover:scale-105 hover:-translate-y-1",
+                    "active:scale-95",
+                    "overflow-visible",
+                    /* State: locked */
+                    isLocked
+                      ? "grayscale-[0.6] opacity-50 cursor-not-allowed hover:scale-100 hover:translate-y-0"
+                      : "",
+                    /* State: current → pulsing glow ring */
+                    isCurrent ? "animate-next-pulse" : "",
+                    /* State: just unlocked → reveal animation */
+                    justUnlocked.has(world.slug) ? "animate-unlock-reveal" : "",
+                    /* State: selected → shrink + fade for transition */
+                    selectedWorld === world.id
+                      ? "scale-110 opacity-90"
+                      : "",
                   ]
                     .filter(Boolean)
                     .join(" ")}
+                  style={{
+                    boxShadow: isLocked
+                      ? undefined
+                      : `0 0 28px 6px ${theme.glow}, 0 12px 32px rgba(40,70,120,0.18)`,
+                  }}
                   onClick={() => handleIslandClick(world)}
                   onPointerEnter={() => !isLocked && prefetchWorld(world)}
                   onFocus={() => !isLocked && prefetchWorld(world)}
@@ -493,39 +631,95 @@ export function WorldsPage() {
                   }`}
                   aria-disabled={isLocked}
                 >
+                  {/* Island thumbnail image (fills the circular button) */}
+                  <img
+                    src={world.thumbnail}
+                    alt=""
+                    loading="eager"
+                    decoding="async"
+                    className="w-full h-full object-cover rounded-full"
+                  />
+
                   {/* Number + theme badge only on reachable islands. Locked
                       islands show just a padlock centred on the island. */}
                   {!isLocked && (
-                    <span className="world-icon-badge" aria-hidden="true">
-                      <span className="world-icon-badge__num">M{world.displayNumber}</span>
-                      <BadgeIcon size={20} strokeWidth={2.1} className="world-icon-badge__icon" />
+                    <span
+                      className={[
+                        "absolute -top-2 left-1/2 -translate-x-1/2",
+                        "flex items-center gap-1 px-2.5 py-1 rounded-full",
+                        "bg-gradient-to-br text-white font-display font-bold text-xs",
+                        "shadow-md pointer-events-none whitespace-nowrap",
+                        `bg-gradient-to-br ${theme.badge}`,
+                      ].join(" ")}
+                      aria-hidden="true"
+                    >
+                      <span>M{world.displayNumber}</span>
+                      <BadgeIcon size={14} strokeWidth={2.1} />
                     </span>
                   )}
-                  {/* No star chip on blocked islands. */}
+
+                  {/* Star chip — not shown on locked islands. */}
                   {!isLocked && (
-                    <span className={starsClass} aria-hidden="true">
-                      <Star size={14} strokeWidth={2.4} className="world-stars-chip__icon" />
+                    <span
+                      className={[
+                        "absolute -bottom-3 left-1/2 -translate-x-1/2",
+                        "flex items-center gap-1 px-2.5 py-1 rounded-full",
+                        "text-xs font-bold whitespace-nowrap pointer-events-none",
+                        "shadow-sm",
+                        isCompleted
+                          ? "bg-gradient-to-r from-emerald-400 to-teal-400 text-white"
+                          : "glass text-text",
+                      ].join(" ")}
+                      aria-hidden="true"
+                    >
+                      <Star
+                        size={14}
+                        strokeWidth={2.4}
+                        className={isCompleted ? "text-white" : "text-amber-400"}
+                        fill={isCompleted ? "currentColor" : "none"}
+                      />
                       {starInfo.earnedStars}/{starInfo.totalStars}
                     </span>
                   )}
-                  {/* The tick is decorative — the button's aria-label already
+
+                  {/* Completion tick — decorative, aria-label already
                       announces "completado". */}
                   {isCompleted && (
-                    <span className="world-complete-badge" aria-hidden="true">
+                    <span
+                      className="absolute top-1 right-1 w-7 h-7 rounded-full bg-emerald-500 text-white grid place-items-center shadow-md animate-tick-pop"
+                      aria-hidden="true"
+                    >
                       <Check size={18} strokeWidth={3.4} />
                     </span>
                   )}
-                  <img src={world.thumbnail} alt="" loading="eager" decoding="async" />
-                  {/* Locked islands are greyed out with a padlock in the centre. */}
+
+                  {/* Locked islands show a padlock centred on the island. */}
                   {isLocked && (
-                    <span className="world-island__lock" aria-hidden="true">
+                    <span
+                      className="absolute inset-0 grid place-items-center text-white/80"
+                      aria-hidden="true"
+                    >
                       <Lock size={30} strokeWidth={2.5} />
                     </span>
                   )}
+
                   {/* Celebratory sparkle burst when this island is unlocked. */}
                   {justUnlocked.has(world.slug) && (
-                    <span className="world-island__burst" aria-hidden="true">
-                      <i /><i /><i /><i /><i /><i />
+                    <span
+                      className="absolute inset-0 pointer-events-none"
+                      aria-hidden="true"
+                    >
+                      {[0, 1, 2, 3, 4, 5].map((i) => (
+                        <i
+                          key={i}
+                          className="absolute top-1/2 left-1/2 w-2 h-2 rounded-full animate-unlock-burst"
+                          style={{
+                            background: ["#c9b8ff", "#bff3ff", "#ffd9f1", "#fff8ff", "#ffe4b8", "#b8ffe4"][i],
+                            animationDelay: `${i * 0.08}s`,
+                            transform: `rotate(${i * 60}deg) translateY(-3rem)`,
+                          }}
+                        />
+                      ))}
                     </span>
                   )}
                 </button>
@@ -538,26 +732,37 @@ export function WorldsPage() {
         </div>
       </section>
 
-      <div className={selectedWorld ? "world-transition is-active" : "world-transition"} />
+      {/* ── World-enter transition overlay ── */}
+      <div
+        className={[
+          "fixed inset-0 z-40 pointer-events-none transition-all duration-500",
+          selectedWorld
+            ? "bg-white/90 opacity-100 backdrop-blur-sm"
+            : "bg-white/0 opacity-0",
+        ].join(" ")}
+      />
 
-      {/* The mascot float lives on `.home-mascot-float` (a small, filter-free
-          wrapper). The <img> below carries the two drop-shadows and stays
-          still, so the rasterizer is no longer forced to re-blur the alpha
-          channel of a 14–24rem tall PNG on every frame. */}
-      <span className="home-mascot-float home-mascot-float--left">
+      {/* The mascot float lives on the wrapper (animate-mascot-float).
+          The <img> carries no filter so the rasterizer is not forced to
+          re-blur the alpha channel of a 14–24rem tall PNG on every frame. */}
+      <span className="absolute bottom-0 left-0 animate-mascot-float pointer-events-none select-none z-10">
         <img
-          className="home-mascot home-mascot--left"
+          className="w-auto max-h-[22vh] drop-shadow-lg"
           src={assets.mascotFemaleLaptop}
           alt=""
           decoding="async"
           loading="lazy"
         />
       </span>
-      <div className="home-mascot-wrap home-mascot-wrap--right">
-        <span className="home-speech-bubble">¡Vamos!</span>
-        <span className="home-mascot-float home-mascot-float--right">
+      <div className="absolute bottom-0 right-0 flex flex-col items-end pointer-events-none select-none z-10">
+        <span
+          className="glass-strong px-4 py-2 rounded-2xl rounded-br-sm text-text font-display font-bold text-sm mb-2 animate-bubble-pop shadow-md"
+        >
+          ¡Vamos!
+        </span>
+        <span className="animate-mascot-float">
           <img
-            className="home-mascot home-mascot--right"
+            className="w-auto max-h-[22vh] drop-shadow-lg"
             src={assets.mascotMaleProud}
             alt=""
             decoding="async"

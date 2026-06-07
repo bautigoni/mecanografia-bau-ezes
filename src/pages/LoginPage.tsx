@@ -118,11 +118,11 @@ export function LoginPage() {
 
   return (
     <main
-      className="login-page page-fade"
+      className="relative min-h-dvh overflow-hidden bg-cover bg-center flex items-center justify-center animate-page-fade"
       style={{ backgroundImage: `url("${assets.loginBg}")` }}
     >
       <img
-        className="login-mascot login-mascot--left"
+        className="absolute bottom-0 left-0 w-auto max-h-[52vh] animate-mascot-float pointer-events-none select-none z-10"
         src={assets.mascotFemaleWave}
         alt="Mascota saludando"
         decoding="async"
@@ -130,7 +130,7 @@ export function LoginPage() {
         fetchpriority="high"
       />
       <img
-        className="login-mascot login-mascot--right"
+        className="absolute bottom-0 right-0 w-auto max-h-[52vh] animate-mascot-float pointer-events-none select-none z-10"
         src={assets.mascotMaleWave}
         alt="Mascota saludando"
         decoding="async"
@@ -138,24 +138,39 @@ export function LoginPage() {
         fetchpriority="high"
       />
 
-      <section className="login-card" aria-label="Ingreso a TYPELY">
-        <span className="login-card__halo" aria-hidden="true" />
-        <span className="login-card__sparkle login-card__sparkle--left" aria-hidden="true">
+      <section
+        className="glass-card-smooth relative w-[min(32rem,92vw)] mx-auto my-[7vh] p-8 pt-12 text-center flex flex-col items-center gap-6 animate-card-in z-20"
+        aria-label="Ingreso a TYPELY"
+      >
+        <span
+          className="absolute -inset-8 -z-10 rounded-[2rem] bg-[radial-gradient(circle_at_50%_40%,rgba(51,199,240,0.22),transparent_60%)] blur-3xl animate-halo-drift pointer-events-none"
+          aria-hidden="true"
+        />
+        <span
+          className="absolute -left-4 top-1/3 text-2xl text-accent-sky/50 animate-sparkle-spin pointer-events-none select-none"
+          aria-hidden="true"
+        >
           ✦
         </span>
-        <span className="login-card__sparkle login-card__sparkle--right" aria-hidden="true">
+        <span
+          className="absolute -right-4 top-1/2 text-xl text-accent-sky/50 animate-sparkle-spin pointer-events-none select-none"
+          aria-hidden="true"
+        >
           ✦
         </span>
-        <span className="login-card__sparkle login-card__sparkle--top" aria-hidden="true">
+        <span
+          className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl text-accent-sky/50 animate-sparkle-spin pointer-events-none select-none"
+          aria-hidden="true"
+        >
           ✧
         </span>
 
-        <div className="login-card__copy">
-          <h1>Bienvenido a TYPELY</h1>
-          <p>Aprendé a escribir jugando entre las nubes ✨</p>
+        <div className="text-center">
+          <h1 className="font-display text-3xl font-bold text-text mb-1">Bienvenido a TYPELY</h1>
+          <p className="text-muted font-semibold">Aprendé a escribir jugando entre las nubes ✨</p>
         </div>
 
-        <form onSubmit={submit} className="login-form">
+        <form onSubmit={submit} className="flex flex-col gap-4 w-full">
           <GlassInput
             icon={<User size={21} aria-hidden="true" />}
             label="Código o usuario"
@@ -174,7 +189,7 @@ export function LoginPage() {
             action={
               <button
                 type="button"
-                className="password-toggle"
+                className="grid w-9 h-9 place-items-center rounded-full bg-transparent border-0 cursor-pointer text-text/60 hover:text-text transition-colors"
                 aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 onClick={() => setShowPassword((v) => !v)}
               >
@@ -192,8 +207,12 @@ export function LoginPage() {
           </AnimatedButton>
 
           {/* Google sign-in — opens the FedCM "continuar como…" popup. */}
-          <button type="button" className="google-login-btn" onClick={googleLogin}>
-            <span className="google-login-btn__icon" aria-hidden="true">
+          <button
+            type="button"
+            className="bg-white flex items-center justify-center gap-2.5 py-3 px-5 rounded-full shadow-md cursor-pointer font-extrabold text-text transition-transform hover:scale-[1.02] active:scale-[0.98] w-full"
+            onClick={googleLogin}
+          >
+            <span className="inline-flex items-center" aria-hidden="true">
               <GoogleGlyph />
             </span>
             Ingresar con Google
@@ -209,7 +228,7 @@ export function LoginPage() {
             Entrar en modo demo
           </AnimatedButton>
 
-          <p className="login-card__safety">
+          <p className="flex items-center justify-center gap-1.5 text-xs text-muted/70 font-semibold mt-1">
             <LockKeyhole size={15} aria-hidden="true" />
             Entorno seguro para aprender y enseñar
           </p>
@@ -217,21 +236,39 @@ export function LoginPage() {
       </section>
 
       {showDemoModal && (
-        <div className="demo-modal" role="dialog" aria-modal="true" aria-labelledby="demo-modal-title">
-          <div className="demo-modal__backdrop" onClick={() => setShowDemoModal(false)} />
-          <div className="demo-modal__card">
-            <span className="demo-modal__icon" aria-hidden="true"><Rocket size={26} /></span>
-            <h2 id="demo-modal-title">Modo demo</h2>
-            <p>¿Querés continuar con el progreso anterior o empezar desde cero?</p>
-            <div className="demo-modal__actions">
-              <button type="button" className="demo-modal__btn demo-modal__btn--primary" onClick={() => enterDemo(false)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 animate-overlay-fade"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="demo-modal-title"
+        >
+          <div className="absolute inset-0" onClick={() => setShowDemoModal(false)} />
+          <div className="glass-card-smooth relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col items-center gap-5 animate-menu-reveal">
+            <span className="text-4xl" aria-hidden="true"><Rocket size={26} /></span>
+            <h2 id="demo-modal-title" className="font-display text-xl font-bold text-text">Modo demo</h2>
+            <p className="text-muted text-sm text-center">¿Querés continuar con el progreso anterior o empezar desde cero?</p>
+            <div className="flex gap-3 w-full mt-2">
+              <button
+                type="button"
+                className="flex-1 py-3 rounded-xl font-extrabold text-white cursor-pointer bg-gradient-to-br from-accent-sky to-accent-strong transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                onClick={() => enterDemo(false)}
+              >
                 Continuar
               </button>
-              <button type="button" className="demo-modal__btn demo-modal__btn--ghost" onClick={() => enterDemo(true)}>
+              <button
+                type="button"
+                className="flex-1 py-3 rounded-xl font-extrabold cursor-pointer bg-white/50 text-text transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                onClick={() => enterDemo(true)}
+              >
                 Empezar de cero
               </button>
             </div>
-            <button type="button" className="demo-modal__close" aria-label="Cerrar" onClick={() => setShowDemoModal(false)}>
+            <button
+              type="button"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/30 border-0 cursor-pointer flex items-center justify-center text-text/60 hover:text-text hover:bg-white/50 transition-colors"
+              aria-label="Cerrar"
+              onClick={() => setShowDemoModal(false)}
+            >
               ✕
             </button>
           </div>

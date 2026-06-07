@@ -22,6 +22,14 @@ const NAV: DashNavItem[] = [
   { id: "estudiantes", label: "Estudiantes", icon: Users },
 ];
 
+/* Student-status chip styles (replaces tch-chip--{st}). */
+const chipCls: Record<string, string> = {
+  flying: "bg-mint/20 text-accent-teal",
+  atRisk: "bg-rose/20 text-rose",
+  idle: "bg-white/40 text-muted",
+  neutral: "bg-accent-sky/20 text-accent-sky",
+};
+
 export function TeacherClassPage() {
   const { classId } = useParams();
   const { user, logout } = useAuth();
@@ -70,11 +78,17 @@ export function TeacherClassPage() {
 
   const hero = (
     <>
-      <span className="dash-eyebrow"><BookOpen size={18} /> Curso</span>
-      <h1>{course.name}</h1>
-      <p>{students.length} alumnos · {enabled.size}/{worlds.length} niveles habilitados.</p>
-      <div className="dash-hero__actions">
-        <button type="button" className="tch-back" onClick={() => navigate("/profesor")}>
+      <span className="inline-flex items-center gap-1.5 text-sm font-bold text-accent-teal uppercase tracking-wide">
+        <BookOpen size={18} /> Curso
+      </span>
+      <h1 className="font-display text-3xl font-bold text-text">{course.name}</h1>
+      <p className="text-muted font-semibold">{students.length} alumnos · {enabled.size}/{worlds.length} niveles habilitados.</p>
+      <div className="flex flex-wrap gap-3 mt-2">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 text-sm font-bold text-text/70 hover:text-text cursor-pointer bg-transparent border-0 transition-colors"
+          onClick={() => navigate("/profesor")}
+        >
           <ArrowLeft size={18} /> Volver a mis cursos
         </button>
       </div>
@@ -96,31 +110,64 @@ export function TeacherClassPage() {
       onBell={() => setMessage("No tenés notificaciones nuevas.")}
       hero={hero}
     >
-      <div className="kpi-grid">
+      {/* KPI grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <KpiCard icon={Users} label="Alumnos" value={students.length} tone="pink" />
         <KpiCard icon={BookOpen} label="Niveles habilitados" value={`${enabled.size}/${worlds.length}`} tone="violet" />
         <KpiCard icon={GraduationCap} label="Precisión promedio" value={`${avg}%`} tone="blue" />
       </div>
 
-      <section className="dash-section">
-        <div className="dash-section__head"><div><h2><Users size={20} /> Alumnos del curso</h2><p>Tocá un alumno para ver su detalle.</p></div></div>
+      {/* Students table */}
+      <section className="glass-card p-6 flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="font-display text-xl font-bold text-text flex items-center gap-2">
+              <Users size={20} /> Alumnos del curso
+            </h2>
+            <p className="text-sm text-muted font-semibold">Tocá un alumno para ver su detalle.</p>
+          </div>
+        </div>
         {students.length === 0 ? (
-          <div className="empty-state empty-state--compact"><h3>Este curso todavía no tiene alumnos</h3></div>
+          <div className="flex flex-col items-center justify-center text-center gap-3 py-6 px-4">
+            <h3 className="font-display text-lg font-bold text-text">Este curso todavía no tiene alumnos</h3>
+          </div>
         ) : (
-          <div className="tch-table">
+          <div className="flex flex-col gap-2">
             {students.map((s) => {
               const pct = Math.round(s.stats?.precision ?? 0);
               const st = studentStatus(s);
               return (
-                <div key={s.id} className="tch-table__row">
-                  <span className="tch-people__avatar">{s.name.charAt(0).toUpperCase()}</span>
-                  <span className="tch-table__name"><strong>{s.name}</strong><small>{s.username}</small></span>
-                  <div className="progress-track tch-table__bar"><div className="progress-track__fill" style={{ width: `${pct}%` }} /></div>
-                  <span className="tch-table__pct">{pct}%</span>
-                  <span className={`tch-chip tch-chip--${st}`}>{STATUS_LABEL[st]}</span>
-                  <div className="tch-table__actions">
-                    <button type="button" className="tch-btn" onClick={() => navigate(`/profesor/alumno/${s.id}`)}>Ver</button>
-                    <button type="button" className="tch-btn" onClick={() => resetPw(s)} title="Restablecer contraseña"><KeyRound size={14} /></button>
+                <div key={s.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/40">
+                  <span className="grid place-items-center w-9 h-9 rounded-full bg-accent/15 text-accent font-bold text-sm shrink-0">
+                    {s.name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="flex flex-col min-w-0 w-32 shrink-0">
+                    <strong className="text-sm text-text truncate">{s.name}</strong>
+                    <small className="text-xs text-muted truncate">{s.username}</small>
+                  </span>
+                  <div className="flex-1 h-3 rounded-full bg-white/50 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-accent-sky to-accent-teal transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-sm font-bold text-muted w-12 text-right">{pct}%</span>
+                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${chipCls[st]}`}>
+                    {STATUS_LABEL[st]}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold cursor-pointer bg-white/50 text-text hover:bg-white/70 border-0 transition-colors"
+                      onClick={() => navigate(`/profesor/alumno/${s.id}`)}
+                    >
+                      Ver
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold cursor-pointer bg-white/50 text-text hover:bg-white/70 border-0 transition-colors"
+                      onClick={() => resetPw(s)}
+                      title="Restablecer contraseña"
+                    >
+                      <KeyRound size={14} />
+                    </button>
                   </div>
                 </div>
               );
@@ -129,25 +176,40 @@ export function TeacherClassPage() {
         )}
       </section>
 
-      <section className="dash-section">
-        <div className="dash-section__head"><div><h2><BookOpen size={20} /> Niveles a asignar</h2><p>Elegí qué niveles puede ver y jugar este curso. Se guarda automáticamente.</p></div></div>
-        <div className="island-toggle-grid">
+      {/* Island toggle grid */}
+      <section className="glass-card p-6 flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="font-display text-xl font-bold text-text flex items-center gap-2">
+              <BookOpen size={20} /> Niveles a asignar
+            </h2>
+            <p className="text-sm text-muted font-semibold">Elegí qué niveles puede ver y jugar este curso. Se guarda automáticamente.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {worlds.map((world) => {
             const isOn = enabled.has(world.id);
             return (
-              <article key={world.id} className={`island-toggle-card ${isOn ? "is-on" : "is-off"}`}>
-                <div className="island-toggle-card__thumb">
-                  <img src={world.thumbnail} alt="" decoding="async" loading="lazy" />
-                  <span className="island-toggle-card__order">#{world.order}</span>
+              <article
+                key={world.id}
+                className={`glass-surface flex flex-col overflow-hidden animate-card-in ${!isOn ? "opacity-60" : ""}`}
+              >
+                <div className="relative h-28 overflow-hidden bg-accent-sky/10">
+                  <img src={world.thumbnail} alt="" decoding="async" loading="lazy" className="w-full h-full object-cover" />
+                  <span className="absolute top-2 left-2 text-xs font-bold px-2 py-0.5 rounded-full bg-white/60 text-text">
+                    #{world.order}
+                  </span>
                 </div>
-                <div className="island-toggle-card__body">
-                  <strong>{world.title}</strong>
-                  <span className="island-toggle-card__topic">{world.topic}</span>
-                  <span className="island-toggle-card__meta">{world.levels.length} niveles</span>
+                <div className="p-3 flex flex-col gap-0.5">
+                  <strong className="text-sm text-text">{world.title}</strong>
+                  <span className="text-xs text-muted">{world.topic}</span>
+                  <span className="text-xs text-muted/70">{world.levels.length} niveles</span>
                 </div>
                 <button
                   type="button"
-                  className={`island-toggle-card__switch ${isOn ? "is-on" : "is-off"}`}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold cursor-pointer border-0 transition-colors mx-3 mb-3 mt-0 rounded-xl ${
+                    isOn ? "bg-mint/25 text-accent-teal" : "bg-white/40 text-muted"
+                  }`}
                   onClick={() => toggleWorld(world.id)}
                   aria-pressed={isOn}
                 >

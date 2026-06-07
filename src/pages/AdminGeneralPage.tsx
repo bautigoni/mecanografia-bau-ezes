@@ -41,6 +41,13 @@ const NAV: DashNavItem[] = [
   { id: "admins", label: "Admins de sede", icon: ShieldCheck },
 ];
 
+/* ── Shared Tailwind class fragments ── */
+const INPUT_CLS =
+  "w-full min-h-[3rem] px-4 rounded-xl bg-white/70 border border-white/60 text-text font-semibold outline-none focus:border-accent-teal focus:ring-2 focus:ring-accent-teal/20 transition-all placeholder:text-muted/50";
+const SELECT_CLS =
+  "w-full min-h-[3rem] px-4 rounded-xl bg-white/70 border border-white/60 text-text font-semibold outline-none focus:border-accent-teal focus:ring-2 focus:ring-accent-teal/20 transition-all cursor-pointer";
+const BTN_SM = "min-h-[2.25rem] px-3 text-sm";
+
 interface SiteDraft {
   name: string;
   city: string;
@@ -210,7 +217,7 @@ export function AdminGeneralPage() {
     : sedeAdmins;
 
   const kpis = (
-    <div className="kpi-grid">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
       <KpiCard icon={School} label="Sedes" value={counts.sedes} tone="green" trend="↑ ecosistema" onClick={() => setSection("sedes")} />
       <KpiCard icon={ShieldCheck} label="Admins de sede" value={counts.sedeAdmins} tone="violet" onClick={() => setSection("admins")} />
       <KpiCard icon={GraduationCap} label="Docentes" value={counts.teachers} tone="blue" />
@@ -222,42 +229,52 @@ export function AdminGeneralPage() {
   function SedeCards({ sites }: { sites: Site[] }) {
     if (sites.length === 0) {
       return (
-        <div className="empty-state">
-          <img src={assets.mascotFemaleLaptop} alt="" decoding="async" />
-          <h3>Todavía no hay sedes</h3>
-          <p>Creá tu primera sede para empezar a construir el ecosistema Typely.</p>
-          <Button className="button--sm" onClick={startCreateSite}>
+        <div className="flex flex-col items-center justify-center text-center gap-3 py-10 px-4">
+          <img src={assets.mascotFemaleLaptop} alt="" decoding="async" className="w-28 h-auto" />
+          <h3 className="font-display text-lg font-bold text-text">Todavía no hay sedes</h3>
+          <p className="text-muted font-semibold text-sm">Creá tu primera sede para empezar a construir el ecosistema Typely.</p>
+          <Button className={BTN_SM} onClick={startCreateSite}>
             <Plus size={18} /> Crear sede
           </Button>
         </div>
       );
     }
     return (
-      <div className="sede-grid">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
         {sites.map((site) => (
-          <div key={site.id} className="sede-card">
-            <div className="sede-card__media">
-              <span className={`sede-card__status ${site.active === false ? "is-off" : ""}`}>
+          <div key={site.id} className="glass-card overflow-hidden flex flex-col animate-card-in">
+            <div className="relative h-40 bg-accent-sky/15 overflow-hidden">
+              <span
+                className={`absolute top-3 right-3 z-10 text-xs font-bold px-3 py-1 rounded-full text-white ${
+                  site.active === false ? "bg-muted/60" : "bg-mint"
+                }`}
+              >
                 {site.active === false ? "Inactiva" : "Activa"}
               </span>
               {site.photo ? (
-                <img className="sede-card__photo" src={site.photo} alt={`Foto de ${site.name}`} decoding="async" loading="lazy" />
+                <img
+                  className="w-full h-full object-cover"
+                  src={site.photo}
+                  alt={`Foto de ${site.name}`}
+                  decoding="async"
+                  loading="lazy"
+                />
               ) : (
-                <span className="sede-card__placeholder" aria-hidden="true">
+                <span className="flex flex-col items-center justify-center gap-1 h-full text-muted" aria-hidden="true">
                   <School size={30} />
                   <small>Sin foto del colegio</small>
                 </span>
               )}
             </div>
-            <div className="sede-card__body">
-              <strong>{site.name}</strong>
-              <span>{site.city}</span>
-              <div className="sede-card__stats">
-                <span><Users size={15} /> {countFor(site.id, "alumno")}</span>
-                <span><GraduationCap size={15} /> {countFor(site.id, "profesor")}</span>
-                <span><Building2 size={15} /> {classesFor(site.id)}</span>
+            <div className="p-4 flex flex-col gap-2">
+              <strong className="text-text">{site.name}</strong>
+              <span className="text-sm text-muted">{site.city}</span>
+              <div className="flex items-center gap-3 text-sm text-muted font-semibold">
+                <span className="inline-flex items-center gap-1"><Users size={15} /> {countFor(site.id, "alumno")}</span>
+                <span className="inline-flex items-center gap-1"><GraduationCap size={15} /> {countFor(site.id, "profesor")}</span>
+                <span className="inline-flex items-center gap-1"><Building2 size={15} /> {classesFor(site.id)}</span>
               </div>
-              <Button className="sede-card__edit button--sm" variant="secondary" onClick={() => startEditSite(site)}>
+              <Button className={`${BTN_SM} self-start mt-auto`} variant="secondary" onClick={() => startEditSite(site)}>
                 <Pencil size={15} /> Editar sede
               </Button>
             </div>
@@ -270,9 +287,9 @@ export function AdminGeneralPage() {
   function AdminCards({ admins }: { admins: EduTicUser[] }) {
     if (admins.length === 0) {
       return (
-        <div className="empty-state empty-state--compact">
-          <h3>Sin administradores de sede</h3>
-          <p>
+        <div className="flex flex-col items-center justify-center text-center gap-3 py-6 px-4">
+          <h3 className="font-display text-lg font-bold text-text">Sin administradores de sede</h3>
+          <p className="text-muted font-semibold text-sm">
             {data.sites.length === 0
               ? "Primero creá una sede, luego asignale un administrador."
               : "Creá un administrador y asignalo a una de tus sedes."}
@@ -281,21 +298,33 @@ export function AdminGeneralPage() {
       );
     }
     return (
-      <div className="people-card-grid">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {admins.map((admin) => (
-          <div key={admin.id} className={`people-card ${admin.active === false ? "is-off" : ""}`}>
-            <span className="people-card__avatar">
+          <div
+            key={admin.id}
+            className={`glass-surface flex items-center gap-3 p-4 animate-card-in ${admin.active === false ? "opacity-60" : ""}`}
+          >
+            <span className="grid place-items-center w-10 h-10 rounded-full bg-accent/15 text-accent shrink-0">
               <ShieldCheck size={20} />
             </span>
-            <div className="people-card__main">
-              <strong>{admin.name}</strong>
-              <span>{admin.email ?? admin.username}</span>
-              <small>{siteName(admin.siteId)}</small>
+            <div className="flex flex-col min-w-0 flex-1">
+              <strong className="text-sm text-text truncate">{admin.name}</strong>
+              <span className="text-xs text-muted truncate">{admin.email ?? admin.username}</span>
+              <small className="text-xs text-muted/70 truncate">{siteName(admin.siteId)}</small>
             </div>
-            <span className={`people-card__pill ${admin.active === false ? "is-off" : ""}`}>
+            <span
+              className={`text-xs font-bold px-3 py-1 rounded-full text-white shrink-0 ${
+                admin.active === false ? "bg-muted/60" : "bg-mint"
+              }`}
+            >
               {admin.active === false ? "Inactivo" : "Activo"}
             </span>
-            <button type="button" className="people-card__edit" aria-label={`Editar ${admin.name}`} onClick={() => openEditAdmin(admin)}>
+            <button
+              type="button"
+              className="grid place-items-center w-8 h-8 rounded-full bg-white/40 text-text/60 hover:text-text hover:bg-white/70 cursor-pointer border-0 transition-colors shrink-0"
+              aria-label={`Editar ${admin.name}`}
+              onClick={() => openEditAdmin(admin)}
+            >
               <Pencil size={16} />
             </button>
           </div>
@@ -306,19 +335,22 @@ export function AdminGeneralPage() {
 
   const hero = (
     <>
-      <span className="dash-eyebrow">
+      <span className="inline-flex items-center gap-1.5 text-sm font-bold text-accent-teal uppercase tracking-wide">
         <Crown size={18} /> ¡Bienvenido, Superadmin!
       </span>
-      <h1>
-        Panel <span className="grad">Superadmin</span>
+      <h1 className="font-display text-3xl font-bold text-text">
+        Panel{" "}
+        <span className="bg-gradient-to-r from-accent-sky via-accent to-accent-pink bg-clip-text text-transparent">
+          Superadmin
+        </span>
       </h1>
-      <p>Gestioná las sedes y sus administradores del ecosistema Typely desde un solo lugar.</p>
-      <div className="dash-hero__actions">
-        <Button className="button--sm" onClick={startCreateSite}>
+      <p className="text-muted font-semibold">Gestioná las sedes y sus administradores del ecosistema Typely desde un solo lugar.</p>
+      <div className="flex flex-wrap gap-3 mt-2">
+        <Button className={BTN_SM} onClick={startCreateSite}>
           <Plus size={18} /> Crear sede
         </Button>
         <Button
-          className="button--sm"
+          className={BTN_SM}
           variant="secondary"
           onClick={openCreateAdmin}
           disabled={data.sites.length === 0}
@@ -353,19 +385,31 @@ export function AdminGeneralPage() {
       {section === "inicio" && (
         <>
           {kpis}
-          <section className="dash-section">
-            <div className="dash-section__head">
-              <h2><School size={22} /> Sedes activas</h2>
-              <button type="button" className="link-arrow" onClick={() => setSection("sedes")}>
+          <section className="glass-card p-6 flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <h2 className="font-display text-xl font-bold text-text flex items-center gap-2">
+                <School size={22} /> Sedes activas
+              </h2>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-sm font-bold text-accent hover:text-accent-strong transition-colors cursor-pointer bg-transparent border-0"
+                onClick={() => setSection("sedes")}
+              >
                 Ver todas <ArrowRight size={16} />
               </button>
             </div>
             <SedeCards sites={data.sites.slice(0, 4)} />
           </section>
-          <section className="dash-section">
-            <div className="dash-section__head">
-              <h2><ShieldCheck size={22} /> Administradores de sede</h2>
-              <button type="button" className="link-arrow" onClick={() => setSection("admins")}>
+          <section className="glass-card p-6 flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <h2 className="font-display text-xl font-bold text-text flex items-center gap-2">
+                <ShieldCheck size={22} /> Administradores de sede
+              </h2>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-sm font-bold text-accent hover:text-accent-strong transition-colors cursor-pointer bg-transparent border-0"
+                onClick={() => setSection("admins")}
+              >
                 Ver todos <ArrowRight size={16} />
               </button>
             </div>
@@ -375,52 +419,82 @@ export function AdminGeneralPage() {
       )}
 
       {section === "sedes" && (
-        <section className="dash-section">
-          <div className="dash-section__head">
+        <section className="glass-card p-6 flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <h2><School size={22} /> Sedes</h2>
-              <p>Colegios y campus del ecosistema.</p>
+              <h2 className="font-display text-xl font-bold text-text flex items-center gap-2">
+                <School size={22} /> Sedes
+              </h2>
+              <p className="text-sm text-muted font-semibold">Colegios y campus del ecosistema.</p>
             </div>
-            <Button className="button--sm" onClick={startCreateSite}>
+            <Button className={BTN_SM} onClick={startCreateSite}>
               <Plus size={18} /> Crear sede
             </Button>
           </div>
           {showSiteForm && (
-            <form className="admin-form sede-form" onSubmit={submitSite}>
-              <div className="sede-form__fields">
-                <label className="field">
-                  <span>Nombre de la sede</span>
-                  <input required placeholder="Colegio San Martín" value={siteDraft.name} onChange={(e) => setSiteDraft({ ...siteDraft, name: e.target.value })} />
+            <form className="flex flex-col gap-4" onSubmit={submitSite}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-bold text-text">Nombre de la sede</span>
+                  <input
+                    required
+                    className={INPUT_CLS}
+                    placeholder="Colegio San Martín"
+                    value={siteDraft.name}
+                    onChange={(e) => setSiteDraft({ ...siteDraft, name: e.target.value })}
+                  />
                 </label>
-                <label className="field">
-                  <span>Ciudad / ubicación</span>
-                  <input placeholder="Buenos Aires" value={siteDraft.city} onChange={(e) => setSiteDraft({ ...siteDraft, city: e.target.value })} />
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-bold text-text">Ciudad / ubicación</span>
+                  <input
+                    className={INPUT_CLS}
+                    placeholder="Buenos Aires"
+                    value={siteDraft.city}
+                    onChange={(e) => setSiteDraft({ ...siteDraft, city: e.target.value })}
+                  />
                 </label>
               </div>
-              <div className="sede-form__photo">
-                <div className={`photo-preview ${siteDraft.photo ? "has-img" : ""}`}>
+              <div className="flex flex-col sm:flex-row items-start gap-4">
+                <div
+                  className={`w-32 h-32 rounded-xl border-2 border-dashed grid place-items-center overflow-hidden shrink-0 ${
+                    siteDraft.photo
+                      ? "border-solid border-white/80"
+                      : "bg-accent-sky/10 border-white/60"
+                  }`}
+                >
                   {siteDraft.photo ? (
-                    <img src={siteDraft.photo} alt="Vista previa de la sede" />
+                    <img src={siteDraft.photo} alt="Vista previa de la sede" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="photo-preview__empty"><School size={26} /><small>Sin foto</small></span>
+                    <span className="flex flex-col items-center gap-1 text-muted">
+                      <School size={26} />
+                      <small>Sin foto</small>
+                    </span>
                   )}
                 </div>
-                <div className="sede-form__photo-actions">
-                  <label className="photo-upload button button--secondary button--sm">
+                <div className="flex flex-col gap-2">
+                  <label className={`inline-flex items-center gap-1.5 min-h-[2.25rem] px-3 rounded-xl font-bold cursor-pointer transition-all bg-white/75 text-text shadow hover:bg-white/90 text-sm`}>
                     <ImagePlus size={16} /> {siteDraft.photo ? "Cambiar foto" : "Subir foto del colegio"}
                     <input type="file" accept="image/*" onChange={onPhotoPick} hidden />
                   </label>
                   {siteDraft.photo && (
-                    <button type="button" className="photo-remove" onClick={() => setSiteDraft({ ...siteDraft, photo: "" })}>
+                    <button
+                      type="button"
+                      className="text-sm font-bold text-rose hover:text-rose/80 cursor-pointer bg-transparent border-0 self-start inline-flex items-center gap-1"
+                      onClick={() => setSiteDraft({ ...siteDraft, photo: "" })}
+                    >
                       <Trash2 size={15} /> Quitar
                     </button>
                   )}
-                  <small className="photo-hint">JPG o PNG. Se ajusta automáticamente.</small>
+                  <small className="text-xs text-muted">JPG o PNG. Se ajusta automáticamente.</small>
                 </div>
               </div>
-              <div className="admin-form__actions">
-                <Button type="submit" className="button--sm">{editingSiteId ? "Guardar cambios" : "Crear sede"}</Button>
-                <Button type="button" variant="ghost" className="button--sm" onClick={() => setShowSiteForm(false)}>Cancelar</Button>
+              <div className="flex gap-3 mt-1">
+                <Button type="submit" className={BTN_SM}>
+                  {editingSiteId ? "Guardar cambios" : "Crear sede"}
+                </Button>
+                <Button type="button" variant="ghost" className={BTN_SM} onClick={() => setShowSiteForm(false)}>
+                  Cancelar
+                </Button>
               </div>
             </form>
           )}
@@ -429,14 +503,16 @@ export function AdminGeneralPage() {
       )}
 
       {section === "admins" && (
-        <section className="dash-section">
-          <div className="dash-section__head">
+        <section className="glass-card p-6 flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <h2><ShieldCheck size={22} /> Administradores de sede</h2>
-              <p>Cada admin gestiona únicamente su sede asignada.</p>
+              <h2 className="font-display text-xl font-bold text-text flex items-center gap-2">
+                <ShieldCheck size={22} /> Administradores de sede
+              </h2>
+              <p className="text-sm text-muted font-semibold">Cada admin gestiona únicamente su sede asignada.</p>
             </div>
             <Button
-              className="button--sm"
+              className={BTN_SM}
               onClick={openCreateAdmin}
               disabled={data.sites.length === 0}
               title={data.sites.length === 0 ? "Primero creá una sede para poder asignarle un administrador." : undefined}
@@ -449,60 +525,108 @@ export function AdminGeneralPage() {
       )}
 
       {showAdminModal && (
-        <div className="demo-modal" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
-          <div className="demo-modal__backdrop" onClick={closeAdminModal} />
-          <div className="demo-modal__card admin-modal__card">
-            <span className="demo-modal__icon" aria-hidden="true"><UserCog size={24} /></span>
-            <h2 id="admin-modal-title">{editingAdminId ? "Editar admin de sede" : "Nuevo admin de sede"}</h2>
-            <p>{editingAdminId ? "Actualizá los datos y la sede asignada." : "Creá un administrador y asignalo a una sede."}</p>
-            <form className="admin-form" onSubmit={submitAdmin}>
-              <label className="field">
-                <span>Nombre completo</span>
-                <input required placeholder="Nombre y apellido" value={adminDraft.name} onChange={(e) => setAdminDraft({ ...adminDraft, name: e.target.value })} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
+          <div className="absolute inset-0 bg-black/30 animate-overlay-fade" onClick={closeAdminModal} />
+          <div className="glass-card-smooth relative max-h-[88vh] overflow-y-auto p-8 w-[min(30rem,92vw)] flex flex-col gap-5 animate-menu-reveal">
+            <span className="grid place-items-center w-12 h-12 rounded-full bg-accent/15 text-accent" aria-hidden="true">
+              <UserCog size={24} />
+            </span>
+            <h2 id="admin-modal-title" className="font-display text-xl font-bold text-text">
+              {editingAdminId ? "Editar admin de sede" : "Nuevo admin de sede"}
+            </h2>
+            <p className="text-muted font-semibold text-sm">
+              {editingAdminId ? "Actualizá los datos y la sede asignada." : "Creá un administrador y asignalo a una sede."}
+            </p>
+            <form className="flex flex-col gap-4" onSubmit={submitAdmin}>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-bold text-text">Nombre completo</span>
+                <input
+                  required
+                  className={INPUT_CLS}
+                  placeholder="Nombre y apellido"
+                  value={adminDraft.name}
+                  onChange={(e) => setAdminDraft({ ...adminDraft, name: e.target.value })}
+                />
               </label>
-              <label className="field">
-                <span>Email <em className="req">obligatorio</em></span>
-                <input required type="email" placeholder="admin@colegio.edu" value={adminDraft.email} onChange={(e) => setAdminDraft({ ...adminDraft, email: e.target.value })} />
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-bold text-text">
+                  Email <em className="text-rose text-xs font-bold not-italic">obligatorio</em>
+                </span>
+                <input
+                  required
+                  type="email"
+                  className={INPUT_CLS}
+                  placeholder="admin@colegio.edu"
+                  value={adminDraft.email}
+                  onChange={(e) => setAdminDraft({ ...adminDraft, email: e.target.value })}
+                />
               </label>
-              <label className="field">
-                <span>Sede asignada <em className="req">obligatorio</em></span>
-                <select required value={adminDraft.siteId} onChange={(e) => setAdminDraft({ ...adminDraft, siteId: e.target.value })}>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-bold text-text">
+                  Sede asignada <em className="text-rose text-xs font-bold not-italic">obligatorio</em>
+                </span>
+                <select
+                  required
+                  className={SELECT_CLS}
+                  value={adminDraft.siteId}
+                  onChange={(e) => setAdminDraft({ ...adminDraft, siteId: e.target.value })}
+                >
                   {data.sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </label>
 
               {editingAdminId && (
                 <>
-                  <label className="switch-row">
-                    <input type="checkbox" checked={adminDraft.active} onChange={(e) => setAdminDraft({ ...adminDraft, active: e.target.checked })} />
-                    <span>{adminDraft.active ? "Cuenta activa" : "Cuenta desactivada"}</span>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5 rounded-md accent-accent-teal cursor-pointer"
+                      checked={adminDraft.active}
+                      onChange={(e) => setAdminDraft({ ...adminDraft, active: e.target.checked })}
+                    />
+                    <span className="text-sm font-semibold text-text">
+                      {adminDraft.active ? "Cuenta activa" : "Cuenta desactivada"}
+                    </span>
                   </label>
-                  <div className="reset-box">
-                    <button type="button" className="reset-box__btn" onClick={doResetPassword}>
+                  <div className="flex flex-col gap-2 p-4 rounded-xl bg-white/40 border border-white/50">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-2 text-sm font-bold text-accent hover:text-accent-strong cursor-pointer bg-transparent border-0 self-start"
+                      onClick={doResetPassword}
+                    >
                       <KeyRound size={16} /> Restablecer contraseña
                     </button>
                     {tempPassword ? (
-                      <p className="reset-box__result">
-                        Clave temporal: <code>{tempPassword}</code>
-                        <small>Compartila una sola vez. Recomendá iniciar sesión con Google.</small>
+                      <p className="text-sm text-text font-semibold">
+                        Clave temporal: <code className="bg-white/50 px-1.5 py-0.5 rounded text-accent-teal">{tempPassword}</code>
+                        <small className="block text-xs text-muted mt-1">Compartila una sola vez. Recomendá iniciar sesión con Google.</small>
                       </p>
                     ) : (
-                      <small className="reset-box__hint">Nunca se muestra la contraseña actual. Esto genera una nueva temporal.</small>
+                      <small className="text-xs text-muted">Nunca se muestra la contraseña actual. Esto genera una nueva temporal.</small>
                     )}
                   </div>
                 </>
               )}
 
-              <Button type="submit" className="button--sm">
+              <Button type="submit" className={BTN_SM}>
                 {editingAdminId ? <><Pencil size={16} /> Guardar cambios</> : <><Plus size={16} /> Crear admin</>}
               </Button>
               {editingAdminId && (
-                <button type="button" className="admin-form__delete" onClick={askDeleteCurrentAdmin}>
+                <button
+                  type="button"
+                  className="text-sm font-bold text-rose hover:text-rose/80 cursor-pointer bg-transparent border-0 mt-2 self-start inline-flex items-center gap-1.5"
+                  onClick={askDeleteCurrentAdmin}
+                >
                   <Trash2 size={16} /> Eliminar admin
                 </button>
               )}
             </form>
-            <button type="button" className="demo-modal__close" aria-label="Cerrar" onClick={closeAdminModal}>
+            <button
+              type="button"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/30 border-0 cursor-pointer flex items-center justify-center text-text/60 hover:text-text hover:bg-white/50 transition-colors"
+              aria-label="Cerrar"
+              onClick={closeAdminModal}
+            >
               <X size={18} />
             </button>
           </div>
@@ -510,24 +634,39 @@ export function AdminGeneralPage() {
       )}
 
       {confirmDelete && (
-        <div className="demo-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-delete-title">
-          <div className="demo-modal__backdrop" onClick={() => setConfirmDelete(null)} />
-          <div className="demo-modal__card confirm-card">
-            <span className="demo-modal__icon demo-modal__icon--danger" aria-hidden="true"><Trash2 size={24} /></span>
-            <h2 id="confirm-delete-title">¿Eliminar admin?</h2>
-            <p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="confirm-delete-title">
+          <div className="absolute inset-0 bg-black/30 animate-overlay-fade" onClick={() => setConfirmDelete(null)} />
+          <div className="glass-card-smooth relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col gap-5 animate-menu-reveal text-center">
+            <span className="grid place-items-center w-12 h-12 rounded-full bg-rose/15 text-rose mx-auto" aria-hidden="true">
+              <Trash2 size={24} />
+            </span>
+            <h2 id="confirm-delete-title" className="font-display text-xl font-bold text-text">¿Eliminar admin?</h2>
+            <p className="text-muted font-semibold text-sm">
               Vas a eliminar a <strong>{confirmDelete.name}</strong>. Esta acción no se puede deshacer.
               Si solo querés pausarlo, mejor desactivá la cuenta.
             </p>
-            <div className="demo-modal__actions confirm-card__actions">
-              <button type="button" className="demo-modal__btn demo-modal__btn--danger" onClick={confirmDeleteAdmin}>
-                <Trash2 size={16} /> Sí, eliminar
+            <div className="flex gap-3 mt-2 justify-center">
+              <button
+                type="button"
+                className="flex-1 py-3 rounded-xl font-extrabold cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98] bg-rose text-white"
+                onClick={confirmDeleteAdmin}
+              >
+                <Trash2 size={16} className="inline mr-1" /> Sí, eliminar
               </button>
-              <button type="button" className="demo-modal__btn demo-modal__btn--ghost" onClick={() => setConfirmDelete(null)}>
+              <button
+                type="button"
+                className="flex-1 py-3 rounded-xl font-extrabold cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98] bg-white/50 text-text"
+                onClick={() => setConfirmDelete(null)}
+              >
                 Cancelar
               </button>
             </div>
-            <button type="button" className="demo-modal__close" aria-label="Cerrar" onClick={() => setConfirmDelete(null)}>
+            <button
+              type="button"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/30 border-0 cursor-pointer flex items-center justify-center text-text/60 hover:text-text hover:bg-white/50 transition-colors"
+              aria-label="Cerrar"
+              onClick={() => setConfirmDelete(null)}
+            >
               <X size={18} />
             </button>
           </div>

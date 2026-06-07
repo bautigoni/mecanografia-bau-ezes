@@ -323,25 +323,45 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
   const current = combos[Math.min(prog.progress, total - 1)];
 
   return (
-    <main className="i5-shell sc-shell page-fade">
+    <main className="relative isolate flex min-h-screen flex-col overflow-hidden font-body text-text animate-page-fade">
       {/* Per-world background with pastel overlay */}
-      <div className="sc-bg" style={{ backgroundImage: `url("${background}")` }} aria-hidden="true" />
-      <div className="i5-shell__sparkles" aria-hidden="true">
+      <div
+        className="absolute inset-0 -z-10 bg-cover bg-center pointer-events-none"
+        style={{ backgroundImage: `url("${background}")` }}
+        aria-hidden="true"
+      />
+      {/* Pastel wash so text stays readable over any world art */}
+      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-bg-soft/70 via-white/40 to-accent-sky/20 pointer-events-none" aria-hidden="true" />
+
+      {/* Sparkles */}
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
         {Array.from({ length: 14 }).map((_, i) => (
-          <span key={i} className={`i5-sparkle i5-sparkle--${i % 5}`} />
+          <span
+            key={i}
+            className={`absolute block rounded-full bg-white/80 shadow-[0_0_12px_rgba(255,255,255,0.9)] animate-twinkle ${
+              i % 5 === 0 ? "h-2 w-2 top-[8%] left-[10%]" :
+              i % 5 === 1 ? "h-1.5 w-1.5 top-[18%] left-[82%] animation-delay-300" :
+              i % 5 === 2 ? "h-2.5 w-2.5 top-[36%] left-[6%] animation-delay-700" :
+              i % 5 === 3 ? "h-1 w-1 top-[55%] left-[92%] animation-delay-500" :
+                             "h-2 w-2 top-[72%] left-[16%] animation-delay-900"
+            }`}
+            style={{ animationDelay: `${(i % 5) * 300}ms` }}
+          />
         ))}
       </div>
 
       {/* Header */}
-      <header className="i5-shell__top">
-        <div className="i5-shell__card i5-shell__card--title">
-          <span className="i5-shell__kicker">NIVEL {activity.levelNumber}</span>
-          <strong>{activity.title}</strong>
-          <em>{activity.subtitle}</em>
+      <header className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-8">
+        <div className="glass-card-smooth flex flex-col gap-0.5 rounded-2xl px-4 py-3 shadow-card max-w-[72%]">
+          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-strong">
+            NIVEL {activity.levelNumber}
+          </span>
+          <strong className="font-display text-base sm:text-lg text-text leading-tight">{activity.title}</strong>
+          <em className="text-xs text-muted not-italic">{activity.subtitle}</em>
         </div>
         <button
           type="button"
-          className="i5-shell__exit"
+          className="glass rounded-full px-3 py-2 text-sm font-semibold text-text shadow-btn transition hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0 flex items-center gap-1.5"
           onClick={() => navigate(`/worlds/${activity.worldId}`)}
           aria-label="Salir"
         >
@@ -351,21 +371,40 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
       </header>
 
       {/* Goal strip */}
-      <div className="i5-shell__goal">
-        <span className="i5-shell__goal-label">
+      <div className="mx-4 mt-4 sm:mx-8 glass-card-smooth rounded-2xl px-4 py-3 shadow-card">
+        <span className="inline-block rounded-full bg-accent/20 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wider text-accent-strong">
           Atajo {Math.min(prog.progress + (prog.completed ? 0 : 1), total)} / {total}
         </span>
-        <h2>{activity.instruction}</h2>
+        <h2 className="mt-1 font-display text-lg sm:text-xl text-text">{activity.instruction}</h2>
       </div>
 
       {/* Stage: mascots + virtual environment */}
-      <section className="i5-shell__stage" aria-label="Escena">
-        <img className="i5-mascot i5-mascot--left" src={assets.mascotFemaleWave} alt="" decoding="async" />
-        <span className="i5-bubble i5-bubble--left">¡Vos podés!</span>
-        <img className="i5-mascot i5-mascot--right" src={assets.mascotMaleProud} alt="" decoding="async" />
-        <span className="i5-bubble i5-bubble--right">¡Sos un crack!</span>
+      <section
+        className="relative mx-4 mt-4 flex flex-1 flex-col items-center justify-center gap-4 sm:mx-8"
+        aria-label="Escena"
+      >
+        <img
+          className="hidden sm:block absolute left-0 bottom-4 w-24 md:w-32 animate-mascot-float drop-shadow-xl"
+          src={assets.mascotFemaleWave}
+          alt=""
+          decoding="async"
+        />
+        <span className="hidden sm:block absolute left-24 md:left-36 bottom-24 glass-card-smooth rounded-2xl rounded-bl-sm px-3 py-1.5 text-xs font-semibold text-text shadow-card animate-bubble-pop">
+          ¡Vos podés!
+        </span>
+        <img
+          className="hidden sm:block absolute right-0 bottom-4 w-24 md:w-32 animate-mascot-float drop-shadow-xl"
+          style={{ animationDelay: "1.2s" }}
+          src={assets.mascotMaleProud}
+          alt=""
+          decoding="async"
+        />
+        <span className="hidden sm:block absolute right-24 md:right-36 bottom-24 glass-card-smooth rounded-2xl rounded-br-sm px-3 py-1.5 text-xs font-semibold text-text shadow-card animate-bubble-pop"
+          style={{ animationDelay: "400ms" }}>
+          ¡Sos un crack!
+        </span>
 
-        <div className="i5-scene sc-scene">
+        <div className="relative z-10 w-full max-w-3xl glass-card p-4 sm:p-6 shadow-card flex flex-col gap-4">
           {/* key={prog.progress} forces a fresh mount for each new combo so
               virtual-env state (open tabs, dialog state, etc.) resets cleanly. */}
           <VirtualEnv
@@ -378,25 +417,30 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
           />
 
           {/* Keycap display (always shown as the safe fallback) */}
-          <div className="sc-keycap-area">
-            <span className="sc-hint">
-              <Monitor size={16} />
+          <div className="flex flex-col items-center gap-2 pt-2">
+            <span className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-xs sm:text-sm font-medium text-text shadow-sm backdrop-blur">
+              <Monitor size={16} className="text-accent-strong" />
               {current ? comboActionHint(current) : "Hacé el atajo dentro del simulador."}
             </span>
-            <span className="sc-hint sc-hint--sub">Usá las teclas del juego o el teclado.</span>
-            <div className="sc-combo" aria-label={`Atajo: ${current?.raw ?? ""}`}>
+            <span className="text-[11px] text-muted">Usá las teclas del juego o el teclado.</span>
+            <div className="flex flex-wrap items-center justify-center gap-1.5" aria-label={`Atajo: ${current?.raw ?? ""}`}>
               {current?.caps.map((cap, i) => (
-                <span key={`${i}:${cap}`} className="sc-combo__group">
+                <span key={`${i}:${cap}`} className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    className={`sc-key ${clicked[`${i}:${cap}`] ? "is-pressed" : ""}`}
+                    className={[
+                      "min-w-[2.5rem] select-none rounded-xl border border-white/80 bg-gradient-to-b from-white to-bg-soft px-3 py-2 text-sm sm:text-base font-bold text-text shadow-btn transition",
+                      clicked[`${i}:${cap}`]
+                        ? "from-accent to-accent-strong text-white scale-95 shadow-inner"
+                        : "hover:-translate-y-0.5 hover:shadow-btn-hover active:scale-95",
+                    ].join(" ")}
                     onClick={() => onKeycapClick(i, cap)}
                     tabIndex={-1}
                   >
                     {cap}
                   </button>
                   {i < current.caps.length - 1 && (
-                    <span className="sc-plus">+</span>
+                    <span className="px-1 text-lg font-bold text-muted">+</span>
                   )}
                 </span>
               ))}
@@ -406,60 +450,97 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
       </section>
 
       {/* Metrics bar */}
-      <div className="i5-shell__metrics">
-        <span>★</span>
+      <div className="mx-4 mt-4 mb-2 sm:mx-8 flex items-center justify-center gap-3 rounded-2xl bg-white/60 px-4 py-2 text-sm font-semibold text-text shadow-card backdrop-blur-md">
+        <span className="text-amber-400">★</span>
         <div><b>Intentos:</b> {prog.attempts}</div>
-        <div className="i5-divider" />
+        <div className="h-4 w-px bg-text/15" />
         <div><b>Aciertos:</b> {prog.progress}</div>
-        <div className="i5-divider" />
+        <div className="h-4 w-px bg-text/15" />
         <div><b>Precisión:</b> {prog.precision}%</div>
-        <span>★</span>
+        <span className="text-amber-400">★</span>
       </div>
 
       {/* Footer */}
-      <footer className="i5-shell__bottom">
-        <div className="i5-shell__hint">
-          <span aria-hidden="true">★</span>
+      <footer className="flex flex-wrap items-center justify-between gap-2 px-4 pb-4 sm:px-8">
+        <div className="glass-card-smooth flex-1 rounded-2xl px-4 py-2 text-sm font-medium text-text shadow-card min-w-[200px]">
+          <span aria-hidden="true" className="mr-1 text-amber-400">★</span>
           {feedback ?? activity.description}
         </div>
-        <button type="button" className="i5-btn-ghost" onClick={speak}>
+        <button
+          type="button"
+          className="glass-card-smooth rounded-full px-4 py-2 text-sm font-semibold text-text shadow-btn transition hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0 flex items-center gap-1.5"
+          onClick={speak}
+        >
           <span aria-hidden="true">🔊</span> Escuchar consigna
         </button>
-        <button type="button" className="i5-btn-ghost" onClick={retry}>
+        <button
+          type="button"
+          className="glass-card-smooth rounded-full px-4 py-2 text-sm font-semibold text-text shadow-btn transition hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0 flex items-center gap-1.5"
+          onClick={retry}
+        >
           <RotateCcw size={16} /> Reintentar
         </button>
       </footer>
 
       {/* Completion modal */}
       {prog.completed && (
-        <div className="i5-modal" role="dialog" aria-modal="true">
-          <div className="i5-modal__backdrop" />
-          <div className="i5-modal__card">
-            <div className="i5-modal__confetti" aria-hidden="true">
-              {Array.from({ length: 18 }).map((_, i) => (
-                <span key={i} className={`i5-confetti i5-confetti--${i % 6}`} />
-              ))}
-            </div>
-            <div className="i5-modal__trophy" aria-hidden="true">🏆</div>
-            <h3 className="i5-modal__title">¡Muy bien!</h3>
-            <p className="i5-modal__sub">Completaste el nivel</p>
-            <div className="i5-modal__stars" aria-hidden="true">
-              {[1, 2, 3].map((i) => {
-                const earned = getStarsFromAccuracy(prog.precision);
-                return <span key={i} className={earned >= i ? "" : "is-empty"}>{earned >= i ? "★" : "☆"}</span>;
-              })}
-            </div>
-            <div className="i5-modal__actions">
-              <button
-                type="button"
-                className="i5-btn-primary"
-                onClick={() => navigate(`/worlds/${activity.worldId}`)}
-              >
-                Volver a la isla
-              </button>
-              <button type="button" className="i5-btn-ghost" onClick={retry}>
-                <RotateCcw size={16} /> Repetir nivel
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-text/40 backdrop-blur-sm" />
+          <div className="relative w-full max-w-md animate-modal-in">
+            <div className="glass-card-smooth relative overflow-hidden rounded-3xl p-8 text-center shadow-card">
+              <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+                {Array.from({ length: 18 }).map((_, i) => (
+                  <span
+                    key={i}
+                    className={`absolute block h-2 w-2 rounded-full animate-fall ${
+                      i % 6 === 0 ? "bg-accent-pink" :
+                      i % 6 === 1 ? "bg-accent-sky" :
+                      i % 6 === 2 ? "bg-mint" :
+                      i % 6 === 3 ? "bg-accent" :
+                      i % 6 === 4 ? "bg-rose" :
+                                    "bg-accent-teal"
+                    }`}
+                    style={{
+                      left: `${(i * 53) % 100}%`,
+                      animationDelay: `${(i * 120) % 1200}ms`,
+                      animationDuration: `${1800 + ((i * 300) % 800)}ms`,
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="text-5xl animate-bounce-trophy" aria-hidden="true">🏆</div>
+              <h3 className="mt-3 font-display text-2xl text-text">¡Muy bien!</h3>
+              <p className="text-sm text-muted">Completaste el nivel</p>
+              <div className="mt-3 flex items-center justify-center gap-1.5 text-2xl" aria-hidden="true">
+                {[1, 2, 3].map((i) => {
+                  const earned = getStarsFromAccuracy(prog.precision);
+                  return (
+                    <span
+                      key={i}
+                      className={earned >= i ? "animate-star-pop-i5 text-amber-400" : "text-text/25"}
+                      style={earned >= i ? { animationDelay: `${i * 180}ms` } : undefined}
+                    >
+                      {earned >= i ? "★" : "☆"}
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-full bg-gradient-to-br from-accent to-accent-strong px-5 py-2.5 text-sm font-bold text-white shadow-btn transition hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0"
+                  onClick={() => navigate(`/worlds/${activity.worldId}`)}
+                >
+                  Volver a la isla
+                </button>
+                <button
+                  type="button"
+                  className="glass-card-smooth rounded-full px-4 py-2 text-sm font-semibold text-text shadow-btn transition hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0 flex items-center gap-1.5"
+                  onClick={retry}
+                >
+                  <RotateCcw size={16} /> Repetir nivel
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -552,19 +633,26 @@ function VirtualBrowser({ combo, completed, triggerSignal, onAction }: EnvProps)
     "Cambiar pestaña";
 
   return (
-    <div className="sc-venv sc-browser">
-      <div className="sc-browser__bar">
+    <div className="glass-surface flex flex-col gap-3 p-4">
+      {/* Browser toolbar */}
+      <div className="flex items-center gap-1 rounded-xl bg-white/80 p-1.5 shadow-sm">
         {tabs.map((tab, i) => (
           <button
             key={`${tab}-${i}`}
             type="button"
-            className={`sc-browser__tab ${i === active ? "is-active" : ""} ${justActed && i === active ? "just-acted" : ""}`}
+            className={[
+              "group relative flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition",
+              i === active
+                ? "bg-gradient-to-b from-accent-sky/30 to-accent/20 text-text shadow-sm"
+                : "text-muted hover:bg-white/60 hover:text-text",
+              justActed && i === active ? "animate-reward-pop" : "",
+            ].join(" ")}
             onClick={() => setActive(i)}
           >
-            {tab}
+            <span className="truncate max-w-[6rem] sm:max-w-[8rem]">{tab}</span>
             {tabs.length > 1 && (
               <span
-                className="sc-browser__tab-close"
+                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] text-muted transition hover:bg-rose/20 hover:text-rose"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (combo.key.toLowerCase() === "w") act("close");
@@ -577,19 +665,25 @@ function VirtualBrowser({ combo, completed, triggerSignal, onAction }: EnvProps)
         ))}
         <button
           type="button"
-          className="sc-browser__new-tab"
+          className="ml-auto flex h-7 w-7 items-center justify-center rounded-lg text-lg font-bold text-muted transition hover:bg-accent/15 hover:text-accent-strong"
           onClick={() => combo.key.toLowerCase() === "t" && act("new")}
         >
           +
         </button>
       </div>
-      <div className="sc-browser__content">
-        <p className="sc-browser__page-title">{tabs[active]}</p>
-        <p className="sc-browser__hint">Contenido de la página</p>
+      {/* Browser content */}
+      <div className="flex min-h-[8rem] flex-col items-center justify-center rounded-xl bg-white/70 p-4 text-center shadow-inner">
+        <p className="font-display text-lg text-text">{tabs[active]}</p>
+        <p className="mt-1 text-xs text-muted">Contenido de la página</p>
       </div>
       <button
         type="button"
-        className={`sc-venv-btn ${justActed ? "is-active" : ""}`}
+        className={[
+          "self-center rounded-full px-4 py-2 text-sm font-bold shadow-btn transition",
+          justActed
+            ? "bg-gradient-to-br from-mint to-accent-teal text-white scale-95"
+            : "bg-gradient-to-br from-accent to-accent-strong text-white hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0",
+        ].join(" ")}
         onClick={() => act("click")}
       >
         {actionLabel}
@@ -625,25 +719,38 @@ function VirtualFindBox({ combo, completed, triggerSignal, onAction }: EnvProps)
   const SAMPLE = "El gato saltó sobre la mesa. El perro corrió por el jardín. El niño leyó un libro.";
 
   return (
-    <div className="sc-venv sc-find">
-      <div className="sc-find__page">
+    <div className="glass-surface flex flex-col gap-3 p-4">
+      <div className="relative min-h-[8rem] rounded-xl bg-white/80 p-4 text-sm text-text shadow-inner">
         <p>{SAMPLE}</p>
         {open && (
-          <div className="sc-find__box">
+          <div className="absolute right-3 top-3 flex items-center gap-1 rounded-lg border border-white/80 bg-white/90 px-2 py-1 shadow-card animate-modal-in">
             <input
               ref={inputRef}
-              className="sc-find__input"
+              className="w-40 sm:w-56 bg-transparent text-xs text-text placeholder:text-muted/70 outline-none"
               placeholder="Buscar en la página…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <button type="button" className="sc-find__close" onClick={() => { setOpen(false); setQuery(""); }}>
+            <button
+              type="button"
+              className="flex h-5 w-5 items-center justify-center rounded-full text-sm text-muted transition hover:bg-rose/20 hover:text-rose"
+              onClick={() => { setOpen(false); setQuery(""); }}
+            >
               ×
             </button>
           </div>
         )}
       </div>
-      <button type="button" className={`sc-venv-btn ${open ? "is-active" : ""}`} onClick={act}>
+      <button
+        type="button"
+        className={[
+          "self-center rounded-full px-4 py-2 text-sm font-bold shadow-btn transition",
+          open
+            ? "bg-gradient-to-br from-mint to-accent-teal text-white"
+            : "bg-gradient-to-br from-accent to-accent-strong text-white hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0",
+        ].join(" ")}
+        onClick={act}
+      >
         {combo.key.toLowerCase() === "f"
           ? open ? "Buscar abierto ✓" : "Abrir buscador"
           : "Cerrar buscador"}
@@ -672,23 +779,36 @@ function VirtualAppSwitcher({ completed, triggerSignal, onAction }: EnvProps) {
   }
 
   return (
-    <div className="sc-venv sc-appsw">
-      <p className="sc-appsw__label">Ventanas abiertas:</p>
-      <div className="sc-appsw__apps">
+    <div className="glass-surface flex flex-col items-center gap-3 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted">Ventanas abiertas:</p>
+      <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4">
         {VIRT_APPS.map((app, i) => (
           <div
             key={app}
-            className={`sc-appsw__app ${i === focused ? "is-focused" : ""} ${switching && i === focused ? "is-switching" : ""}`}
+            className={[
+              "flex flex-col items-center gap-1 rounded-2xl border border-white/70 bg-white/60 p-3 text-xs font-semibold text-text shadow-sm transition",
+              i === focused ? "ring-2 ring-accent bg-gradient-to-b from-accent-sky/25 to-accent/15 scale-105" : "",
+              switching && i === focused ? "animate-reward-pop" : "",
+            ].join(" ")}
           >
-            <span className="sc-appsw__icon">{["🎮","🎵","📝","🎨"][i]}</span>
+            <span className="text-2xl">{["🎮","🎵","📝","🎨"][i]}</span>
             <span>{app}</span>
           </div>
         ))}
       </div>
-      <button type="button" className={`sc-venv-btn ${switching ? "is-active" : ""}`} onClick={act}>
+      <button
+        type="button"
+        className={[
+          "self-center rounded-full px-4 py-2 text-sm font-bold shadow-btn transition",
+          switching
+            ? "bg-gradient-to-br from-mint to-accent-teal text-white scale-95"
+            : "bg-gradient-to-br from-accent to-accent-strong text-white hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0",
+        ].join(" ")}
+        onClick={act}
+      >
         Cambiar ventana (Alt + Tab)
       </button>
-      <p className="sc-appsw__note">
+      <p className="text-center text-[11px] text-muted">
         Si Alt+Tab salió de la página, usá el botón de arriba.
       </p>
     </div>
@@ -713,17 +833,30 @@ function VirtualDocEditor({ combo, completed, triggerSignal, onAction }: EnvProp
   }
 
   return (
-    <div className="sc-venv sc-doc">
-      <div className="sc-doc__editor">
-        <div className="sc-doc__toolbar">
+    <div className="glass-surface flex flex-col gap-3 p-4">
+      <div className="flex flex-col overflow-hidden rounded-xl bg-white/85 shadow-inner">
+        <div className="flex items-center gap-3 border-b border-white/60 bg-gradient-to-b from-white/90 to-bg-soft/60 px-3 py-1.5 text-xs font-semibold text-muted">
           <span>Archivo</span>
           <span>Editar</span>
           <span>Vista</span>
-          {saved && <span className="sc-doc__saved">✓ Guardado</span>}
+          {saved && (
+            <span className="ml-auto rounded-full bg-mint/25 px-2 py-0.5 text-[11px] font-bold text-accent-teal animate-reward-pop">
+              ✓ Guardado
+            </span>
+          )}
         </div>
-        <div className="sc-doc__body">{history[histIdx]}</div>
+        <div className="min-h-[6rem] p-4 text-sm text-text">{history[histIdx]}</div>
       </div>
-      <button type="button" className={`sc-venv-btn ${saved ? "is-active" : ""}`} onClick={act}>
+      <button
+        type="button"
+        className={[
+          "self-center rounded-full px-4 py-2 text-sm font-bold shadow-btn transition",
+          saved
+            ? "bg-gradient-to-br from-mint to-accent-teal text-white"
+            : "bg-gradient-to-br from-accent to-accent-strong text-white hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0",
+        ].join(" ")}
+        onClick={act}
+      >
         {combo.key.toLowerCase() === "s" ? "Guardar documento" : "Rehacer cambio"}
       </button>
     </div>
@@ -746,31 +879,56 @@ function VirtualDialog({ combo, completed, triggerSignal, onAction }: EnvProps) 
   }
 
   return (
-    <div className="sc-venv sc-dialog">
-      <div className="sc-dialog__app">
+    <div className="glass-surface flex flex-col items-center gap-3 p-4">
+      <div className="relative flex w-full min-h-[8rem] flex-col items-center justify-center rounded-xl bg-white/80 p-4 text-center text-sm text-text shadow-inner">
         <p>Una app quiere guardar los cambios.</p>
         {state === "open" && (
-          <div className="sc-dialog__modal">
-            <p className="sc-dialog__question">¿Guardar antes de salir?</p>
-            <div className="sc-dialog__btns">
-              <button type="button" className="sc-dialog__ok" onClick={() => { setState("done"); if (!completed) onAction(); }}>
+          <div className="mt-3 w-full max-w-xs animate-modal-in rounded-2xl border border-white/80 bg-white/95 p-4 shadow-card">
+            <p className="text-sm font-semibold text-text">¿Guardar antes de salir?</p>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                className="rounded-full bg-gradient-to-br from-accent to-accent-strong px-4 py-1.5 text-xs font-bold text-white shadow-btn transition hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0"
+                onClick={() => { setState("done"); if (!completed) onAction(); }}
+              >
                 Aceptar (Enter)
               </button>
-              <button type="button" className="sc-dialog__cancel" onClick={() => { setState("idle"); if (!completed) onAction(); }}>
+              <button
+                type="button"
+                className="rounded-full border border-text/15 bg-white px-4 py-1.5 text-xs font-bold text-text shadow-sm transition hover:-translate-y-0.5 hover:shadow-btn active:translate-y-0"
+                onClick={() => { setState("idle"); if (!completed) onAction(); }}
+              >
                 Cancelar (Escape)
               </button>
             </div>
           </div>
         )}
-        {state === "done" && <p className="sc-dialog__result">✓ ¡Aceptado!</p>}
-        {state === "idle" && <p className="sc-dialog__result">✗ Cancelado.</p>}
+        {state === "done" && (
+          <p className="mt-2 rounded-full bg-mint/25 px-3 py-1 text-xs font-bold text-accent-teal animate-reward-pop">
+            ✓ ¡Aceptado!
+          </p>
+        )}
+        {state === "idle" && (
+          <p className="mt-2 rounded-full bg-rose/20 px-3 py-1 text-xs font-bold text-rose animate-reward-pop">
+            ✗ Cancelado.
+          </p>
+        )}
       </div>
       {state !== "open" && (
-        <button type="button" className="sc-venv-btn is-active" onClick={() => setState("open")}>
+        <button
+          type="button"
+          className="self-center rounded-full bg-gradient-to-br from-mint to-accent-teal px-4 py-2 text-sm font-bold text-white shadow-btn transition hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0"
+          onClick={() => setState("open")}
+        >
           Abrir diálogo otra vez
         </button>
       )}
-      <button type="button" className="sc-venv-btn" onClick={act} style={{ marginTop: "0.5rem" }}>
+      <button
+        type="button"
+        className="self-center rounded-full bg-gradient-to-br from-accent to-accent-strong px-4 py-2 text-sm font-bold text-white shadow-btn transition hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0"
+        onClick={act}
+        style={{ marginTop: state !== "open" ? "0.5rem" : undefined }}
+      >
         {combo.key.toLowerCase() === "enter" ? "Aceptar (Enter)" : "Cancelar (Escape)"}
       </button>
     </div>
@@ -824,23 +982,43 @@ function VirtualTextEditor({ combo, completed, triggerSignal, onAction }: EnvPro
     "Deshacer";
 
   return (
-    <div className="sc-venv sc-texteditor">
-      <div className="sc-texteditor__source">
-        <span className="sc-texteditor__label">Texto fuente</span>
-        {/* user-select:none in CSS keeps the browser from ever selecting it;
-            the .is-selected class draws the simulated selection highlight. */}
-        <p className={`sc-texteditor__text ${selectedAll ? "is-selected" : ""}`}>
+    <div className="glass-surface grid gap-3 p-4 sm:grid-cols-2">
+      <div className="flex flex-col gap-1.5 rounded-xl bg-white/70 p-3 shadow-inner">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Texto fuente</span>
+        {/* user-select:none keeps the browser from ever selecting it;
+            the simulated selection highlight appears via conditional classes. */}
+        <p
+          className={[
+            "rounded-lg p-2 text-sm transition select-none",
+            selectedAll
+              ? "bg-accent/25 text-text ring-2 ring-accent/40"
+              : "text-text/80",
+          ].join(" ")}
+        >
           {SOURCE_TEXT}
         </p>
       </div>
-      <div className="sc-texteditor__dest">
-        <span className="sc-texteditor__label">Área de trabajo</span>
-        <div className="sc-texteditor__area" aria-label="Área de trabajo">
-          {pasted ? pasted : <span className="sc-texteditor__placeholder">Acá aparecerá lo que pegues…</span>}
+      <div className="flex flex-col gap-1.5 rounded-xl bg-white/70 p-3 shadow-inner">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Área de trabajo</span>
+        <div
+          className="min-h-[4rem] rounded-lg border border-dashed border-white/80 bg-white/60 p-2 text-sm text-text"
+          aria-label="Área de trabajo"
+        >
+          {pasted ? pasted : (
+            <span className="text-muted/70 italic">Acá aparecerá lo que pegues…</span>
+          )}
         </div>
-        {undone && <span className="sc-texteditor__undo">↩ deshecho</span>}
+        {undone && (
+          <span className="self-start rounded-full bg-accent-sky/25 px-2 py-0.5 text-[11px] font-bold text-accent-strong animate-reward-pop">
+            ↩ deshecho
+          </span>
+        )}
       </div>
-      <button type="button" className="sc-venv-btn" onClick={act}>
+      <button
+        type="button"
+        className="sm:col-span-2 self-center rounded-full bg-gradient-to-br from-accent to-accent-strong px-4 py-2 text-sm font-bold text-white shadow-btn transition hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0"
+        onClick={act}
+      >
         {label}
       </button>
     </div>
