@@ -2,14 +2,17 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } fro
 import {
   ArrowRight,
   Building2,
+  Copy,
   Crown,
   GraduationCap,
   Home,
   ImagePlus,
   KeyRound,
+  Mail,
   Pencil,
   Plus,
   School,
+  Send,
   ShieldCheck,
   Trash2,
   UserCog,
@@ -38,6 +41,13 @@ const INPUT_CLS =
 const SELECT_CLS =
   "w-full min-h-[3rem] px-4 rounded-xl bg-white/70 border border-white/60 text-text font-semibold outline-none focus:border-accent-teal focus:ring-2 focus:ring-accent-teal/20 transition-all cursor-pointer";
 const BTN_SM = "min-h-[2.25rem] px-3 text-sm";
+
+const inviteStatusCls: Record<string, string> = {
+  pending: "bg-accent-sky/20 text-accent-sky",
+  sent: "bg-mint/20 text-accent-teal",
+  accepted: "bg-mint/30 text-accent-teal",
+  expired: "bg-muted/20 text-muted",
+};
 
 interface SiteDraft {
   name: string;
@@ -78,6 +88,13 @@ export function AdminGeneralPage() {
   /** Admin pending hard-delete confirmation (id + name for the dialog). */
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
 
+  /* Dedicated "invite admin de sede by email" flow (mirrors the teacher one). */
+  const [invitations, setInvitations] = useState<
+    Array<{ id: string; email: string; name?: string | null; role: string; status: string; createdAt: string }>
+  >([]);
+  const [inviteDraft, setInviteDraft] = useState({ email: "", name: "", siteId: "" });
+  const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
+
   /* Live ecosystem state, loaded from the API (Postgres = source of truth). */
   const [sites, setSites] = useState<Site[]>([]);
   const [users, setUsers] = useState<EduTicUser[]>([]);
@@ -85,7 +102,8 @@ export function AdminGeneralPage() {
 
   const reload = useCallback(async () => {
     try {
-      const [s, u, c] = await Promise.all([api.listSedes(), api.listUsers(), api.listClasses()]);
+      const [s, u, c, inv] = await Promise.all([api.listSedes(), api.listUsers(), api.listClasses(), api.listInvitations()]);
+      setInvitations(inv);
       setSites(s.map((x) => ({ id: x.id, name: x.name, city: x.city, photo: x.photo ?? undefined, active: x.active })));
       setUsers(
         u.map((x) => ({
@@ -262,6 +280,54 @@ export function AdminGeneralPage() {
       );
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "No se pudo enviar la invitación.");
+    }
+  }
+  /* Dedicated invite form (Admins section). Same mechanism as teacher invites. */
+  async function submitSuperInvite(event: FormEvent) {
+    event.preventDefault();
+    const siteId = inviteDraft.siteId || data.sites[0]?.id || "";
+    if (!inviteDraft.email.trim()) {
+      setMessage("Ingresá el email del admin a invitar.");
+      return;
+    }
+    if (!siteId) {
+      setMessage("Elegí una sede.");
+      return;
+    }
+    try {
+      const res = await api.createInvitation({
+        email: inviteDraft.email,
+        name: inviteDraft.name || undefined,
+        role: "admin-sede",
+        sedeId: siteId,
+      });
+      setInviteDraft({ email: "", name: "", siteId });
+      setInviteLinks((prev) => ({ ...prev, [res.invitation.id]: res.link }));
+      try {
+        await navigator.clipboard.writeText(res.link);
+      } catch {
+        /* clipboard may be unavailable */
+      }
+      refresh(
+        res.emailed
+          ? `Invitación enviada por email a ${res.invitation.email}`
+          : "Invitación creada. Enlace copiado para compartir.",
+      );
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo enviar la invitación.");
+    }
+  }
+  async function copyAdminInviteLink(id: string) {
+    const link = inviteLinks[id];
+    if (!link) {
+      setMessage("El enlace solo se puede copiar al crear la invitación. Reenviá una nueva si lo necesitás.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(link);
+      setMessage("Enlace de invitación copiado.");
+    } catch {
+      setMessage(link);
     }
   }
   async function doResetPassword() {
@@ -609,6 +675,64 @@ export function AdminGeneralPage() {
             </Button>
           </div>
           <AdminCards admins={filteredAdmins} />
+
+          {/* Invitar admin de sede por email — mismo flujo que invitar docente. */}
+          <div className="mt-2 pt-5 border-t border-white/40 flex flex-col gap-4">
+            <div>
+              <h3 className="font-display text-lg font-bold text-text flex items-center gap-2">
+                <Mail size={20} /> Invitar admin de sede por email
+              </h3>
+              <p className="text-sm text-muted font-semibold">
+                El admin recibe un enlace y elige su propia contraseña. (También podés crearlo con usuario y contraseña desde "Crear admin de sede".)
+              </p>
+            </div>
+            <form className="flex flex-row flex-wrap items-end gap-4" onSubmit={submitSuperInvite}>
+              <input
+                required
+                type="email"
+                className={`${INPUT_CLS} flex-1 min-w-[12rem]`}
+                placeholder="Email del admin"
+                value={inviteDraft.email}
+                onChange={(e) => setInviteDraft({ ...inviteDraft, email: e.target.value })}
+              />
+              <input
+                className={`${INPUT_CLS} flex-1 min-w-[10rem]`}
+                placeholder="Nombre (opcional)"
+                value={inviteDraft.name}
+                onChange={(e) => setInviteDraft({ ...inviteDraft, name: e.target.value })}
+              />
+              <select
+                required
+                className={`${SELECT_CLS} flex-1 min-w-[10rem]`}
+                value={inviteDraft.siteId || data.sites[0]?.id || ""}
+                onChange={(e) => setInviteDraft({ ...inviteDraft, siteId: e.target.value })}
+              >
+                {data.sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <Button type="submit" className={BTN_SM} disabled={data.sites.length === 0}>
+                <Send size={18} /> Invitar
+              </Button>
+            </form>
+            {invitations.filter((i) => i.role === "admin-sede").length > 0 && (
+              <div className="flex flex-col gap-3">
+                {invitations
+                  .filter((i) => i.role === "admin-sede")
+                  .map((inv) => (
+                    <div key={inv.id} className="flex items-center gap-3 flex-wrap p-3 rounded-xl bg-white/40">
+                      <span className="flex items-center gap-2 text-sm font-semibold text-text min-w-0 flex-1">
+                        <Mail size={16} className="shrink-0" /> {inv.email}
+                      </span>
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 ${inviteStatusCls[inv.status] ?? "bg-white/40 text-muted"}`}>
+                        {inv.status}
+                      </span>
+                      <Button variant="secondary" className={BTN_SM} onClick={() => copyAdminInviteLink(inv.id)}>
+                        <Copy size={16} /> Copiar enlace
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
         </section>
       )}
 
