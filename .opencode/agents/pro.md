@@ -1,7 +1,7 @@
 ---
 description: "Subagente avanzado para problemas de arquitectura, infraestructura y depuración profunda."
 mode: "subagent"
-model: "deepseek-v4-pro"
+model: "opencode-go/deepseek-v4-pro"
 temperature: 0.1
 tools:
   edit: true

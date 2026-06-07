@@ -1,7 +1,7 @@
 ---
 description: "Subagente equilibrado para lógica estándar, refactorización y creación de endpoints."
 mode: "subagent"
-model: "qwen3.7-plus"
+model: "opencode-go/qwen3.7-plus"
 temperature: 0.4
 tools:
   edit: true
