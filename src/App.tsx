@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
+import { EntrarPage } from "./pages/EntrarPage";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { InvitePage } from "./pages/InvitePage";
 import { WorldsPage } from "./pages/WorldsPage";
@@ -58,6 +59,10 @@ export function App() {
       <Route path="/cambiar-contrasena" element={<ChangePasswordPage />} />
       {/* Invitation acceptance (opened from the email link). */}
       <Route path="/invite/:token" element={<InvitePage />} />
+      {/* Superadmin god-mode chooser — "¿Cómo querés entrar?". */}
+      <Route element={<ProtectedRoute roles={["superadmin"]} />}>
+        <Route path="/entrar" element={<EntrarPage />} />
+      </Route>
 
       {/* Student game experience — exclusive to students. Admins/teachers
           are redirected to their own dashboards, never the game map. */}

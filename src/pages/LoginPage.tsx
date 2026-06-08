@@ -55,6 +55,13 @@ export function LoginPage() {
       return;
     }
 
+    // Superadmin picks how to enter (god-mode chooser) instead of landing
+    // straight on a single dashboard.
+    if (nextUser.role === "superadmin") {
+      navigate("/entrar");
+      return;
+    }
+
     navigate(routeForRole(nextUser.role));
   }
 
@@ -89,6 +96,10 @@ export function LoginPage() {
         if (result.ok) {
           if (result.user.mustChangePassword) {
             navigate("/cambiar-contrasena");
+            return;
+          }
+          if (result.user.role === "superadmin") {
+            navigate("/entrar");
             return;
           }
           navigate(routeForRole(result.user.role));

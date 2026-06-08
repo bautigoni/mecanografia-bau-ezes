@@ -11,7 +11,7 @@ import { routeForRole } from "../utils/storage";
  * for students, so an admin is always redirected to their own dashboard.
  */
 export function ProtectedRoute({ roles, exclusive = false }: { roles: Role[]; exclusive?: boolean }) {
-  const { user } = useAuth();
+  const { user, viewAs } = useAuth();
   const location = useLocation();
 
   if (!user) {
@@ -24,10 +24,13 @@ export function ProtectedRoute({ roles, exclusive = false }: { roles: Role[]; ex
     return <Navigate to="/cambiar-contrasena" replace />;
   }
 
-  // Superadmin has full access to every protected route — EXCEPT routes
-  // explicitly marked exclusive (the student-only game experience).
-  if (user.role === "superadmin" && !exclusive) {
-    return <Outlet />;
+  // Superadmin has full access to every protected route. Exclusive routes
+  // (the student-only game map) are normally off-limits, but the god-mode
+  // chooser lets a superadmin explicitly enter as "alumno" to play / use
+  // the developer level editor.
+  if (user.role === "superadmin") {
+    if (!exclusive) return <Outlet />;
+    if (exclusive && viewAs?.role === "alumno") return <Outlet />;
   }
 
   if (!roles.includes(user.role)) {

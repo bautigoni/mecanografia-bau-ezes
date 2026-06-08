@@ -10,6 +10,9 @@ import {
   setActiveUser,
   setDemoMode,
   setUserPassword,
+  getViewAs,
+  setViewAsStored,
+  type ViewAs,
 } from "../utils/storage";
 import { isEmailDomainAllowed, parseJwtCredential } from "../utils/googleAuth";
 import { api, ApiError, type ApiActiveUser } from "../utils/api";
@@ -57,6 +60,10 @@ interface AuthContextValue {
    *  which logs the user in server-side). The access token + refresh cookie
    *  are already set by the api client; this syncs the React/local state. */
   adoptSession: (apiUser: ApiActiveUser) => ActiveUser;
+  /** Superadmin "god mode": the role/sede/dev surface they chose to enter
+   *  from the "¿Cómo querés entrar?" chooser. `null` = act as superadmin. */
+  viewAs: ViewAs | null;
+  setViewAs: (view: ViewAs | null) => void;
   logout: () => Promise<void>;
 }
 
@@ -67,6 +74,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<ActiveUser | null>(() => getActiveUser());
   const [bootstrapping, setBootstrapping] = useState(true);
   const [usingApi, setUsingApi] = useState(false);
+  const [viewAs, setViewAsState] = useState<ViewAs | null>(() => getViewAs());
+
+  const setViewAs = useCallback((view: ViewAs | null) => {
+    setViewAsStored(view);
+    setViewAsState(view);
+  }, []);
 
   /* Try to recover a session from the HTTP-only refresh cookie. If it
      works we replace the localStorage user with the API user (more
@@ -219,6 +232,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     setDemoMode(false);
+    setViewAsStored(null);
+    setViewAsState(null);
     if (usingApi) {
       try { await api.logout(); } catch { /* ignore */ }
     }
@@ -227,8 +242,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [usingApi]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, logout }),
-    [user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, logout],
+    () => ({ user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, viewAs, setViewAs, logout }),
+    [user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, viewAs, setViewAs, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

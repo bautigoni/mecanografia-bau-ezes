@@ -72,9 +72,12 @@ function slugEmail(name: string): string {
 }
 
 export function SiteAdminPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, viewAs } = useAuth();
   const navigate = useNavigate();
-  const siteId = user?.siteId;
+  // A superadmin entering via the god-mode chooser scopes the dashboard to
+  // the sede they picked; everyone else uses their own bound sede.
+  const siteId =
+    user?.role === "superadmin" && viewAs?.sedeId ? viewAs.sedeId : user?.siteId;
   const [site, setSite] = useState<{ name: string; city: string } | null>(null);
 
   const [section, setSection] = useState("inicio");

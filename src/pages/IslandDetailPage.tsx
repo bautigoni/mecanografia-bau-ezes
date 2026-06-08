@@ -8,7 +8,12 @@ import { getWorldBySlug, getWorlds, worldStarProgress, WORLD_PEDAGOGY_ORDER, typ
 import { LevelPositionEditor } from "../components/dev/LevelPositionEditor";
 import { assets } from "../utils/assets";
 
-const EDITOR_AVAILABLE = import.meta.env.DEV;
+/* The dev level-position editor is available in local dev builds, OR when a
+   superadmin entered "modo desarrollador" from the god-mode chooser (which
+   sets the `typely_dev_editor` flag). Never available to normal users. */
+const EDITOR_AVAILABLE =
+  import.meta.env.DEV ||
+  (typeof window !== "undefined" && localStorage.getItem("typely_dev_editor") === "1");
 const clampPct = (v: number) => Math.min(100, Math.max(0, v));
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
