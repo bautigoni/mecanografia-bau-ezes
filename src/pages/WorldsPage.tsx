@@ -446,9 +446,9 @@ export function WorldsPage() {
           >
             <defs>
               <linearGradient id="world-route-gradient" x1="0%" y1="35%" x2="100%" y2="40%">
-                <stop offset="0%"   stopColor="#c9b8ff" stopOpacity="0.45" />
-                <stop offset="50%"  stopColor="#9b7cff" stopOpacity="0.9" />
-                <stop offset="100%" stopColor="#b9a3ff" stopOpacity="0.45" />
+                <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.25" />
+                <stop offset="50%"  stopColor="#bfeaff" stopOpacity="0.85" />
+                <stop offset="100%" stopColor="#ffffff" stopOpacity="0.25" />
               </linearGradient>
               <filter id="world-route-glow" x="-18%" y="-32%" width="136%" height="164%">
                 {/* stdDeviation 1.25 → 0.8: a tighter blur is dramatically
@@ -456,9 +456,10 @@ export function WorldsPage() {
                     the glow stays visible because the gradient itself is
                     pastel. */}
                 <feGaussianBlur stdDeviation="0.8" result="blur" />
+                {/* Soft white-cyan glow (no violet tint). */}
                 <feColorMatrix
                   in="blur" result="tint" type="matrix"
-                  values="0.72 0 0 0 0.28  0 0.5 0 0 0.22  0 0 0.95 0 0.5  0 0 0 0.88 0"
+                  values="0 0 0 0 0.80  0 0 0 0 0.92  0 0 0 0 1  0 0 0 0.8 0"
                 />
                 <feMerge>
                   <feMergeNode in="tint" />
@@ -499,8 +500,8 @@ export function WorldsPage() {
                 top: `${spark.y}%`,
                 animationDelay: `${spark.delay}s`,
                 background:
-                  "radial-gradient(circle, rgba(255,255,255,0.95), rgba(201,184,255,0.5) 60%, transparent 80%)",
-                boxShadow: "0 0 6px 2px rgba(201,184,255,0.5)",
+                  "radial-gradient(circle, rgba(255,255,255,0.95), rgba(191,234,255,0.5) 60%, transparent 80%)",
+                boxShadow: "0 0 6px 2px rgba(191,234,255,0.5)",
               }}
               aria-hidden="true"
             />
@@ -515,7 +516,7 @@ export function WorldsPage() {
                 starRefs.current[i] = el;
               }}
               className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-[5] animate-spark-twinkle"
-              style={{ left: 0, top: 0, filter: "drop-shadow(0 0 5px rgba(155,124,255,0.95))" }}
+              style={{ left: 0, top: 0, filter: "drop-shadow(0 0 5px rgba(255,255,255,0.95))" }}
               aria-hidden="true"
             >
               <Star size={18} className="text-amber-200" fill="currentColor" strokeWidth={1} />
@@ -566,9 +567,11 @@ export function WorldsPage() {
                     .filter(Boolean)
                     .join(" ")}
                   style={{
+                    /* Only a soft downward ground shadow — no circular glow
+                       ring/halo around the island. */
                     boxShadow: isLocked
                       ? undefined
-                      : `0 0 28px 6px ${theme.glow}, 0 12px 32px rgba(40,70,120,0.18)`,
+                      : "0 14px 30px rgba(40,70,120,0.22)",
                   }}
                   onClick={() => handleIslandClick(world)}
                   onPointerEnter={() => !isLocked && prefetchWorld(world)}
