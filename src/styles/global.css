@@ -225,6 +225,23 @@ a { color: inherit; text-decoration: none; }
   animation: gradientSweepLR 5s linear infinite;
 }
 
+/* ── App-wide pretty scrollbars (replace the chunky default ones) ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 113, 255, 0.4) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(124, 113, 255, 0.38);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(124, 113, 255, 0.6); }
+
+/* Hide a scrollbar entirely while keeping the element scrollable. */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* ── Prettier horizontal scrollbar for the world map ── */
 .world-scroll {
   scrollbar-width: thin;                       /* Firefox */

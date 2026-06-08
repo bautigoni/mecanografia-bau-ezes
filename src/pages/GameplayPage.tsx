@@ -30,7 +30,7 @@ type KeyboardRow = { id: string; tone: "num" | "top" | "home" | "bot" | "mod"; k
 
 const keyboardRows: KeyboardRow[] = [
   { id: "num",  tone: "num",  keys: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "'", "¿"] },
-  { id: "top",  tone: "top",  keys: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"] },
+  { id: "top",  tone: "top",  keys: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "´"] },
   { id: "home", tone: "home", keys: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ñ"] },
   { id: "bot",  tone: "bot",  keys: ["Z", "X", "C", "V", "B", "N", "M", ",", ".", "-", "Backspace"] },
   { id: "mod",  tone: "mod",  keys: ["Shift", "Space", "Enter"] },
@@ -738,15 +738,19 @@ export function GameplayPage() {
   }
 
   function listen() {
+    // Speak the consigna AND the concrete target (e.g. "Tocá la letra A"),
+    // not just the generic instruction.
+    const prompt = objectivePrompt(activity, target);
+    const phrase = [activity.listenText, prompt].filter(Boolean).join(" ");
     if ("speechSynthesis" in window) {
-      const utterance = new SpeechSynthesisUtterance(activity.listenText);
+      const utterance = new SpeechSynthesisUtterance(phrase);
       utterance.lang = "es-AR";
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
       setFeedback("Reproduciendo consigna.");
       return;
     }
-    setFeedback(activity.listenText);
+    setFeedback(phrase);
   }
 
   return (
@@ -809,7 +813,7 @@ export function GameplayPage() {
         </section>
       )}
 
-      <section className="flex flex-col items-center justify-center gap-4 flex-1 min-h-0 px-4 py-2 overflow-y-auto" aria-label={activity.title}>
+      <section className="flex flex-col items-center justify-center gap-4 flex-1 min-h-0 px-4 py-2 overflow-y-auto no-scrollbar" aria-label={activity.title}>
         <div className="glass rounded-xl px-4 py-2 font-bold text-sm flex items-center gap-3 text-text">
           <span>Nivel {activity.levelNumber}</span>
           <strong>{activity.title}</strong>
@@ -850,7 +854,7 @@ export function GameplayPage() {
                 </span>
                 <strong
                   ref={targetScrollRef}
-                  className="font-display font-bold text-text overflow-x-auto whitespace-nowrap max-w-full"
+                  className="font-display font-bold text-text overflow-x-auto no-scrollbar whitespace-nowrap max-w-full"
                 >
                   {target}
                 </strong>
@@ -913,7 +917,7 @@ export function GameplayPage() {
                   </span>
                   <span
                     ref={typedScrollRef}
-                    className={`font-mono text-2xl sm:text-3xl text-text font-bold overflow-x-auto whitespace-nowrap max-w-full flex items-center ${!typed ? "text-muted italic text-lg" : ""}`}
+                    className={`font-mono text-2xl sm:text-3xl text-text font-bold overflow-x-auto no-scrollbar whitespace-nowrap max-w-full flex items-center ${!typed ? "text-muted italic text-lg" : ""}`}
                   >
                     {typed
                       ? Array.from(typed).map((ch, i) =>
@@ -988,7 +992,7 @@ export function GameplayPage() {
       })()}
 
       <section className="px-4 pb-2 shrink-0" aria-label="Teclado visual">
-        <div className="flex flex-col gap-1.5 max-w-4xl mx-auto">
+        <div className="flex flex-col gap-1.5 max-w-6xl mx-auto">
           {keyboardRows.map((row) => {
             /* Each row has its own pastel colour so kids can scan home-row
                position by colour (gold numbers, pink top, mint home, violet
@@ -1016,7 +1020,7 @@ export function GameplayPage() {
                   const keyClasses = [
                     "relative rounded-lg font-extrabold shadow-sm transition-all duration-100 border-2",
                     "flex items-center justify-center select-none",
-                    isSpace ? "w-48 sm:w-64 h-9 sm:h-11 text-sm" : isWide ? "w-16 sm:w-20 h-9 sm:h-11 text-xs" : "w-9 h-9 sm:w-11 sm:h-11 text-sm",
+                    isSpace ? "w-48 sm:w-72 h-8 sm:h-9 text-sm" : isWide ? "w-16 sm:w-24 h-8 sm:h-9 text-xs" : "w-10 h-8 sm:w-12 sm:h-9 text-sm",
                     // Target/combo override the row colour with the accent blue.
                     isTarget && !isCombo
                       ? "bg-accent text-white border-accent-strong shadow-lg scale-105 animate-target-pulse"
