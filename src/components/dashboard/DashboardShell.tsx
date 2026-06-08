@@ -202,6 +202,15 @@ export function DashboardShell({
             <span className="grid place-items-center w-10 h-10 rounded-full bg-accent/15 text-accent-strong font-black text-sm">
               {account.initial}
             </span>
+            <button
+              type="button"
+              className="flex items-center gap-2 h-10 px-4 rounded-xl glass-surface text-sm font-bold text-muted hover:bg-rose/10 hover:text-rose transition cursor-pointer"
+              onClick={onLogout}
+              aria-label="Cerrar sesión"
+            >
+              <LogOut size={18} />
+              <span className="hidden sm:inline">Cerrar sesión</span>
+            </button>
           </div>
         </header>
 

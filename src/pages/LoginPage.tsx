@@ -122,7 +122,7 @@ export function LoginPage() {
       style={{ backgroundImage: `url("${assets.loginBg}")` }}
     >
       <img
-        className="absolute bottom-0 left-0 w-auto max-h-[52vh] animate-mascot-float pointer-events-none select-none z-10"
+        className="absolute bottom-0 left-0 w-auto max-h-[72vh] animate-mascot-float pointer-events-none select-none z-10"
         src={assets.mascotFemaleWave}
         alt="Mascota saludando"
         decoding="async"
@@ -130,7 +130,7 @@ export function LoginPage() {
         fetchpriority="high"
       />
       <img
-        className="absolute bottom-0 right-0 w-auto max-h-[52vh] animate-mascot-float pointer-events-none select-none z-10"
+        className="absolute bottom-0 right-0 w-auto max-h-[72vh] animate-mascot-float pointer-events-none select-none z-10"
         src={assets.mascotMaleWave}
         alt="Mascota saludando"
         decoding="async"
