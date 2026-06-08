@@ -101,7 +101,7 @@ function Island5Shell({
   }
 
   return (
-    <main className="grid grid-rows-[auto_1fr_auto] h-dvh relative overflow-hidden bg-gradient-to-b from-blue-50/80 to-sky-100/60 animate-page-fade">
+    <main className="flex flex-col h-dvh relative overflow-hidden bg-gradient-to-b from-blue-50/80 to-sky-100/60 animate-page-fade">
       <div
         className="absolute inset-0 bg-cover bg-center pointer-events-none -z-10 opacity-40"
         aria-hidden="true"
