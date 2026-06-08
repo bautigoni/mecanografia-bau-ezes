@@ -778,14 +778,36 @@ export function GameplayPage() {
           window.setTimeout(() => captureInputRef.current?.focus({ preventScroll: true }), 30);
         }}
       />
-      <button
-        className="absolute top-4 right-4 z-20 glass rounded-full w-12 h-12 flex items-center justify-center gap-1 text-text font-bold text-sm shadow-btn hover:scale-105 transition-transform"
-        type="button"
-        onClick={() => navigate(`/worlds/${activity.worldId}`)}
-      >
-        <X size={20} />
-        <span className="sr-only">Salir</span>
-      </button>
+      <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={retry}
+          className="glass rounded-full w-12 h-12 flex items-center justify-center text-text shadow-btn hover:scale-105 transition-transform"
+          aria-label="Reintentar"
+          title="Reintentar"
+        >
+          <RotateCcw size={20} />
+        </button>
+        <button
+          className="glass rounded-full w-12 h-12 flex items-center justify-center text-text shadow-btn hover:scale-105 transition-transform"
+          type="button"
+          onClick={() => navigate(`/worlds/${activity.worldId}`)}
+          aria-label="Salir"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      {/* Consigna (instruction) — at the TOP, never the bottom. */}
+      {!isCompleted && (
+        <section
+          className="glass-strong mx-4 mt-4 mb-1 rounded-2xl px-5 py-3 text-center shrink-0 z-20 mr-28"
+          aria-live="polite"
+        >
+          <h1 className="font-display font-bold text-xl text-text">{activity.instruction}</h1>
+          <p className="text-sm text-muted font-semibold">{feedback}</p>
+        </section>
+      )}
 
       <section className="flex flex-col items-center justify-center gap-4 flex-1 min-h-0 px-4 py-2 overflow-y-auto" aria-label={activity.title}>
         <div className="glass rounded-xl px-4 py-2 font-bold text-sm flex items-center gap-3 text-text">
@@ -932,8 +954,9 @@ export function GameplayPage() {
         const leftPhrase = isIdleHintActive && locationHint ? locationHint : phrasePool[targetIndex % phrasePool.length];
         const rightPhrase = phrasePool[(targetIndex + Math.max(1, Math.floor(phrasePool.length / 2))) % phrasePool.length];
         return (
-          <div className="flex justify-between items-end px-4 pb-2 pointer-events-none" aria-hidden="true">
-            <figure className="flex flex-col items-center gap-2 max-w-[140px]">
+          <>
+            {/* Robots flank the bottom corners — bigger and lower than before. */}
+            <figure className="absolute bottom-0 left-1 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
               <div
                 className={`glass-surface rounded-2xl rounded-br-sm px-3 py-2 text-sm font-bold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
               >
@@ -943,10 +966,10 @@ export function GameplayPage() {
                 src={assets.mascotFemaleWave}
                 alt=""
                 decoding="async"
-                className="w-20 h-20 object-contain animate-mascot-float"
+                className="w-28 sm:w-40 h-auto object-contain animate-mascot-float"
               />
             </figure>
-            <figure className="flex flex-col items-center gap-2 max-w-[140px]">
+            <figure className="absolute bottom-0 right-1 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
               <div
                 className={`glass-surface rounded-2xl rounded-bl-sm px-3 py-2 text-sm font-bold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
               >
@@ -956,11 +979,11 @@ export function GameplayPage() {
                 src={assets.mascotMaleJump}
                 alt=""
                 decoding="async"
-                className="w-20 h-20 object-contain animate-mascot-float"
+                className="w-28 sm:w-40 h-auto object-contain animate-mascot-float"
                 style={{ animationDelay: "1s" }}
               />
             </figure>
-          </div>
+          </>
         );
       })()}
 
@@ -1018,32 +1041,16 @@ export function GameplayPage() {
         </div>
       </section>
 
-      <section
-        className="glass-strong px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mx-4 mb-4 rounded-2xl shadow-card shrink-0"
-        aria-live="polite"
-      >
-        <div className="text-center sm:text-left">
-          <h1 className="font-display font-bold text-lg text-text">{activity.instruction}</h1>
-          <p className="text-sm text-muted font-medium">{feedback}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={listen}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm text-text bg-white/80 border border-white/60 shadow-sm hover:scale-105 transition-transform"
-          >
-            <Volume2 size={21} />
-            Escuchar consigna
-          </button>
-          <button
-            type="button"
-            onClick={retry}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm text-text bg-white/80 border border-white/60 shadow-sm hover:scale-105 transition-transform"
-          >
-            <RotateCcw size={20} />
-            Reintentar
-          </button>
-        </div>
+      {/* Bottom-centre: a single action — "Escuchar consigna". */}
+      <section className="flex justify-center pb-4 pt-1 shrink-0 z-20" aria-live="polite">
+        <button
+          type="button"
+          onClick={listen}
+          className="flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-accent to-accent-strong shadow-btn hover:scale-105 transition-transform"
+        >
+          <Volume2 size={22} />
+          Escuchar consigna
+        </button>
       </section>
 
       {isCompleted && (
