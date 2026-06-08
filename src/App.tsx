@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
 import { EntrarPage } from "./pages/EntrarPage";
+import { LoginLayoutEditorPage } from "./pages/LoginLayoutEditorPage";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { InvitePage } from "./pages/InvitePage";
 import { WorldsPage } from "./pages/WorldsPage";
@@ -62,6 +63,9 @@ export function App() {
       {/* Superadmin god-mode chooser — "¿Cómo querés entrar?". */}
       <Route element={<ProtectedRoute roles={["superadmin"]} />}>
         <Route path="/entrar" element={<EntrarPage />} />
+        {/* Superadmin-only sandbox to drag the login mascots and read off
+            their positions. Does not affect the real login screen. */}
+        <Route path="/editor-login" element={<LoginLayoutEditorPage />} />
       </Route>
 
       {/* Student game experience — exclusive to students. Admins/teachers

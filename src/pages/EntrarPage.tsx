@@ -6,6 +6,7 @@ import {
   Gamepad2,
   ShieldCheck,
   Wrench,
+  Move,
   ArrowRight,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
@@ -144,6 +145,12 @@ export function EntrarPage() {
             title="Modo desarrollador"
             subtitle="Editor de posiciones de niveles activado."
             onClick={enterDev}
+          />
+          <ChoiceCard
+            icon={Move}
+            title="Editor de login"
+            subtitle="Mover los robots del login y copiar sus posiciones."
+            onClick={() => navigate("/editor-login")}
           />
         </div>
       </section>
