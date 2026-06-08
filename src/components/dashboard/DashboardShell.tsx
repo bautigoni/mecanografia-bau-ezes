@@ -18,8 +18,9 @@ interface DashboardShellProps {
   roleSubtitle: string;
   roleIcon: LucideIcon;
   account: { name: string; email?: string; initial: string };
-  /** Robot illustration shown in the sidebar. */
-  sidebarMascot: string;
+  /** Deprecated — the sidebar robot was removed so the footer logout is
+   *  always visible. Kept optional so existing callers don't break. */
+  sidebarMascot?: string;
   nav: DashNavItem[];
   activeId: string;
   onNavigate: (id: string) => void;
@@ -65,7 +66,6 @@ export function DashboardShell({
   roleSubtitle,
   roleIcon: RoleIcon,
   account,
-  sidebarMascot,
   nav,
   activeId,
   onNavigate,
@@ -108,8 +108,9 @@ export function DashboardShell({
           </div>
         </div>
 
-        {/* ── Navigation ── */}
-        <nav className="flex flex-col gap-1" aria-label="Navegación">
+        {/* ── Navigation (grows + scrolls so the footer logout always pins
+            to the bottom and stays visible) ── */}
+        <nav className="flex flex-col gap-1 flex-1 min-h-0 overflow-y-auto" aria-label="Navegación">
           {nav.map(({ id, label, icon: Icon, badge }) => {
             const isActive = id === activeId;
             return (
@@ -135,16 +136,7 @@ export function DashboardShell({
           })}
         </nav>
 
-        {/* ── Mascot illustration ── */}
-        <img
-          className="w-full max-w-[10rem] mx-auto animate-mascot-float select-none"
-          src={sidebarMascot}
-          alt=""
-          decoding="async"
-          loading="lazy"
-        />
-
-        {/* ── Footer: account + logout ── */}
+        {/* ── Footer: account + logout (sidebar robot removed) ── */}
         <div className="mt-auto flex flex-col gap-3 pt-3 border-t border-white/40">
           <div className="flex items-center gap-3">
             <span className="grid place-items-center w-10 h-10 rounded-full bg-accent/15 text-accent-strong font-black text-sm shrink-0">

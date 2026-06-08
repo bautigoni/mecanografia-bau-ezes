@@ -150,15 +150,9 @@ export function WorldsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedWorld, setSelectedWorld] = useState<string | null>(null);
   const [message, setMessage] = useState("");
-  /* Hold a short "preparando…" screen on the FIRST visit per session so the
-     map reveals fully painted instead of popping in island by island. */
-  const [worldsReady, setWorldsReady] = useState(() => {
-    try {
-      return sessionStorage.getItem("edutic.worldsLoaded") === "1";
-    } catch {
-      return false;
-    }
-  });
+  /* The island art is now optimized/lightweight, so we no longer hold a
+     "preparando…" splash — the map renders immediately on every visit. */
+  const [worldsReady] = useState(true);
   /* Slugs that became unlocked since the last visit → play a celebratory
      reveal animation when the student returns to the map. */
   const [justUnlocked, setJustUnlocked] = useState<Set<string>>(new Set());
@@ -208,54 +202,6 @@ export function WorldsPage() {
     const left = Math.max(0, targetPx - scene.clientWidth / 2);
     scene.scrollTo({ left, behavior: "smooth" });
     // Run once on mount; unlock-state changes after page-load are rare.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /* Preload every island thumbnail behind the "preparando…" screen, then
-     reveal the map. Waits for all images to decode (so nothing pops in), with
-     a ~1.8 s minimum so it reads as intentional and a 3.5 s hard cap so it can
-     never hang. Only the first visit per session waits — later returns (assets
-     already cached) skip the loader entirely. */
-  useEffect(() => {
-    if (worldsReady) return;
-    let cancelled = false;
-    const finish = () => {
-      if (cancelled) return;
-      try {
-        sessionStorage.setItem("edutic.worldsLoaded", "1");
-      } catch {
-        /* ignore */
-      }
-      setWorldsReady(true);
-    };
-    const urls = Array.from(new Set(visibleWorlds.map((w) => w.thumbnail)));
-    if (urls.length === 0) {
-      finish();
-      return;
-    }
-    const start = performance.now();
-    const MIN_MS = 1800;
-    let remaining = urls.length;
-    const onOne = () => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        const elapsed = performance.now() - start;
-        window.setTimeout(finish, Math.max(0, MIN_MS - elapsed));
-      }
-    };
-    urls.forEach((src) => {
-      const img = new Image();
-      img.decoding = "async";
-      img.onload = onOne;
-      img.onerror = onOne;
-      img.src = src;
-      prefetched.add(src);
-    });
-    const cap = window.setTimeout(finish, 3500);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(cap);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -366,40 +312,6 @@ export function WorldsPage() {
         aria-hidden="true"
       />
 
-      {/* ── Loader (preparando…) ── */}
-      {!worldsReady && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/70 animate-loader-in"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="glass-card-smooth relative flex flex-col items-center gap-5 p-10">
-            <span
-              className="absolute inset-0 rounded-3xl blur-2xl animate-loader-halo pointer-events-none"
-              style={{
-                background:
-                  "radial-gradient(circle at 50% 40%, rgba(51,199,240,0.35), transparent 65%)",
-              }}
-              aria-hidden="true"
-            />
-            <img
-              className="w-28 h-auto animate-mascot-float drop-shadow-lg"
-              src={assets.mascotMaleProud}
-              alt=""
-              decoding="async"
-            />
-            {/* Spinner ring */}
-            <span
-              className="w-8 h-8 rounded-full border-[3px] border-white/30 border-t-white animate-loader-spin"
-              aria-hidden="true"
-            />
-            <p className="text-white font-display font-bold text-lg">
-              Preparando tu aventura…
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* ── Hamburger menu ── */}
       <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-2">
         <button
@@ -474,7 +386,7 @@ export function WorldsPage() {
 
       {/* ── Horizontally scrollable world journey ── */}
       <section
-        className="relative w-full h-dvh overflow-x-auto overflow-y-hidden scroll-smooth"
+        className="world-scroll relative w-full h-dvh overflow-x-auto overflow-y-hidden scroll-smooth"
         aria-label="Selección de mundos"
         ref={sceneRef}
       >
@@ -513,15 +425,18 @@ export function WorldsPage() {
                 </feMerge>
               </filter>
             </defs>
-            {/* Wide soft halo behind the route */}
+            {/* Shared route geometry — referenced by the travelling stars'
+                <animateMotion> so they ride exactly along the trail. */}
+            <path id="world-route-path" d={ROUTE_D} fill="none" stroke="none" />
+            {/* Wide soft halo behind the route (thinner, daintier) */}
             <path
               d={ROUTE_D}
               fill="none"
               stroke="url(#world-route-gradient)"
-              strokeWidth="5"
+              strokeWidth="3"
               strokeLinecap="round"
               strokeDasharray="0"
-              opacity="0.35"
+              opacity="0.3"
               filter="url(#world-route-glow)"
             />
             {/* Solid base line */}
@@ -529,7 +444,7 @@ export function WorldsPage() {
               d={ROUTE_D}
               fill="none"
               stroke="url(#world-route-gradient)"
-              strokeWidth="2.5"
+              strokeWidth="1.4"
               strokeLinecap="round"
             />
             {/* Dotted overlay */}
@@ -537,23 +452,39 @@ export function WorldsPage() {
               d={ROUTE_D}
               fill="none"
               stroke="white"
-              strokeWidth="1.5"
+              strokeWidth="0.9"
               strokeLinecap="round"
-              strokeDasharray="1.5 4"
-              opacity="0.55"
+              strokeDasharray="1.2 4"
+              opacity="0.5"
             />
             {/* Shimmer highlight */}
             <path
               d={ROUTE_D}
               fill="none"
               stroke="white"
-              strokeWidth="2"
+              strokeWidth="1.2"
               strokeLinecap="round"
               strokeDasharray="6 40"
               opacity="0.7"
               className="animate-route-shimmer"
               style={{ strokeDashoffset: 0 }}
             />
+            {/* Stars travelling along the trail — each rides the shared path
+                via <animateMotion mpath>, staggered so they stream along. */}
+            {[0, 1, 2, 3].map((i) => (
+              <circle key={`travel-${i}`} r="0.7" fill="#fff8ff" opacity="0.95">
+                <animateMotion dur="6s" repeatCount="indefinite" begin={`${i * 1.5}s`} rotate="auto">
+                  <mpath href="#world-route-path" />
+                </animateMotion>
+                <animate
+                  attributeName="r"
+                  values="0.35;0.9;0.35"
+                  dur="1.2s"
+                  repeatCount="indefinite"
+                  begin={`${i * 1.5}s`}
+                />
+              </circle>
+            ))}
           </svg>
 
           {/* Sparkles between islands */}
@@ -747,7 +678,7 @@ export function WorldsPage() {
           re-blur the alpha channel of a 14–24rem tall PNG on every frame. */}
       <span className="absolute bottom-0 left-0 animate-mascot-float pointer-events-none select-none z-10">
         <img
-          className="w-auto max-h-[22vh] drop-shadow-lg"
+          className="w-auto max-h-[32vh] drop-shadow-lg"
           src={assets.mascotFemaleLaptop}
           alt=""
           decoding="async"
@@ -762,7 +693,7 @@ export function WorldsPage() {
         </span>
         <span className="animate-mascot-float">
           <img
-            className="w-auto max-h-[22vh] drop-shadow-lg"
+            className="w-auto max-h-[32vh] drop-shadow-lg"
             src={assets.mascotMaleProud}
             alt=""
             decoding="async"

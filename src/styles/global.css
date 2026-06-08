@@ -207,6 +207,33 @@ a { color: inherit; text-decoration: none; }
 .animate-twinkle { animation: i5-twinkle 3s ease-in-out infinite; }
 .animate-soft-hint-in { animation: softHintIn 400ms ease both; }
 
+/* ── Prettier horizontal scrollbar for the world map ── */
+.world-scroll {
+  scrollbar-width: thin;                       /* Firefox */
+  scrollbar-color: rgba(124, 113, 255, 0.55) transparent;
+}
+.world-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+.world-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.world-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  background-image: linear-gradient(
+    90deg,
+    rgba(84, 232, 198, 0.85),
+    rgba(37, 200, 223, 0.85),
+    rgba(124, 113, 255, 0.85)
+  );
+  transition: filter 0.2s ease;
+}
+.world-scroll::-webkit-scrollbar-thumb:hover {
+  filter: brightness(1.1);
+}
+
 /* ── Reduced Motion ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
