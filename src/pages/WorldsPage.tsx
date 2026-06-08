@@ -158,6 +158,10 @@ export function WorldsPage() {
   const [justUnlocked, setJustUnlocked] = useState<Set<string>>(new Set());
   const pendingNav = useRef<number | null>(null);
   const sceneRef = useRef<HTMLDivElement | null>(null);
+  /* Trail path + the real stars that glide along it (positioned each frame
+     by sampling the path — see the rAF effect below). */
+  const routePathRef = useRef<SVGPathElement | null>(null);
+  const starRefs = useRef<(HTMLSpanElement | null)[]>([]);
 
   /* Build the user context + world model once per user (not on every render).
      Rebuilding all 15 worlds + reading localStorage on each hover/menu toggle
@@ -204,6 +208,44 @@ export function WorldsPage() {
     // Run once on mount; unlock-state changes after page-load are rare.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* Glide the real stars slowly along the trail. We sample the SVG path with
+     getPointAtLength (undistorted user units: x in vw, y in %) and position
+     the star spans over the map each frame. Honours reduced-motion. */
+  useEffect(() => {
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) return;
+    const path = routePathRef.current;
+    if (!path) return;
+    let len = 0;
+    try {
+      len = path.getTotalLength();
+    } catch {
+      return;
+    }
+    if (!len) return;
+    const N = starRefs.current.length || 2;
+    const SPEED = len / 18000; // full pass ≈ 18 s → gentle, slow drift
+    let raf = 0;
+    let start = 0;
+    const tick = (t: number) => {
+      if (!start) start = t;
+      const elapsed = t - start;
+      for (let i = 0; i < N; i++) {
+        const el = starRefs.current[i];
+        if (!el) continue;
+        const dist = (elapsed * SPEED + (i * len) / N) % len;
+        const p = path.getPointAtLength(dist);
+        el.style.left = `${p.x}vw`;
+        el.style.top = `${p.y}%`;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [ROUTE_D]);
 
   /* Detect islands unlocked since the last visit and flag them for the reveal
      animation. Runs once the map is actually visible (after the loader). On a
@@ -404,10 +446,9 @@ export function WorldsPage() {
           >
             <defs>
               <linearGradient id="world-route-gradient" x1="0%" y1="35%" x2="100%" y2="40%">
-                <stop offset="0%"   stopColor="#fff8ff" stopOpacity="0.28" />
-                <stop offset="32%"  stopColor="#c9b8ff" stopOpacity="0.78" />
-                <stop offset="64%"  stopColor="#bff3ff" stopOpacity="0.72" />
-                <stop offset="100%" stopColor="#ffd9f1" stopOpacity="0.34" />
+                <stop offset="0%"   stopColor="#c9b8ff" stopOpacity="0.45" />
+                <stop offset="50%"  stopColor="#9b7cff" stopOpacity="0.9" />
+                <stop offset="100%" stopColor="#b9a3ff" stopOpacity="0.45" />
               </linearGradient>
               <filter id="world-route-glow" x="-18%" y="-32%" width="136%" height="164%">
                 {/* stdDeviation 1.25 → 0.8: a tighter blur is dramatically
@@ -425,66 +466,27 @@ export function WorldsPage() {
                 </feMerge>
               </filter>
             </defs>
-            {/* Shared route geometry — referenced by the travelling stars'
-                <animateMotion> so they ride exactly along the trail. */}
-            <path id="world-route-path" d={ROUTE_D} fill="none" stroke="none" />
-            {/* Wide soft halo behind the route (thinner, daintier) */}
+            {/* Shared route geometry — measured by the travelling stars so
+                they ride exactly along the trail (see rAF effect above). */}
+            <path ref={routePathRef} id="world-route-path" d={ROUTE_D} fill="none" stroke="none" />
+            {/* Soft violet glow behind the line */}
             <path
               d={ROUTE_D}
               fill="none"
               stroke="url(#world-route-gradient)"
-              strokeWidth="3"
+              strokeWidth="2.6"
               strokeLinecap="round"
-              strokeDasharray="0"
-              opacity="0.3"
+              opacity="0.5"
               filter="url(#world-route-glow)"
             />
-            {/* Solid base line */}
+            {/* One clean, solid line — no dots, no dashes */}
             <path
               d={ROUTE_D}
               fill="none"
               stroke="url(#world-route-gradient)"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-            />
-            {/* Dotted overlay */}
-            <path
-              d={ROUTE_D}
-              fill="none"
-              stroke="white"
               strokeWidth="0.9"
               strokeLinecap="round"
-              strokeDasharray="1.2 4"
-              opacity="0.5"
             />
-            {/* Shimmer highlight */}
-            <path
-              d={ROUTE_D}
-              fill="none"
-              stroke="white"
-              strokeWidth="1.2"
-              strokeLinecap="round"
-              strokeDasharray="6 40"
-              opacity="0.7"
-              className="animate-route-shimmer"
-              style={{ strokeDashoffset: 0 }}
-            />
-            {/* Stars travelling along the trail — each rides the shared path
-                via <animateMotion mpath>, staggered so they stream along. */}
-            {[0, 1, 2, 3].map((i) => (
-              <circle key={`travel-${i}`} r="0.7" fill="#fff8ff" opacity="0.95">
-                <animateMotion dur="6s" repeatCount="indefinite" begin={`${i * 1.5}s`} rotate="auto">
-                  <mpath href="#world-route-path" />
-                </animateMotion>
-                <animate
-                  attributeName="r"
-                  values="0.35;0.9;0.35"
-                  dur="1.2s"
-                  repeatCount="indefinite"
-                  begin={`${i * 1.5}s`}
-                />
-              </circle>
-            ))}
           </svg>
 
           {/* Sparkles between islands */}
@@ -502,6 +504,22 @@ export function WorldsPage() {
               }}
               aria-hidden="true"
             />
+          ))}
+
+          {/* Real stars gliding slowly along the trail (positioned each frame
+              by the rAF effect via the path ref). */}
+          {[0, 1].map((i) => (
+            <span
+              key={`travel-star-${i}`}
+              ref={(el) => {
+                starRefs.current[i] = el;
+              }}
+              className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-[5] animate-spark-twinkle"
+              style={{ left: 0, top: 0, filter: "drop-shadow(0 0 5px rgba(155,124,255,0.95))" }}
+              aria-hidden="true"
+            >
+              <Star size={18} className="text-amber-200" fill="currentColor" strokeWidth={1} />
+            </span>
           ))}
 
           {/* Island buttons */}
@@ -536,10 +554,8 @@ export function WorldsPage() {
                     "overflow-visible",
                     /* State: locked */
                     isLocked
-                      ? "grayscale-[0.6] opacity-50 cursor-not-allowed hover:scale-100 hover:translate-y-0"
+                      ? "grayscale-[0.6] opacity-70 cursor-not-allowed hover:scale-100 hover:translate-y-0"
                       : "",
-                    /* State: current → pulsing glow ring */
-                    isCurrent ? "animate-next-pulse" : "",
                     /* State: just unlocked → reveal animation */
                     justUnlocked.has(world.slug) ? "animate-unlock-reveal" : "",
                     /* State: selected → shrink + fade for transition */
