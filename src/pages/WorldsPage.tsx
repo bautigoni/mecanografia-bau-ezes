@@ -566,13 +566,6 @@ export function WorldsPage() {
                   ]
                     .filter(Boolean)
                     .join(" ")}
-                  style={{
-                    /* Only a soft downward ground shadow — no circular glow
-                       ring/halo around the island. */
-                    boxShadow: isLocked
-                      ? undefined
-                      : "0 14px 30px rgba(40,70,120,0.22)",
-                  }}
                   onClick={() => handleIslandClick(world)}
                   onPointerEnter={() => !isLocked && prefetchWorld(world)}
                   onFocus={() => !isLocked && prefetchWorld(world)}
@@ -581,13 +574,14 @@ export function WorldsPage() {
                   }`}
                   aria-disabled={isLocked}
                 >
-                  {/* Island thumbnail image (fills the circular button) */}
+                  {/* Island art — transparent PNG shown at its natural shape
+                      (object-contain, NOT cropped into a circle). */}
                   <img
                     src={world.thumbnail}
                     alt=""
                     loading="eager"
                     decoding="async"
-                    className="w-full h-full object-cover rounded-full"
+                    className="w-full h-full object-contain drop-shadow-[0_10px_18px_rgba(40,70,120,0.28)]"
                   />
 
                   {/* Number + theme badge only on reachable islands. Locked

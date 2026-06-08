@@ -28,6 +28,9 @@
 /* ── Base Reset ── */
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { min-height: 100%; margin: 0; }
+/* Pastel base behind everything: no white flash on reload and no white
+   borders behind the art at any browser zoom level. */
+html, body { background-color: #e9e6f7; }
 body { overflow-x: hidden; }
 button, input, select { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
@@ -206,6 +209,18 @@ a { color: inherit; text-decoration: none; }
 .animate-mouse-bob { animation: i5-mouseBob 2s ease-in-out infinite; }
 .animate-twinkle { animation: i5-twinkle 3s ease-in-out infinite; }
 .animate-soft-hint-in { animation: softHintIn 400ms ease both; }
+
+/* ── Looping pastel gradient text (login heading: green → pink → green) ── */
+@keyframes gradientSweepLR { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+.text-gradient-loop {
+  background-image: linear-gradient(90deg, #6fd6a8 0%, #ff9ecd 35%, #7c9bff 65%, #6fd6a8 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: gradientSweepLR 5s linear infinite;
+}
 
 /* ── Prettier horizontal scrollbar for the world map ── */
 .world-scroll {

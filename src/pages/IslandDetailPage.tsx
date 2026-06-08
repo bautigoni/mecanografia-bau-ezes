@@ -27,10 +27,10 @@ const ISLAND_IMG: Partial<Record<string, string>> = {
   island1: "/assets/edutic-art/islands/1/island.png",
 };
 const ISLAND_BG: Partial<Record<string, string>> = {
-  // Pink "sky islands" backdrop (same as login/worlds) — the island art is a
-  // separate PNG layered on top. The old islands/1/background.png was a flat
-  // blue sky and looked wrong behind the island.
-  island1: assets.loginBg,
+  // Soft pastel sky (same backdrop as the /mundos map) — clean, no busy
+  // castle islands. The island art is a separate PNG layered on top. The old
+  // islands/1/background.png was a flat blue sky and looked wrong.
+  island1: assets.homeBg,
 };
 
 

@@ -787,7 +787,7 @@ export function GameplayPage() {
         <span className="sr-only">Salir</span>
       </button>
 
-      <section className="grid place-items-center gap-4 flex-1 min-h-0 px-4" aria-label={activity.title}>
+      <section className="flex flex-col items-center justify-center gap-4 flex-1 min-h-0 px-4 py-2 overflow-y-auto" aria-label={activity.title}>
         <div className="glass rounded-xl px-4 py-2 font-bold text-sm flex items-center gap-3 text-text">
           <span>Nivel {activity.levelNumber}</span>
           <strong>{activity.title}</strong>
@@ -964,20 +964,23 @@ export function GameplayPage() {
         );
       })()}
 
-      <section className="px-4 pb-2" aria-label="Teclado visual">
+      <section className="px-4 pb-2 shrink-0" aria-label="Teclado visual">
         <div className="flex flex-col gap-1.5 max-w-4xl mx-auto">
           {keyboardRows.map((row) => {
-            const rowToneClasses: Record<string, string> = {
-              num: "bg-white/60",
-              top: "bg-white/70",
-              home: "bg-white/80",
-              bot: "bg-white/70",
-              mod: "bg-white/60",
+            /* Each row has its own pastel colour so kids can scan home-row
+               position by colour (gold numbers, pink top, mint home, violet
+               bottom, sky modifiers). Applied to the KEYS, not a panel. */
+            const rowKeyTone: Record<string, string> = {
+              num: "bg-gradient-to-b from-amber-50 to-amber-200 border-amber-300 text-amber-900",
+              top: "bg-gradient-to-b from-pink-50 to-pink-200 border-pink-300 text-pink-900",
+              home: "bg-gradient-to-b from-emerald-50 to-emerald-200 border-emerald-300 text-emerald-900",
+              bot: "bg-gradient-to-b from-violet-50 to-violet-200 border-violet-300 text-violet-900",
+              mod: "bg-gradient-to-b from-sky-50 to-sky-200 border-sky-300 text-sky-900",
             };
             return (
               <div
                 key={row.id}
-                className={`flex justify-center gap-1.5 ${rowToneClasses[row.tone] || ""} rounded-xl p-1.5`}
+                className="flex justify-center gap-1.5"
               >
                 {row.keys.map((key) => {
                   const isTarget = !isCompleted && expectedKeys.has(key);
@@ -988,12 +991,15 @@ export function GameplayPage() {
                   const isWide = key === "Backspace" || key === "Shift" || key === "Enter";
 
                   const keyClasses = [
-                    "relative rounded-lg font-bold text-text shadow-sm transition-all duration-100",
+                    "relative rounded-lg font-extrabold shadow-sm transition-all duration-100 border-2",
                     "flex items-center justify-center select-none",
-                    "bg-white border-2 border-white/80",
-                    isSpace ? "w-48 sm:w-64 text-sm" : isWide ? "w-16 sm:w-20 text-xs" : "w-9 h-9 sm:w-11 sm:h-11 text-sm",
-                    isTarget && !isCombo ? "bg-accent text-white border-accent-strong shadow-lg scale-105 animate-target-pulse" : "",
-                    isCombo ? "bg-accent-strong text-white border-accent-strong shadow-lg scale-110 animate-target-pulse" : "",
+                    isSpace ? "w-48 sm:w-64 h-9 sm:h-11 text-sm" : isWide ? "w-16 sm:w-20 h-9 sm:h-11 text-xs" : "w-9 h-9 sm:w-11 sm:h-11 text-sm",
+                    // Target/combo override the row colour with the accent blue.
+                    isTarget && !isCombo
+                      ? "bg-accent text-white border-accent-strong shadow-lg scale-105 animate-target-pulse"
+                      : isCombo
+                        ? "bg-accent-strong text-white border-accent-strong shadow-lg scale-110 animate-target-pulse"
+                        : rowKeyTone[row.tone],
                     isFindHint ? "animate-key-find ring-4 ring-accent-pink/50" : "",
                     isPressed ? "animate-key-pop scale-90" : "",
                   ]
@@ -1013,7 +1019,7 @@ export function GameplayPage() {
       </section>
 
       <section
-        className="glass-strong px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mx-4 mb-4 rounded-2xl shadow-card"
+        className="glass-strong px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mx-4 mb-4 rounded-2xl shadow-card shrink-0"
         aria-live="polite"
       >
         <div className="text-center sm:text-left">

@@ -160,26 +160,30 @@ export function LoginPage() {
           aria-hidden="true"
         />
         <span
-          className="absolute -left-4 top-1/3 text-2xl text-accent-sky/50 animate-sparkle-spin pointer-events-none select-none"
+          className="absolute -left-4 top-1/3 text-2xl text-accent-pink/60 animate-sparkle-spin pointer-events-none select-none"
           aria-hidden="true"
         >
           ✦
         </span>
         <span
-          className="absolute -right-4 top-1/2 text-xl text-accent-sky/50 animate-sparkle-spin pointer-events-none select-none"
+          className="absolute -right-4 top-1/2 text-xl text-mint/70 animate-sparkle-spin pointer-events-none select-none"
           aria-hidden="true"
         >
           ✦
         </span>
         <span
-          className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl text-accent-sky/50 animate-sparkle-spin pointer-events-none select-none"
+          className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl text-accent/60 animate-sparkle-spin pointer-events-none select-none"
           aria-hidden="true"
         >
           ✧
         </span>
 
         <div className="text-center">
-          <h1 className="font-display text-3xl font-bold text-text mb-1">Bienvenido a TYPELY</h1>
+          <h1 className="font-display text-3xl font-extrabold mb-1 text-gradient-loop">
+            ¡Bienvenido a TYPELY!
+          </h1>
+          {/* Colourful accent divider under the heading. */}
+          <span className="block h-1.5 w-20 mx-auto rounded-full bg-gradient-to-r from-mint via-accent-sky to-accent-pink my-2" aria-hidden="true" />
           <p className="text-muted font-semibold">Aprendé a escribir jugando entre las nubes ✨</p>
         </div>
 
