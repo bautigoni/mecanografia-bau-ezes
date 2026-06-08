@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Crosshair, Grid3x3, RotateCcw, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Crosshair, Grid3x3, Move, RotateCcw, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { LevelPosition } from "../../data/levelPositions";
 
 /* =====================================================================
@@ -165,6 +166,33 @@ export function LevelPositionEditor({
 }: LevelPositionEditorProps) {
   const sel = selectedIndex >= 0 && selectedIndex < positions.length ? positions[selectedIndex] : null;
 
+  /* Drag-to-move the HUD panel so it never permanently covers a level node. */
+  const [hudPos, setHudPos] = useState<{ left: number; top: number } | null>(null);
+  const hudDrag = useRef<{ sx: number; sy: number; bl: number; bt: number } | null>(null);
+  useEffect(() => {
+    function onMove(e: PointerEvent) {
+      const d = hudDrag.current;
+      if (!d) return;
+      const left = Math.max(0, Math.min(window.innerWidth - 80, d.bl + (e.clientX - d.sx)));
+      const top = Math.max(0, Math.min(window.innerHeight - 40, d.bt + (e.clientY - d.sy)));
+      setHudPos({ left, top });
+    }
+    function onUp() { hudDrag.current = null; }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, []);
+  function startHudDrag(e: React.PointerEvent) {
+    const panel = (e.currentTarget as HTMLElement).closest("[data-hud]") as HTMLElement | null;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    hudDrag.current = { sx: e.clientX, sy: e.clientY, bl: r.left, bt: r.top };
+    setHudPos({ left: r.left, top: r.top });
+  }
+
   function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest("[data-hud]")) return;
     onCursorMove(e.clientX, e.clientY);
@@ -253,13 +281,18 @@ export function LevelPositionEditor({
       <div
         data-hud
         className="fixed right-4 top-4 z-20 glass-surface p-4 rounded-xl w-72 flex flex-col gap-3 max-h-[calc(100dvh-2rem)] overflow-y-auto animate-hud-in"
+        style={hudPos ? { left: hudPos.left, top: hudPos.top, right: "auto" } : undefined}
         role="dialog"
         aria-label="Editor de posiciones de niveles"
       >
-        {/* Head */}
+        {/* Head — drag handle (move the panel so it never covers a node). */}
         <div className="flex items-center justify-between gap-2">
-          <strong className="flex items-center gap-1.5 text-text text-sm font-extrabold">
-            <Crosshair size={15} /> Editor · {worldSlug}
+          <strong
+            onPointerDown={startHudDrag}
+            className="flex items-center gap-1.5 text-text text-sm font-extrabold cursor-move select-none touch-none"
+            title="Arrastrá para mover el editor"
+          >
+            <Move size={14} className="text-muted" /> Editor · {worldSlug}
           </strong>
           <button
             type="button"
