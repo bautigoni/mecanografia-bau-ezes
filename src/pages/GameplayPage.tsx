@@ -802,24 +802,17 @@ export function GameplayPage() {
         </button>
       </div>
 
-      {/* Consigna (instruction) — at the TOP, never the bottom. */}
+      {/* Header — compact floating glass capsule (Liquid Glass). */}
       {!isCompleted && (
-        <section
-          className="glass-strong mx-auto mt-4 mb-1 w-[min(42rem,calc(100%-8rem))] rounded-2xl px-5 py-3 text-center shrink-0 z-20"
-          aria-live="polite"
-        >
-          <h1 className="font-display font-bold text-xl text-text">{activity.instruction}</h1>
-          <p className="text-sm text-muted font-semibold">{feedback}</p>
-        </section>
+        <div className="shrink-0 mt-4 mb-1 flex justify-center px-4 z-20" aria-live="polite">
+          <div className="inline-flex flex-col items-center gap-0.5 rounded-3xl px-7 py-2.5 bg-white/20 backdrop-blur-xl border border-white/35 shadow-[0_10px_34px_rgba(54,86,134,0.18)]">
+            <h1 className="font-display font-bold text-lg sm:text-xl text-text leading-tight">{activity.instruction}</h1>
+            <p className="text-sm text-text/70 font-semibold leading-tight">{feedback}</p>
+          </div>
+        </div>
       )}
 
-      <section className="flex flex-col items-center justify-center gap-4 flex-1 min-h-0 px-4 py-2 overflow-y-auto no-scrollbar" aria-label={activity.title}>
-        <div className="glass rounded-xl px-4 py-2 font-bold text-sm flex items-center gap-3 text-text">
-          <span>Nivel {activity.levelNumber}</span>
-          <strong>{activity.title}</strong>
-          <em className="font-normal text-muted">{activity.subtitle}</em>
-        </div>
-
+      <section className="flex flex-col items-center justify-center gap-3 flex-1 min-h-0 px-4 py-1 z-10" aria-label={activity.title}>
         {(() => {
           const isPhrase = /\s/.test(target);
           const variant =
@@ -839,92 +832,110 @@ export function GameplayPage() {
           const isLongTarget = target.length > 14 || target.includes("@");
 
           const targetCardSize =
-            variant === "letter" ? "text-7xl sm:text-8xl" :
-            variant === "symbol" ? "text-6xl sm:text-7xl" :
-            variant === "phrase" ? "text-2xl sm:text-3xl" :
-            "text-3xl sm:text-4xl";
+            variant === "letter" ? "text-[clamp(5rem,17vh,10rem)]" :
+            variant === "symbol" ? "text-[clamp(4rem,14vh,8rem)]" :
+            variant === "phrase" ? "text-3xl sm:text-4xl" :
+            "text-4xl sm:text-5xl";
+          /* Soft white halo so floating (container-less) text stays readable
+             over the bright background art. */
+          const floatShadow = { textShadow: "0 1px 12px rgba(255,255,255,0.9), 0 1px 2px rgba(255,255,255,0.9)" } as const;
 
           return (
             <>
-              <div
-                className={`glass-card px-8 py-6 sm:px-12 sm:py-8 flex flex-col items-center gap-3 text-center max-w-3xl w-full ${isLongTarget ? "text-xl sm:text-2xl" : targetCardSize} ${isIdleHintActive ? "animate-target-pulse" : ""}`}
+              {/* Objective — floating text, no box. */}
+              <span
+                className="font-display font-extrabold text-text/80 text-sm uppercase tracking-[0.18em]"
+                style={floatShadow}
               >
-                <span className="text-sm font-bold text-muted uppercase tracking-wide">
-                  Objetivo {visibleObjective} / {totalObjectives}
-                </span>
+                Objetivo {visibleObjective} / {totalObjectives}
+              </span>
+
+              {/* Target — the hero. A light floating glass card holds ONLY the
+                  letter/word so it reads as the focal point of the scene. */}
+              <div
+                className={`inline-flex items-center justify-center rounded-[2.25rem] px-10 py-3 sm:px-14 sm:py-5 bg-white/20 backdrop-blur-xl border border-white/35 shadow-[0_22px_60px_rgba(54,86,134,0.28)] ${isIdleHintActive ? "animate-target-pulse" : ""}`}
+              >
                 <strong
                   ref={targetScrollRef}
-                  className="font-display font-bold text-text overflow-x-auto no-scrollbar whitespace-nowrap max-w-full"
+                  className={`font-display font-black text-text leading-none overflow-x-auto no-scrollbar whitespace-nowrap max-w-[82vw] ${isLongTarget ? "text-2xl sm:text-3xl" : targetCardSize}`}
                 >
                   {target}
                 </strong>
-                {locationHint && !isCompleted && (
-                  <small className="text-sm text-muted font-medium">{locationHint}</small>
-                )}
-                {commaHint && !isCompleted && (
-                  <small className="text-sm text-accent-strong font-semibold">
-                    Después de una coma va un espacio antes de la siguiente palabra.
-                  </small>
-                )}
-                {combo && !isCompleted && (
-                  <div
-                    className="bg-gradient-to-r from-amber-100 to-yellow-100 border border-amber-300 rounded-full px-4 py-2 flex items-center gap-2 flex-wrap justify-center shadow-sm"
-                    aria-label={`Combinación: ${combo.join(" + ")}`}
-                  >
-                    <span className="text-sm font-bold text-amber-900">
-                      Para escribir {expectedChar || "este símbolo"}
-                    </span>
-                    {combo.map((step, i) => (
-                      <span key={`${step}-${i}`} className="flex items-center gap-1">
-                        {i > 0 && <span className="text-amber-700 font-bold">+</span>}
-                        <kbd className="bg-white rounded px-2 py-0.5 text-sm font-bold text-text shadow-sm border border-amber-200">
-                          {step}
-                        </kbd>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {altCombos && !isCompleted && (
-                  <div className="flex items-center gap-2 flex-wrap justify-center text-sm" aria-label="Otras formas">
-                    <span className="text-muted font-medium">o también</span>
-                    {altCombos.map((alt, idx) => (
-                      <span key={idx} className="flex items-center gap-1">
-                        {alt.map((step, i) => (
-                          <span key={`${step}-${i}`} className="flex items-center gap-1">
-                            {i > 0 && <span className="text-muted font-bold">+</span>}
-                            <kbd className="bg-white/70 rounded px-2 py-0.5 text-xs font-bold text-text shadow-sm border border-white/60">
-                              {step}
-                            </kbd>
-                          </span>
-                        ))}
-                        {idx < altCombos.length - 1 && <span className="text-muted mx-1">·</span>}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {(activity.requiresShift || activity.requiresAccent) && !isCompleted && (
-                  <small className="text-sm text-muted opacity-75 block mt-1">
-                    {activity.requiresShift && "Usá Shift para mayúsculas y símbolos. "}
-                    {activity.requiresAccent && "Respetá tildes y la ñ."}
-                  </small>
-                )}
               </div>
 
+              {/* Secondary instruction — floating text, no container. */}
+              {locationHint && !isCompleted && (
+                <span className="text-text/80 font-semibold text-base" style={floatShadow}>{locationHint}</span>
+              )}
+              {commaHint && !isCompleted && (
+                <span className="text-accent-strong font-semibold text-sm" style={floatShadow}>
+                  Después de una coma va un espacio antes de la siguiente palabra.
+                </span>
+              )}
+
+              {/* Combo hint — light floating glass pill. */}
+              {combo && !isCompleted && (
+                <div
+                  className="inline-flex items-center gap-2 flex-wrap justify-center rounded-full px-4 py-1.5 bg-amber-200/45 backdrop-blur-md border border-amber-300/60 shadow-sm"
+                  aria-label={`Combinación: ${combo.join(" + ")}`}
+                >
+                  <span className="text-sm font-bold text-amber-900">
+                    Para escribir {expectedChar || "este símbolo"}
+                  </span>
+                  {combo.map((step, i) => (
+                    <span key={`${step}-${i}`} className="flex items-center gap-1">
+                      {i > 0 && <span className="text-amber-700 font-bold">+</span>}
+                      <kbd className="bg-white/90 rounded px-2 py-0.5 text-sm font-bold text-text shadow-sm border border-amber-200">
+                        {step}
+                      </kbd>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {altCombos && !isCompleted && (
+                <div className="flex items-center gap-2 flex-wrap justify-center text-sm" style={floatShadow} aria-label="Otras formas">
+                  <span className="text-text/70 font-medium">o también</span>
+                  {altCombos.map((alt, idx) => (
+                    <span key={idx} className="flex items-center gap-1">
+                      {alt.map((step, i) => (
+                        <span key={`${step}-${i}`} className="flex items-center gap-1">
+                          {i > 0 && <span className="text-text/60 font-bold">+</span>}
+                          <kbd className="bg-white/80 rounded px-2 py-0.5 text-xs font-bold text-text shadow-sm border border-white/60">
+                            {step}
+                          </kbd>
+                        </span>
+                      ))}
+                      {idx < altCombos.length - 1 && <span className="text-text/50 mx-1">·</span>}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {(activity.requiresShift || activity.requiresAccent) && !isCompleted && (
+                <span className="text-text/70 text-sm font-medium" style={floatShadow}>
+                  {activity.requiresShift && "Usá Shift para mayúsculas y símbolos. "}
+                  {activity.requiresAccent && "Respetá tildes y la ñ."}
+                </span>
+              )}
+
+              {/* Typed preview — light floating glass (word/phrase levels). */}
               {showTypedPreview && (
-                <div className="glass-surface px-6 py-4 flex flex-col items-center gap-2 max-w-2xl w-full" aria-live="polite">
-                  <span className="text-xs font-bold text-muted uppercase tracking-wider">
+                <div
+                  className="inline-flex flex-col items-center gap-1 rounded-2xl px-6 py-2.5 bg-white/15 backdrop-blur-xl border border-white/25 shadow-md"
+                  aria-live="polite"
+                >
+                  <span className="text-[11px] font-bold text-text/55 uppercase tracking-wider">
                     Lo que estás escribiendo
                   </span>
                   <span
                     ref={typedScrollRef}
-                    className={`font-mono text-2xl sm:text-3xl text-text font-bold overflow-x-auto no-scrollbar whitespace-nowrap max-w-full flex items-center ${!typed ? "text-muted italic text-lg" : ""}`}
+                    className={`font-mono text-2xl sm:text-3xl text-text font-bold overflow-x-auto no-scrollbar whitespace-nowrap max-w-[70vw] flex items-center ${!typed ? "text-text/50 italic text-lg" : ""}`}
                   >
                     {typed
                       ? Array.from(typed).map((ch, i) =>
                           ch === " " ? (
                             <span
                               key={i}
-                              className="inline-block w-4 h-8 border-b-2 border-dashed border-muted/50 mx-0.5"
+                              className="inline-block w-4 h-8 border-b-2 border-dashed border-text/40 mx-0.5"
                               aria-label="espacio"
                             />
                           ) : (
@@ -941,14 +952,15 @@ export function GameplayPage() {
                   </span>
                 </div>
               )}
+
+              {/* Errors / precision — floating text. */}
+              <div className="flex items-center gap-4 text-sm font-bold text-text/75" style={floatShadow}>
+                <span>Errores: {errors}</span>
+                <span>Precisión: {accuracy}%</span>
+              </div>
             </>
           );
         })()}
-
-        <div className="flex items-center gap-4 text-sm font-bold text-text">
-          <span>Errores: {errors}</span>
-          <span>Precisión: {accuracy}%</span>
-        </div>
       </section>
 
       {/* Two motivational robots flank the keyboard, switching phrases each target. */}
@@ -962,7 +974,7 @@ export function GameplayPage() {
             {/* Robots flank the bottom corners — bigger and lower than before. */}
             <figure className="absolute bottom-0 left-1 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
               <div
-                className={`glass-surface rounded-2xl rounded-br-sm px-3 py-2 text-sm font-bold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
+                className={`glass-surface rounded-2xl rounded-br-sm px-2.5 py-1.5 text-xs font-semibold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
               >
                 {leftPhrase}
               </div>
@@ -975,7 +987,7 @@ export function GameplayPage() {
             </figure>
             <figure className="absolute bottom-0 right-1 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
               <div
-                className={`glass-surface rounded-2xl rounded-bl-sm px-3 py-2 text-sm font-bold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
+                className={`glass-surface rounded-2xl rounded-bl-sm px-2.5 py-1.5 text-xs font-semibold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
               >
                 {rightPhrase}
               </div>
