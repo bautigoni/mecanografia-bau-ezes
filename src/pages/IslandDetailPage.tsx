@@ -11,9 +11,13 @@ import { assets } from "../utils/assets";
 /* The dev level-position editor is available in local dev builds, OR when a
    superadmin entered "modo desarrollador" from the god-mode chooser (which
    sets the `typely_dev_editor` flag). Never available to normal users. */
-const EDITOR_AVAILABLE =
-  import.meta.env.DEV ||
-  (typeof window !== "undefined" && localStorage.getItem("typely_dev_editor") === "1");
+/* The editor is ONLY available in superadmin "Modo desarrollador" (which sets
+   the typely_dev_editor flag via setViewAsStored). It is NOT shown in local dev
+   for the demo student, nor to any normal user. Checked dynamically because the
+   flag is set after this module first loads. */
+function editorAvailable(): boolean {
+  return typeof window !== "undefined" && localStorage.getItem("typely_dev_editor") === "1";
+}
 const clampPct = (v: number) => Math.min(100, Math.max(0, v));
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
@@ -98,7 +102,7 @@ export function IslandDetailPage() {
   /* ---- Dev-only level position editor state ---- */
   const mapRef = useRef<HTMLElement>(null);
   const [editorOn, setEditorOn] = useState(
-    () => EDITOR_AVAILABLE && new URLSearchParams(window.location.search).has("editor"),
+    () => editorAvailable() && new URLSearchParams(window.location.search).has("editor"),
   );
   const [gridOn, setGridOn] = useState(true);
   const [editorPositions, setEditorPositions] = useState<LevelPosition[]>([]);
@@ -605,7 +609,7 @@ export function IslandDetailPage() {
                 : undefined
             }
           >
-            {EDITOR_AVAILABLE && editorOn && (
+            {editorAvailable() && editorOn && (
               <LevelPositionEditor
                 worldSlug={world.slug}
                 positions={activePositions}
@@ -839,7 +843,7 @@ export function IslandDetailPage() {
         <span>Volver a mundos</span>
       </button>
 
-      {EDITOR_AVAILABLE && (
+      {editorAvailable() && (
         <button
           type="button"
           className={`fixed bottom-4 left-4 z-30 glass-surface rounded-xl px-3 py-2 flex items-center gap-2 text-text font-bold shadow-card hover:brightness-105 transition cursor-pointer ${editorOn ? "bg-accent/20 ring-2 ring-accent" : ""}`}

@@ -755,7 +755,7 @@ export function GameplayPage() {
 
   return (
     <main
-      className={`flex flex-col h-dvh overflow-hidden container-type-[inline-size] animate-page-fade relative bg-cover bg-center ${isErrorActive ? "animate-error-shake" : ""}`}
+      className="flex flex-col h-dvh overflow-hidden container-type-[inline-size] animate-page-fade relative bg-cover bg-center"
       style={{ backgroundImage: `url("${getGameplayBackground(activity.worldId)}")` }}
     >
       {/* Hidden capture field — drives beforeinput/composition so accented
@@ -805,7 +805,7 @@ export function GameplayPage() {
       {/* Consigna (instruction) — at the TOP, never the bottom. */}
       {!isCompleted && (
         <section
-          className="glass-strong mx-4 mt-4 mb-1 rounded-2xl px-5 py-3 text-center shrink-0 z-20 mr-28"
+          className="glass-strong mx-auto mt-4 mb-1 w-[min(42rem,calc(100%-8rem))] rounded-2xl px-5 py-3 text-center shrink-0 z-20"
           aria-live="polite"
         >
           <h1 className="font-display font-bold text-xl text-text">{activity.instruction}</h1>
@@ -847,7 +847,7 @@ export function GameplayPage() {
           return (
             <>
               <div
-                className={`glass-card px-8 py-6 sm:px-12 sm:py-8 flex flex-col items-center gap-3 text-center max-w-3xl w-full ${isLongTarget ? "text-xl sm:text-2xl" : targetCardSize} ${isErrorActive ? "animate-error-shake" : ""} ${isIdleHintActive ? "animate-target-pulse" : ""}`}
+                className={`glass-card px-8 py-6 sm:px-12 sm:py-8 flex flex-col items-center gap-3 text-center max-w-3xl w-full ${isLongTarget ? "text-xl sm:text-2xl" : targetCardSize} ${isIdleHintActive ? "animate-target-pulse" : ""}`}
               >
                 <span className="text-sm font-bold text-muted uppercase tracking-wide">
                   Objetivo {visibleObjective} / {totalObjectives}
@@ -992,7 +992,11 @@ export function GameplayPage() {
       })()}
 
       <section className="px-4 pb-2 shrink-0" aria-label="Teclado visual">
-        <div className="flex flex-col gap-1.5 max-w-6xl mx-auto">
+        <div
+          className={`flex flex-col gap-1.5 max-w-6xl mx-auto rounded-2xl p-2 transition-colors duration-150 ${
+            isErrorActive ? "animate-error-shake bg-rose-400/35 ring-2 ring-rose-400" : ""
+          }`}
+        >
           {keyboardRows.map((row) => {
             /* Each row has its own pastel colour so kids can scan home-row
                position by colour (gold numbers, pink top, mint home, violet

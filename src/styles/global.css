@@ -34,7 +34,9 @@ html, body { background-color: #e9e6f7; }
 /* Apply the app body font everywhere (was missing → fell back to default
    sans). Headings opt into the display font via the `font-display` utility. */
 body { overflow-x: hidden; font-family: var(--font-body); color: var(--color-text); }
-h1, h2, h3, h4, .font-display { font-family: var(--font-display); }
+/* Headings and buttons use the rounded display font (Baloo 2) so the whole
+   app — including "Volver a mundos", login and nav buttons — shares the look. */
+h1, h2, h3, h4, button, .font-display { font-family: var(--font-display); }
 button, input, select { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
 a { color: inherit; text-decoration: none; }
