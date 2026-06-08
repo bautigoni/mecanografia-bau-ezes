@@ -812,7 +812,7 @@ export function GameplayPage() {
         </div>
       )}
 
-      <section className="flex flex-col items-center justify-center gap-3 flex-1 min-h-0 px-4 py-1 z-10" aria-label={activity.title}>
+      <section className="flex flex-col items-center justify-center gap-3 flex-1 min-h-0 px-4 py-1 z-10 overflow-hidden" aria-label={activity.title}>
         {(() => {
           const isPhrase = /\s/.test(target);
           const variant =
@@ -953,15 +953,21 @@ export function GameplayPage() {
                 </div>
               )}
 
-              {/* Errors / precision — floating text. */}
-              <div className="flex items-center gap-4 text-sm font-bold text-text/75" style={floatShadow}>
-                <span>Errores: {errors}</span>
-                <span>Precisión: {accuracy}%</span>
-              </div>
             </>
           );
         })()}
       </section>
+
+      {/* Errors / precision — own compact row so it never overlaps the keyboard. */}
+      {!isCompleted && (
+        <div
+          className="shrink-0 flex justify-center gap-5 text-xs font-bold text-text/70 pb-1 z-10"
+          style={{ textShadow: "0 1px 8px rgba(255,255,255,0.9)" }}
+        >
+          <span>Errores: {errors}</span>
+          <span>Precisión: {accuracy}%</span>
+        </div>
+      )}
 
       {/* Two motivational robots flank the keyboard, switching phrases each target. */}
       {!isCompleted && (() => {
@@ -1005,8 +1011,8 @@ export function GameplayPage() {
 
       <section className="px-4 pb-2 shrink-0" aria-label="Teclado visual">
         <div
-          className={`flex flex-col gap-1.5 max-w-6xl mx-auto rounded-2xl p-2 transition-colors duration-150 ${
-            isErrorActive ? "animate-error-shake bg-rose-400/35 ring-2 ring-rose-400" : ""
+          className={`flex flex-col gap-1.5 w-fit mx-auto rounded-2xl transition-all duration-150 ${
+            isErrorActive ? "animate-error-shake ring-2 ring-rose-400/70" : ""
           }`}
         >
           {keyboardRows.map((row) => {

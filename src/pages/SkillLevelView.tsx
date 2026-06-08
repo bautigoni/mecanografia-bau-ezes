@@ -146,10 +146,10 @@ function Island5Shell({
       </div>
 
       <section className="flex-1 flex items-center justify-center relative min-h-0 overflow-hidden" aria-label="Escena">
-        <img className="absolute bottom-0 left-0 w-auto max-h-[55vh] pointer-events-none select-none animate-mascot-float z-10" src={assets.mascotFemaleWave} alt="" decoding="async" />
-        <span className="absolute glass-strong rounded-2xl px-3 py-2 text-sm font-bold text-text animate-bubble-pop max-w-[12rem] bottom-[18%] left-[8%] rounded-bl-sm">¡Vos podés!</span>
-        <img className="absolute bottom-0 right-0 w-auto max-h-[55vh] pointer-events-none select-none animate-mascot-float z-10" src={assets.mascotMaleProud} alt="" decoding="async" />
-        <span className="absolute glass-strong rounded-2xl px-3 py-2 text-sm font-bold text-text animate-bubble-pop max-w-[12rem] bottom-[18%] right-[8%] rounded-br-sm">¡Sos un crack!</span>
+        <img className="absolute bottom-0 left-0 w-auto max-h-[44vh] pointer-events-none select-none animate-mascot-float z-10" src={assets.mascotFemaleWave} alt="" decoding="async" />
+        <span className="absolute glass-strong rounded-2xl px-2.5 py-1.5 text-xs font-bold text-text animate-bubble-pop max-w-[9rem] bottom-[44%] left-[2%] rounded-bl-sm z-20">¡Vos podés!</span>
+        <img className="absolute bottom-0 right-0 w-auto max-h-[44vh] pointer-events-none select-none animate-mascot-float z-10" src={assets.mascotMaleProud} alt="" decoding="async" />
+        <span className="absolute glass-strong rounded-2xl px-2.5 py-1.5 text-xs font-bold text-text animate-bubble-pop max-w-[9rem] bottom-[44%] right-[2%] rounded-br-sm z-20">¡Sos un crack!</span>
 
         <div className="flex items-center justify-center w-full h-full">{children}</div>
       </section>
@@ -360,14 +360,16 @@ function LeftClickLevel({ activity }: { activity: Activity }) {
             <button
               key={o.id}
               type="button"
-              className={`relative flex flex-col items-center gap-2 cursor-pointer transition-all duration-200 hover:scale-110 group rounded-full ${clickableTones[o.tone] ?? ""} ${popped[o.id] ? "animate-pop-out opacity-0" : ""}`}
+              className={`relative flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 hover:scale-110 ${popped[o.id] ? "animate-pop-out" : ""}`}
               onClick={(e) => onPick(o.id, e)}
               disabled={popped[o.id]}
               aria-label={`Hacer clic en ${o.label}`}
             >
-              <span className="absolute inset-0 rounded-full animate-pulse-aura pointer-events-none" />
+              {/* Soft glow so the objects "brillan" — no solid colour box. */}
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 sm:w-24 sm:h-24 rounded-full animate-pulse-aura pointer-events-none" />
               <img className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-lg" src={o.art} alt="" draggable={false} decoding="async" />
-              <span className="w-12 h-3 rounded-full bg-white/40 shadow-inner" />
+              {/* Little ground shadow under the floating object. */}
+              <span className="w-10 h-2 rounded-[999px] bg-black/15 blur-[2px]" />
             </button>
           ))}
         </div>
@@ -378,7 +380,9 @@ function LeftClickLevel({ activity }: { activity: Activity }) {
           className="fixed flex items-center justify-center pointer-events-none animate-burst text-4xl select-none -translate-x-1/2 -translate-y-1/2"
           style={{ left: `${b.x}px`, top: `${b.y}px` }}
           aria-hidden="true"
-        />
+        >
+          ✨
+        </span>
       ))}
     </Island5Shell>
   );
@@ -1415,7 +1419,7 @@ function ShortcutsLevel({ activity }: { activity: Activity }) {
           <span className="text-xs font-bold uppercase tracking-wider text-muted">1 · Texto para copiar</span>
           <p
             ref={sourceRef}
-            className="text-lg font-bold text-text py-2 px-3 bg-white/50 rounded-lg text-center select-none cursor-text"
+            className="text-lg font-bold text-text py-2 px-3 bg-white/50 rounded-lg text-center select-all cursor-pointer"
             onClick={selectSource}
             tabIndex={0}
             onFocus={selectSource}
