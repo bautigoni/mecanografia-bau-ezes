@@ -26,7 +26,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { getWorldStatesForUser, getWorldsForUser, worldStarProgress, type World } from "../data/worlds";
@@ -162,6 +162,13 @@ export function WorldsPage() {
      by sampling the path — see the rAF effect below). */
   const routePathRef = useRef<SVGPathElement | null>(null);
   const starRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  /* Inner track + per-island refs so we can measure each island's REAL visual
+     centre and route the trail through it (a static % offset can't be right at
+     every aspect ratio — that's why the line drifted off-centre on different
+     screen sizes). */
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const islandRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [measuredCenters, setMeasuredCenters] = useState<{ x: number; y: number }[]>([]);
 
   /* Build the user context + world model once per user (not on every render).
      Rebuilding all 15 worlds + reading localStorage on each hover/menu toggle
@@ -177,7 +184,40 @@ export function WorldsPage() {
      render. Cheaper than relying on the referential stability of
      `visibleWorlds` (the function reads localStorage). */
   const trackWidthVw = useMemo(() => trackWidth(visibleWorlds), [visibleWorlds]);
-  const centers = useMemo(() => visibleWorlds.map(islandCenter), [visibleWorlds]);
+  /* Approximate centres (used until the real ones are measured on first paint). */
+  const fallbackCenters = useMemo(() => visibleWorlds.map(islandCenter), [visibleWorlds]);
+  /* Measure each island's real centre (in SVG units: x in vw, y in % of track
+     height) so the trail passes through the middle of every island, on any
+     screen size. Re-runs on mount, when the visible set changes, and on resize. */
+  useLayoutEffect(() => {
+    function measure() {
+      const track = trackRef.current;
+      if (!track) return;
+      const trackRect = track.getBoundingClientRect();
+      const vwPx = window.innerWidth / 100;
+      const next: { x: number; y: number }[] = [];
+      for (let i = 0; i < visibleWorlds.length; i++) {
+        const el = islandRefs.current[i];
+        if (!el) return; // not all mounted yet — try again next frame
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width / 2 - trackRect.left;
+        const cy = r.top + r.height / 2 - trackRect.top;
+        next.push({ x: cx / vwPx, y: (cy / trackRect.height) * 100 });
+      }
+      setMeasuredCenters(next);
+    }
+    const raf = requestAnimationFrame(measure);
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", measure);
+    };
+  }, [visibleWorlds]);
+
+  const centers =
+    measuredCenters.length === visibleWorlds.length && visibleWorlds.length > 0
+      ? measuredCenters
+      : fallbackCenters;
   const ROUTE_D = useMemo(() => buildRoute(centers), [centers]);
   const routeSparkles = useMemo(
     () =>
@@ -433,6 +473,7 @@ export function WorldsPage() {
         ref={sceneRef}
       >
         <div
+          ref={trackRef}
           className="relative h-full"
           style={{ width: `${trackWidthVw}vw` }}
         >
@@ -524,7 +565,7 @@ export function WorldsPage() {
           ))}
 
           {/* Island buttons */}
-          {visibleWorlds.map((world) => {
+          {visibleWorlds.map((world, wIdx) => {
             const BadgeIcon = worldBadges[world.slug];
             const state = worldStates[world.slug];
             const isLocked = state === "locked";
@@ -546,6 +587,9 @@ export function WorldsPage() {
               >
                 <button
                   type="button"
+                  ref={(el) => {
+                    islandRefs.current[wIdx] = el;
+                  }}
                   className={[
                     /* Base island styles */
                     "relative w-[20vw] max-w-[14rem] aspect-square rounded-full border-0 p-0",
