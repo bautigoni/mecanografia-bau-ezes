@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Lock, MapPin, RotateCcw, Star, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Lock, MapPin, RotateCcw, Star } from "lucide-react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -27,7 +27,10 @@ const ISLAND_IMG: Partial<Record<string, string>> = {
   island1: "/assets/edutic-art/islands/1/island.png",
 };
 const ISLAND_BG: Partial<Record<string, string>> = {
-  island1: "/assets/edutic-art/islands/1/background.png",
+  // Pink "sky islands" backdrop (same as login/worlds) — the island art is a
+  // separate PNG layered on top. The old islands/1/background.png was a flat
+  // blue sky and looked wrong behind the island.
+  island1: assets.loginBg,
 };
 
 
@@ -534,23 +537,28 @@ export function IslandDetailPage() {
   return (
     <main
       className={`relative min-h-dvh overflow-hidden bg-cover bg-center animate-page-fade ${editorOn ? "cursor-crosshair" : ""}`}
-      style={{ "--scene-bg": `url("${islandBgPath}")` } as CSSProperties}
+      /* Soft pastel fallback colour behind everything: covers the pre-load
+         frame and any sub-pixel gap so a white edge can never flash. */
+      style={{ "--scene-bg": `url("${islandBgPath}")`, backgroundColor: "#ebe3f7" } as CSSProperties}
     >
-      {/* Aspect-ratio-locked stage: the image and every level node share the
-          same 16:9 coordinate system, so % positions land on the real
+      {/* Full-viewport background — lives OUTSIDE the aspect-locked stage so it
+          always covers the whole screen (object-cover, never letterboxed).
+          This is what kills the white borders during the entrance zoom and
+          when navigating back to the worlds map. */}
+      <img
+        className={`absolute inset-0 w-full h-full object-cover z-0 ${bgReady ? "animate-island-zoom" : "opacity-0"}`}
+        src={islandBgPath}
+        alt={world.title}
+        decoding="async"
+        // @ts-expect-error — fetchPriority is supported by all modern browsers
+        fetchpriority="high"
+      />
+
+      {/* Aspect-ratio-locked stage: the island PNG and every level node share
+          the same 16:9 coordinate system, so % positions land on the real
           painted platforms on every screen size. */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="false">
         <div className="relative w-full h-full max-w-[1600px] max-h-[900px]">
-          {/* Full-scene background fills viewport, lowest z-index */}
-          <img
-            className={`absolute inset-0 w-full h-full object-cover ${bgReady ? "animate-island-zoom" : "opacity-0"}`}
-            src={islandBgPath}
-            alt={world.title}
-            decoding="async"
-            // @ts-expect-error — fetchPriority is supported by all modern browsers
-            fetchpriority="high"
-          />
-
           {/* Island PNG — only shown when separate island art is available */}
           {islandContainer && (
             <div
@@ -877,16 +885,6 @@ export function IslandDetailPage() {
           </button>
         )}
       </header>
-
-      <button
-        type="button"
-        className="fixed bottom-4 right-4 z-30 glass-surface rounded-full w-16 h-16 flex flex-col items-center justify-center gap-0.5 text-text font-bold text-[10px] shadow-card cursor-pointer hover:brightness-105 transition animate-bubble-pop"
-        aria-label="Mi cuenta"
-        onClick={() => navigate("/mi-cuenta")}
-      >
-        <UserRound size={25} />
-        <span>Perfil</span>
-      </button>
 
       <Toast message={message} />
     </main>
