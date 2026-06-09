@@ -39,8 +39,21 @@ async function ensureSchema() {
     );`);
 
   /* F6 — academic year + soft-delete + audit log. */
-  await db.execute(sql`CREATE TYPE IF NOT EXISTS class_status AS ENUM ('active', 'archived')`);
-  await db.execute(sql`CREATE TYPE IF NOT EXISTS enrollment_status AS ENUM ('cursando', 'promovido', 'egresado', 'retirado')`);
+  /* Postgres does NOT support `CREATE TYPE ... IF NOT EXISTS` for enums
+   * (the IF NOT EXISTS form is rejected with `syntax error at or near
+   * "NOT"`), so we guard with a pg_type lookup. Idempotent on every boot. */
+  await db.execute(sql`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'class_status') THEN
+        CREATE TYPE class_status AS ENUM ('active', 'archived');
+      END IF;
+    END $$`);
+  await db.execute(sql`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enrollment_status') THEN
+        CREATE TYPE enrollment_status AS ENUM ('cursando', 'promovido', 'egresado', 'retirado');
+      END IF;
+    END $$`);
 
   await db.execute(sql`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz`);
