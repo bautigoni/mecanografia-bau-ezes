@@ -564,7 +564,7 @@ export function IslandDetailPage() {
           the same 16:9 coordinate system, so % positions land on the real
           painted platforms on every screen size. */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="false">
-        <div className="relative w-full h-full max-w-[1600px] max-h-[900px]">
+        <div className="relative w-full h-full">
           {/* Island PNG — only shown when separate island art is available */}
           {islandContainer && (
             <div
@@ -634,14 +634,23 @@ export function IslandDetailPage() {
               />
             )}
 
-            <img
-              className="absolute w-[clamp(3rem,6vw,4.5rem)] pointer-events-none z-20 animate-ship-hover"
-              src={shipAsset}
-              alt="Nave de los estudiantes en el nivel actual"
-              decoding="async"
-              loading="lazy"
-              style={{ left: `${currentPosition.x}%`, top: `${currentPosition.y - 13}%` }}
-            />
+            {/* Ship/avatar. Anchored by its BOTTOM-CENTRE just above the current
+                level node (translate -50%,-100%), so making it bigger grows it
+                UPWARD and it never covers the node it sits on. The bob animation
+                lives on the inner <img> so it doesn't fight the positioning
+                transform on the wrapper. */}
+            <span
+              className="absolute z-20 pointer-events-none"
+              style={{ left: `${currentPosition.x}%`, top: `${currentPosition.y - 3}%`, transform: "translate(-50%,-100%)" }}
+            >
+              <img
+                className="block w-[clamp(3.6rem,16vmin,20rem)] animate-ship-hover"
+                src={shipAsset}
+                alt="Nave de los estudiantes en el nivel actual"
+                decoding="async"
+                loading="lazy"
+              />
+            </span>
 
             {/* Track hover for pressed button state (disabled during editor). */}
             {world.levels.map((level, index) => {
@@ -684,7 +693,7 @@ export function IslandDetailPage() {
                  image) + effective scale/perspective. No dynamic rotate deltas. */
               const numTransform = `perspective(${effPersp}px) rotateX(${PERSPECTIVE_BASE.rotateX}deg) rotateY(${PERSPECTIVE_BASE.rotateY}deg) rotateZ(${PERSPECTIVE_BASE.rotateZ}deg) scale(${effScale})`;
 
-              const numSize = `${1.2 * numScale}rem`;
+              const numSize = `${3 * numScale}vmin`;
 
               /* State-driven visual classes for the node button. */
               const stateClass =
@@ -701,7 +710,7 @@ export function IslandDetailPage() {
                   data-level-node=""
                   className={[
                     "absolute -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto",
-                    "w-[clamp(3.2rem,6.5vw,4.8rem)] h-[clamp(3.2rem,6.5vw,4.8rem)]",
+                    "w-[clamp(3rem,12vmin,16rem)] h-[clamp(3rem,12vmin,16rem)]",
                     "rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-sky",
                     "transition-opacity duration-150",
                     isSelected ? "animate-platform-pulse" : "",
@@ -842,7 +851,7 @@ export function IslandDetailPage() {
         onClick={() => navigate("/mundos")}
       >
         <ArrowLeft size={23} />
-        <span>Volver a mundos</span>
+        <span className="text-[clamp(1.3rem,2.3vmin,2rem)]">Volver a mundos</span>
       </button>
 
       {editorAvailable() && (
@@ -860,13 +869,13 @@ export function IslandDetailPage() {
       {/* Compact floating island header — sits in the top-safe area and never
           covers the level nodes. Replaces the old large title/progress panel. */}
       <header className="fixed top-0 left-1/2 -translate-x-1/2 z-20 glass-strong rounded-b-2xl px-5 py-3 flex items-center gap-4 shadow-card animate-hud-in max-w-[92vw]">
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/20 text-violet-700 font-bold text-sm whitespace-nowrap">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/20 text-violet-700 font-bold text-[clamp(1.25rem,2.3vmin,2rem)] whitespace-nowrap">
           <Star size={15} fill="currentColor" />
           Mundo {worldNumber}
         </span>
         <div className="flex flex-col min-w-0">
-          <h1 className="font-display font-black text-text text-lg truncate">{world.title}</h1>
-          <div className="flex items-center gap-3 text-sm">
+          <h1 className="font-display font-black text-text text-[clamp(1.6rem,3vmin,2.8rem)] truncate">{world.title}</h1>
+          <div className="flex items-center gap-3 text-[clamp(1.25rem,2.3vmin,2rem)]">
             <span className="inline-flex items-center gap-1 text-yellow-500 font-bold">
               <Star size={14} fill="currentColor" />
               {starProgress.earnedStars}/{starProgress.totalStars}
