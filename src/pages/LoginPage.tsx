@@ -146,7 +146,7 @@ export function LoginPage() {
       {/* Mascots stand ON the green islands: lifted off the bottom edge and
           nudged inward so they read as "standing on" the painted platforms. */}
       <img
-        className="absolute bottom-[10vh] left-[2vw] w-auto max-h-[64vh] animate-mascot-float pointer-events-none select-none z-10"
+        className="absolute bottom-[15vh] left-[6vw] w-auto max-h-[57vh] animate-mascot-float pointer-events-none select-none z-10"
         src={assets.mascotFemaleWave}
         alt="Mascota saludando"
         decoding="async"
@@ -154,7 +154,7 @@ export function LoginPage() {
         fetchpriority="high"
       />
       <img
-        className="absolute bottom-[12vh] right-[2vw] w-auto max-h-[60vh] animate-mascot-float pointer-events-none select-none z-10"
+        className="absolute bottom-[4.5vh] right-[8.5vw] w-auto max-h-[67.5vh] animate-mascot-float pointer-events-none select-none z-10"
         src={assets.mascotMaleWave}
         alt="Mascota saludando"
         decoding="async"
@@ -301,15 +301,15 @@ export function LoginPage() {
         </div>
       )}
 
-      {/* Error popup — red, floating ABOVE the card at the top-centre. */}
+      {/* Error popup — red, floating ABOVE the card at the top-centre. The
+          outer flex centres it so the drop-in animation's transform can't
+          knock it off-centre. */}
       {message && (
-        <div
-          key={errKey}
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[min(34rem,92vw)] animate-banner-drop"
-          role="alert"
-          aria-live="assertive"
-        >
-          <div className="flex items-start gap-3 rounded-2xl px-5 py-3.5 bg-gradient-to-r from-rose-500 to-red-500 text-white shadow-[0_18px_40px_rgba(225,29,72,0.4)] border border-white/30">
+        <div className="fixed top-6 inset-x-0 z-50 flex justify-center px-4 pointer-events-none" role="alert" aria-live="assertive">
+          <div
+            key={errKey}
+            className="flex items-start gap-3 rounded-2xl px-5 py-3.5 bg-gradient-to-r from-rose-500 to-red-500 text-white shadow-[0_18px_40px_rgba(225,29,72,0.4)] border border-white/30 w-[min(34rem,92vw)] pointer-events-auto animate-banner-drop"
+          >
             <ShieldCheck size={20} className="shrink-0 mt-0.5" aria-hidden="true" />
             <p className="font-bold text-sm leading-snug flex-1">{message}</p>
             <button
