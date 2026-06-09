@@ -149,7 +149,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { academicYearRoutes } from "./routes/academicYears.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
-const ORIGIN = process.env.CORS_ORIGIN ?? "https://mecanografia.bauhub.online";
+const ORIGIN = process.env.CORS_ORIGIN ?? "https://typely.bauhub.online";
 
 async function main() {
   const app = Fastify({

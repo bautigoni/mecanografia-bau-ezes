@@ -33,7 +33,7 @@ Core visual direction:
 
 TYPELY started frontend-only (localStorage) and now has a real backend. It runs
 as **three Docker containers behind a Caddy reverse proxy** at
-`mecanografia.bauhub.online`:
+`typely.bauhub.online`:
 
 | Layer | Stack | Where | Exposed |
 | --- | --- | --- | --- |
