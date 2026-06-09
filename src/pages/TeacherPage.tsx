@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   BookOpen,
@@ -15,9 +15,10 @@ import { Toast } from "../components/common/Toast";
 import { DashboardShell, KpiCard, type DashNavItem } from "../components/dashboard/DashboardShell";
 import { useAuth } from "../hooks/useAuth";
 import { getClassesForTeacher, getStudentsInClass, resetUserPassword } from "../utils/storage";
+import { api, ApiError } from "../utils/api";
 import { STATUS_LABEL, studentStatus } from "../utils/studentStatus";
 import { assets } from "../utils/assets";
-import type { EduTicUser } from "../types";
+import type { ClassRoom, EduTicUser } from "../types";
 
 const NAV: DashNavItem[] = [
   { id: "inicio", label: "Inicio", icon: Home },
@@ -43,29 +44,96 @@ function StatusChip({ student }: { student: EduTicUser }) {
 }
 
 export function TeacherPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, usingApi } = useAuth();
   const navigate = useNavigate();
   const [section, setSection] = useState("inicio");
   const [message, setMessage] = useState("");
   const [version, setVersion] = useState(0);
 
-  const classes = useMemo(() => getClassesForTeacher(user), [user, version]);
+  /* API-backed state: when usingApi is true, fetch the teacher's classes
+     (the ones where they are assigned in class_teachers) and the roster
+     for each one. Stored as plain `ClassRoom` + `EduTicUser` shapes so
+     the rest of the component keeps using the same field accesses. */
+  const [apiClasses, setApiClasses] = useState<ClassRoom[]>([]);
+  const [apiRoster, setApiRoster] = useState<Record<string, EduTicUser[]>>({});
+  const [apiLoading, setApiLoading] = useState(false);
+
+  useEffect(() => {
+    if (!usingApi || !user) return;
+    let cancelled = false;
+    (async () => {
+      setApiLoading(true);
+      try {
+        const list = await api.listClasses();
+        if (cancelled) return;
+        const mapped: ClassRoom[] = list.map((c) => ({
+          id: c.id,
+          name: c.name,
+          siteId: c.sedeId,
+          grade: (c.grade as any) ?? "libre",
+          teacherIds: [],
+          studentIds: [],
+        }));
+        setApiClasses(mapped);
+        // Pull rosters in parallel; ignore individual failures so a single
+        // misbehaving class doesn't blank the whole dashboard.
+        const entries = await Promise.all(
+          mapped.map(async (c) => {
+            try {
+              const m = await api.classMembers(c.id);
+              const roster: EduTicUser[] = m.students.map((s) => ({
+                id: s.id,
+                name: s.fullName,
+                username: s.username ?? "",
+                email: s.email,
+                role: "alumno",
+                // `password` is required by EduTicUser but irrelevant in the
+                // API-backed path (the API never sends the hash back to the
+                // client). Empty placeholder keeps the type system happy.
+                password: "",
+                active: true,
+              }));
+              return [c.id, roster] as const;
+            } catch {
+              return [c.id, [] as EduTicUser[]] as const;
+            }
+          }),
+        );
+        if (cancelled) return;
+        setApiRoster(Object.fromEntries(entries));
+      } catch (e) {
+        if (!cancelled) {
+          setMessage(e instanceof ApiError ? e.message : "No se pudieron cargar tus cursos.");
+        }
+      } finally {
+        if (!cancelled) setApiLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [usingApi, user, version]);
+
+  const classes = useMemo<ClassRoom[]>(() => {
+    if (usingApi) return apiClasses;
+    return getClassesForTeacher(user);
+  }, [usingApi, apiClasses, user, version]);
 
   /* Every student across the teacher's classes (de-duplicated), tagged with
-     their course name. Pure localStorage — the per-attempt history would need
-     the backend. */
+     their course name. */
   const students = useMemo(() => {
     const seen = new Set<string>();
     const list: Array<EduTicUser & { className: string; classId: string }> = [];
     for (const c of classes) {
-      for (const s of getStudentsInClass(c.id)) {
+      const roster = usingApi
+        ? apiRoster[c.id] ?? []
+        : getStudentsInClass(c.id);
+      for (const s of roster) {
         if (seen.has(s.id)) continue;
         seen.add(s.id);
         list.push({ ...s, className: c.name, classId: c.id });
       }
     }
     return list;
-  }, [classes, version]);
+  }, [classes, usingApi, apiRoster, version]);
 
   const avgPrecision = students.length
     ? Math.round(students.reduce((a, s) => a + (s.stats?.precision ?? 0), 0) / students.length)
@@ -186,7 +254,7 @@ export function TeacherPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {classes.map((c) => {
-                  const roster = getStudentsInClass(c.id);
+                  const roster = usingApi ? apiRoster[c.id] ?? [] : getStudentsInClass(c.id);
                   const avg = roster.length ? Math.round(roster.reduce((a, s) => a + (s.stats?.precision ?? 0), 0) / roster.length) : 0;
                   return (
                     <button
@@ -228,7 +296,7 @@ export function TeacherPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {classes.map((c) => {
-                const roster = getStudentsInClass(c.id);
+                const roster = usingApi ? apiRoster[c.id] ?? [] : getStudentsInClass(c.id);
                 const avg = roster.length ? Math.round(roster.reduce((a, s) => a + (s.stats?.precision ?? 0), 0) / roster.length) : 0;
                 return (
                   <button

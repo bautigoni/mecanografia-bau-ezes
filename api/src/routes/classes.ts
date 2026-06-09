@@ -47,9 +47,21 @@ export async function classRoutes(app: FastifyInstance) {
 
     const { sedeId, includeArchived } = req.query as { sedeId?: string; includeArchived?: string };
     const conditions = [];
-    if (actor.role === "admin-sede" || actor.role === "profesor") {
+    if (actor.role === "admin-sede") {
       if (!actor.sede) return reply.send([]);
       conditions.push(eq(schema.classes.sedeId, actor.sede));
+    } else if (actor.role === "profesor") {
+      // Teachers only see the classes they are explicitly assigned to via
+      // class_teachers. (Was: every class in their sede. That gave the
+      // teacher zero visibility control over their own course list.)
+      if (!actor.sede || !actor.sub) return reply.send([]);
+      const assigned = await db
+        .select({ classId: schema.classTeachers.classId })
+        .from(schema.classTeachers)
+        .where(eq(schema.classTeachers.userId, actor.sub));
+      const ids = assigned.map((r) => r.classId);
+      if (!ids.length) return reply.send([]);
+      conditions.push(inArray(schema.classes.id, ids));
     } else if (sedeId) {
       conditions.push(eq(schema.classes.sedeId, sedeId));
     }
