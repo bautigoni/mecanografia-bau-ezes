@@ -11,6 +11,7 @@ import {
   smallint,
   bigserial,
   timestamp,
+  date,
   index,
   primaryKey,
   pgEnum,
@@ -191,6 +192,28 @@ export const attempts = pgTable(
     pk: primaryKey({ columns: [t.id, t.endedAt] }),
     userTimeIdx: index("idx_attempts_user_time").on(t.userId, t.endedAt),
   }),
+);
+
+/* Persisted gamification stats per student (F5). Updated on level complete. */
+export const studentStats = pgTable("student_stats", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  xp: integer("xp").notNull().default(0),
+  stars: integer("stars").notNull().default(0),
+  levelsCompleted: integer("levels_completed").notNull().default(0),
+  streakDays: integer("streak_days").notNull().default(0),
+  longestStreak: integer("longest_streak").notNull().default(0),
+  lastActiveDay: date("last_active_day"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const studentAchievements = pgTable(
+  "student_achievements",
+  {
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    achievementId: text("achievement_id").notNull(),
+    unlockedAt: timestamp("unlocked_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.userId, t.achievementId] }) }),
 );
 
 export const invitations = pgTable("invitations", {

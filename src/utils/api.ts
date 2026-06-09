@@ -149,6 +149,7 @@ export interface StudentDetail {
   student: { id: string; fullName: string; username: string | null; email: string; classId: string | null; className: string | null };
   stats: { completedLevels: number; avgAccuracy: number; currentWorld: string | null; currentLevel: number; totalSeconds: number; streakDays: number; totalAttempts: number; xp: number; stars: number };
   byWorld: { worldId: string; completed: number; avgAccuracy: number }[];
+  achievements: { id: string; unlockedAt: string }[];
   timeline: { worldId: string; levelNumber: number; accuracy: number; completed: boolean; errorCount: number; at: string }[];
 }
 

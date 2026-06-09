@@ -7,6 +7,7 @@ import { db, schema } from "../db/index.js";
 import { and, eq, inArray, gte, sql, desc } from "drizzle-orm";
 import { verifyAccessToken } from "../auth.js";
 import { canActOnSede } from "../rbac.js";
+import { getAchievements } from "../stats.js";
 import type { AccessClaims } from "../auth.js";
 
 async function requireStaff(req: FastifyRequest): Promise<AccessClaims> {
@@ -185,10 +186,12 @@ export async function adminRoutes(app: FastifyInstance) {
     for (const r of lp) if (r.completed) stars += r.bestAccuracy >= 90 ? 3 : r.bestAccuracy >= 75 ? 2 : 1;
     const xp = completedLevels * 10 + (avgAccuracy >= 90 ? completedLevels * 2 : 0);
 
+    const achievements = await getAchievements(id);
     return reply.send({
       student: { id: s.id, fullName: s.fullName, username: s.username, email: s.email, classId: s.classId, className },
       stats: { completedLevels, avgAccuracy, currentWorld: currentWorld ? `island${currentWorld}` : null, currentLevel, totalSeconds: Math.round(totalSeconds), streakDays, totalAttempts: att.length, xp, stars },
       byWorld,
+      achievements,
       timeline: att.slice(0, 20).map((a) => ({ worldId: a.worldId, levelNumber: a.levelNumber, accuracy: a.accuracy, completed: a.completed, errorCount: a.errorCount, at: new Date(a.endedAt).toISOString() })),
     });
   });

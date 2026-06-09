@@ -219,3 +219,21 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE TRIGGER trg_classes_updated BEFORE UPDATE ON classes FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Gamification (F5) — also created idempotently on API boot via ensureSchema().
+CREATE TABLE IF NOT EXISTS student_stats (
+  user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  xp integer NOT NULL DEFAULT 0,
+  stars integer NOT NULL DEFAULT 0,
+  levels_completed integer NOT NULL DEFAULT 0,
+  streak_days integer NOT NULL DEFAULT 0,
+  longest_streak integer NOT NULL DEFAULT 0,
+  last_active_day date,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS student_achievements (
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  achievement_id text NOT NULL,
+  unlocked_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, achievement_id)
+);

@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { relTime } from "./TeachersListPage";
 import { api, type StudentDetail } from "../../utils/api";
+import { ALL_ACHIEVEMENTS, achievementMeta } from "../../data/achievements";
 
 const SKILLS: Record<string, string[]> = {
   Escritura: ["island1", "island2", "island3", "island4", "island6", "island7", "island8", "island9", "island10", "island13", "island15"],
@@ -31,6 +32,7 @@ export function StudentDetailPage() {
 
   if (!d) return <main className="min-h-dvh grid place-items-center text-text font-bold">{err || "Cargando…"}</main>;
   const { student, stats, byWorld, timeline } = d;
+  const unlocked = new Set(d.achievements.map((a) => a.id));
 
   const skillAvgs = Object.entries(SKILLS).map(([name, ws]) => {
     const vals = byWorld.filter((b) => ws.includes(b.worldId) && b.avgAccuracy > 0).map((b) => b.avgAccuracy);
@@ -108,6 +110,23 @@ export function StudentDetailPage() {
           )}
         </section>
       </div>
+
+      {/* Achievements */}
+      <section className="glass-card-smooth rounded-2xl p-5">
+        <h2 className="font-display font-extrabold text-lg text-text flex items-center gap-2 mb-3"><Star size={18} className="text-amber-400" /> Logros ({unlocked.size}/{ALL_ACHIEVEMENTS.length})</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {ALL_ACHIEVEMENTS.map((id) => {
+            const m = achievementMeta(id);
+            const on = unlocked.has(id);
+            return (
+              <div key={id} className={`rounded-xl p-3 flex items-center gap-2 transition ${on ? "glass-surface" : "bg-white/30 opacity-50 grayscale"}`} title={m.desc}>
+                <span className="text-2xl">{m.emoji}</span>
+                <span className="text-sm font-bold text-text leading-tight">{m.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Timeline */}
       <section className="glass-card-smooth rounded-2xl p-5">

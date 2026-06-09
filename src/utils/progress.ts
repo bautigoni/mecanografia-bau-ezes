@@ -1,4 +1,6 @@
 import { activitiesByWorld, type Activity } from "../data/activities";
+import { api, getAccessToken } from "./api";
+import { isDemoMode } from "./storage";
 
 export type WorldKey = Activity["worldId"];
 
@@ -55,7 +57,12 @@ export function saveProgress(progress: CurriculumProgress) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
 }
 
-export function markLevelComplete(worldId: WorldKey, levelNumber: number, accuracy: number, attempts: number) {
+export function markLevelComplete(
+  worldId: WorldKey,
+  levelNumber: number,
+  accuracy: number,
+  attempts: number,
+): Promise<string[]> {
   const progress = loadProgress();
   const previous = progress[worldId]?.[levelNumber];
   const best = Math.max(previous?.bestAccuracy ?? 0, accuracy);
@@ -64,6 +71,27 @@ export function markLevelComplete(worldId: WorldKey, levelNumber: number, accura
     [levelNumber]: { completed: true, bestAccuracy: best, attempts },
   };
   saveProgress(progress);
+
+  /* Mirror to the API for real (non-demo) students so cross-device sync,
+     dashboards, gamification stats and achievements actually populate.
+     Returns the newly-unlocked achievement ids (empty for demo/offline). */
+  if (getAccessToken() && !isDemoMode()) {
+    const endedAt = new Date();
+    const startedAt = new Date(endedAt.getTime() - 60_000);
+    const errorCount = Math.max(0, Math.round((100 - accuracy) / 8));
+    return api
+      .postProgressComplete({
+        worldId,
+        levelNumber,
+        accuracy: Math.round(accuracy),
+        errorCount,
+        startedAt: startedAt.toISOString(),
+        endedAt: endedAt.toISOString(),
+      })
+      .then((r) => (r as { unlockedAchievements?: string[] })?.unlockedAchievements ?? [])
+      .catch(() => []);
+  }
+  return Promise.resolve([]);
 }
 
 export function isLevelCompleted(progress: CurriculumProgress, worldId: WorldKey, levelNumber: number): boolean {

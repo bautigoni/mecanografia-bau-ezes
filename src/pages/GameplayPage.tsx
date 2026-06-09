@@ -5,6 +5,7 @@ import { getActivityById } from "../data/activities";
 import { assets } from "../utils/assets";
 import { getGameplayBackground } from "../data/worlds";
 import { getStarsFromAccuracy, markLevelComplete } from "../utils/progress";
+import { achievementMeta } from "../data/achievements";
 import { SkillLevelView } from "./SkillLevelView";
 import { ShortcutLevelView } from "./ShortcutLevelView";
 
@@ -266,6 +267,7 @@ export function GameplayPage() {
   const [isErrorActive, setIsErrorActive] = useState(false);
   const [isIdleHintActive, setIsIdleHintActive] = useState(false);
   const [inputSignal, setInputSignal] = useState(0);
+  const [unlockedAch, setUnlockedAch] = useState<string[]>([]);
   const completionSaved = useRef(false);
   const activityRef = useRef(activity);
   const advanceTimeoutRef = useRef<number | null>(null);
@@ -339,7 +341,9 @@ export function GameplayPage() {
     if (completionSaved.current) return;
     completionSaved.current = true;
     const currentActivity = activityRef.current;
-    markLevelComplete(currentActivity.worldId, currentActivity.levelNumber, finalAccuracy, finalAttempts);
+    void markLevelComplete(currentActivity.worldId, currentActivity.levelNumber, finalAccuracy, finalAttempts).then((unlocked) => {
+      if (unlocked.length) setUnlockedAch(unlocked);
+    });
   }
 
   function targetAt(index: number) {
@@ -1100,6 +1104,22 @@ export function GameplayPage() {
               ¡Nivel completado!
             </h2>
             <p className="text-muted font-bold text-lg">Sumaste {accuracy}% de precisión.</p>
+            {unlockedAch.length > 0 && (
+              <div className="flex flex-col items-center gap-2 w-full">
+                <span className="text-xs font-black uppercase tracking-wider text-accent-strong">¡Logro desbloqueado!</span>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {unlockedAch.map((id) => {
+                    const m = achievementMeta(id);
+                    return (
+                      <span key={id} className="glass-surface rounded-2xl px-3 py-2 flex items-center gap-2 animate-card-pop">
+                        <span className="text-2xl">{m.emoji}</span>
+                        <span className="text-sm font-bold text-text">{m.label}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="flex items-end gap-4" aria-hidden="true">
               {[1, 2, 3].map((index) => {
                 const isOn = getStarsFromAccuracy(accuracy) >= index;

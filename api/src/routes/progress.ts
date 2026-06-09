@@ -10,6 +10,7 @@ import { z } from "zod";
 import { db, schema } from "../db/index.js";
 import { and, eq, sql } from "drizzle-orm";
 import { verifyAccessToken } from "../auth.js";
+import { syncStats, getAchievements, computeStats } from "../stats.js";
 import type { AccessClaims } from "../auth.js";
 
 async function requireUser(req: FastifyRequest): Promise<AccessClaims> {
@@ -20,7 +21,7 @@ async function requireUser(req: FastifyRequest): Promise<AccessClaims> {
 
 const completeSchema = z.object({
   worldId: z.string(),
-  levelNumber: z.number().int().min(1).max(15),
+  levelNumber: z.number().int().min(1).max(60),
   accuracy: z.number().int().min(0).max(100),
   wpm: z.number().int().min(0).optional(),
   errorCount: z.number().int().min(0).default(0),
@@ -77,7 +78,21 @@ export async function progressRoutes(app: FastifyInstance) {
       errorCount,
       completed: true,
     });
-    return reply.send({ ok: true });
+    // Recompute persisted gamification stats + unlock new achievements.
+    let newlyUnlocked: string[] = [];
+    try {
+      ({ newlyUnlocked } = await syncStats(actor.sub));
+    } catch (e) {
+      req.log?.error?.({ err: e }, "syncStats failed");
+    }
+    return reply.send({ ok: true, unlockedAchievements: newlyUnlocked });
+  });
+
+  /* ----- GET /api/me/stats (the playing student's gamification state) ----- */
+  app.get("/api/me/stats", async (req, reply) => {
+    const actor = await requireUser(req);
+    const [stats, achievements] = await Promise.all([computeStats(actor.sub), getAchievements(actor.sub)]);
+    return reply.send({ stats, achievements });
   });
 
   /* ----- GET /api/teacher/students ----- */
