@@ -11,6 +11,8 @@ import { TeachersListPage } from "./pages/admin/TeachersListPage";
 import { StudentsListPage } from "./pages/admin/StudentsListPage";
 import { ProgresoPage, ConfigPage } from "./pages/admin/SedeStubPages";
 import { InicioPage } from "./pages/admin/InicioPage";
+import { StudentDetailPage } from "./pages/admin/StudentDetailPage";
+import { TeacherDetailPage } from "./pages/admin/TeacherDetailPage";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { InvitePage } from "./pages/InvitePage";
 import { WorldsPage } from "./pages/WorldsPage";
@@ -110,7 +112,9 @@ export function App() {
         {/* Dedicated admin-sede screens (F1 redesign). */}
         <Route path="/admin-sede/cursos" element={<CoursesListPage />} />
         <Route path="/admin-sede/docentes" element={<TeachersListPage />} />
+        <Route path="/admin-sede/docentes/:id" element={<TeacherDetailPage />} />
         <Route path="/admin-sede/alumnos" element={<StudentsListPage />} />
+        <Route path="/admin-sede/alumnos/:id" element={<StudentDetailPage />} />
         <Route path="/admin-sede/progreso" element={<ProgresoPage />} />
         <Route path="/admin-sede/config" element={<ConfigPage />} />
         {/* Per-course management: assign teachers, add students (single/bulk),

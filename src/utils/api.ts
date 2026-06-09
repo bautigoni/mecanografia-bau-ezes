@@ -145,6 +145,20 @@ export interface AdminOverview {
   recent: { studentName: string; worldId: string; completed: boolean; at: string }[];
 }
 
+export interface StudentDetail {
+  student: { id: string; fullName: string; username: string | null; email: string; classId: string | null; className: string | null };
+  stats: { completedLevels: number; avgAccuracy: number; currentWorld: string | null; currentLevel: number; totalSeconds: number; streakDays: number; totalAttempts: number; xp: number; stars: number };
+  byWorld: { worldId: string; completed: number; avgAccuracy: number }[];
+  timeline: { worldId: string; levelNumber: number; accuracy: number; completed: boolean; errorCount: number; at: string }[];
+}
+
+export interface TeacherDetail {
+  teacher: { id: string; fullName: string; username: string | null; email: string; lastLoginAt: string | null };
+  classes: { id: string; name: string; grade: string; studentCount: number }[];
+  stats: { classCount: number; studentCount: number };
+  recent: { studentName: string; worldId: string; completed: boolean; at: string }[];
+}
+
 export interface ClassProgressRow {
   id: string;
   fullName: string;
@@ -254,6 +268,8 @@ export const api = {
     call<{ ok: true }>(`/classes/${classId}/students`, { method: "POST", json: { userId } }),
   classProgress: (id: string) => call<{ students: ClassProgressRow[] }>(`/classes/${id}/progress`),
   adminOverview: (sedeId?: string) => call<AdminOverview>(`/admin/overview${sedeId ? `?sedeId=${sedeId}` : ""}`),
+  studentDetail: (id: string) => call<StudentDetail>(`/students/${id}`),
+  teacherDetail: (id: string) => call<TeacherDetail>(`/teachers/${id}`),
   /* Progress. */
   postProgressComplete: (payload: {
     worldId: string;

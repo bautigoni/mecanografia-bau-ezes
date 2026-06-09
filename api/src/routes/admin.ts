@@ -6,6 +6,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { db, schema } from "../db/index.js";
 import { and, eq, inArray, gte, sql, desc } from "drizzle-orm";
 import { verifyAccessToken } from "../auth.js";
+import { canActOnSede } from "../rbac.js";
 import type { AccessClaims } from "../auth.js";
 
 async function requireStaff(req: FastifyRequest): Promise<AccessClaims> {
@@ -125,6 +126,113 @@ export async function adminRoutes(app: FastifyInstance) {
       alerts: { inactiveStudents, lowPrecisionStudents, inactiveTeachers, coursesNoTeacher },
       attentionCourses: attentionCourses.slice(0, 6),
       recent: recentActivity,
+    });
+  });
+
+  /* ----- GET /api/students/:id (Duolingo-style detail) ----- */
+  app.get("/api/students/:id", async (req, reply) => {
+    const actor = await requireStaff(req);
+    const { id } = req.params as { id: string };
+    const [s] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
+    if (!s || s.role !== "alumno") return reply.code(404).send({ error: "Alumno no encontrado." });
+    if (!canActOnSede({ role: actor.role, sedeId: actor.sede }, s.sedeId)) {
+      return reply.code(403).send({ error: "El alumno es de otra sede." });
+    }
+    let className: string | null = null;
+    if (s.classId) {
+      const [c] = await db.select({ name: schema.classes.name }).from(schema.classes).where(eq(schema.classes.id, s.classId)).limit(1);
+      className = c?.name ?? null;
+    }
+
+    const lp = await db
+      .select({ worldId: schema.levelProgress.worldId, levelNumber: schema.levelProgress.levelNumber, completed: schema.levelProgress.completed, bestAccuracy: schema.levelProgress.bestAccuracy, attempts: schema.levelProgress.attempts })
+      .from(schema.levelProgress).where(eq(schema.levelProgress.userId, id));
+    const att = await db
+      .select({ worldId: schema.attempts.worldId, levelNumber: schema.attempts.levelNumber, accuracy: schema.attempts.accuracy, completed: schema.attempts.completed, errorCount: schema.attempts.errorCount, startedAt: schema.attempts.startedAt, endedAt: schema.attempts.endedAt })
+      .from(schema.attempts).where(eq(schema.attempts.userId, id)).orderBy(desc(schema.attempts.endedAt)).limit(200);
+
+    // Per-world aggregate.
+    const wMap = new Map<string, { completed: number; accSum: number; n: number }>();
+    let accSum = 0, completedLevels = 0;
+    for (const r of lp) {
+      const w = wMap.get(r.worldId) ?? { completed: 0, accSum: 0, n: 0 };
+      if (r.completed) { w.completed++; completedLevels++; }
+      w.accSum += r.bestAccuracy; w.n++; accSum += r.bestAccuracy;
+      wMap.set(r.worldId, w);
+    }
+    const byWorld = [...wMap.entries()].map(([worldId, v]) => ({ worldId, completed: v.completed, avgAccuracy: Math.round(v.accSum / v.n) }));
+    const avgAccuracy = lp.length ? Math.round(accSum / lp.length) : 0;
+    const worldNum = (w: string) => Number(w.replace("island", "")) || 0;
+    const currentWorld = byWorld.length ? byWorld.map((b) => worldNum(b.worldId)).reduce((a, b) => Math.max(a, b), 0) : 0;
+    const currentLevel = lp.filter((r) => worldNum(r.worldId) === currentWorld).map((r) => r.levelNumber).reduce((a, b) => Math.max(a, b), 0);
+
+    // Total time (cap each attempt at 600s) + streak from distinct days.
+    let totalSeconds = 0;
+    const dayset = new Set<string>();
+    for (const a of att) {
+      const dur = Math.min(600, Math.max(0, (new Date(a.endedAt).getTime() - new Date(a.startedAt).getTime()) / 1000));
+      totalSeconds += dur;
+      dayset.add(new Date(a.endedAt).toISOString().slice(0, 10));
+    }
+    let streakDays = 0;
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    // allow today OR yesterday as the streak anchor
+    if (!dayset.has(d.toISOString().slice(0, 10))) d.setDate(d.getDate() - 1);
+    while (dayset.has(d.toISOString().slice(0, 10))) { streakDays++; d.setDate(d.getDate() - 1); }
+
+    // Stars (1-3 per completed level by accuracy) + simple XP proxy.
+    let stars = 0;
+    for (const r of lp) if (r.completed) stars += r.bestAccuracy >= 90 ? 3 : r.bestAccuracy >= 75 ? 2 : 1;
+    const xp = completedLevels * 10 + (avgAccuracy >= 90 ? completedLevels * 2 : 0);
+
+    return reply.send({
+      student: { id: s.id, fullName: s.fullName, username: s.username, email: s.email, classId: s.classId, className },
+      stats: { completedLevels, avgAccuracy, currentWorld: currentWorld ? `island${currentWorld}` : null, currentLevel, totalSeconds: Math.round(totalSeconds), streakDays, totalAttempts: att.length, xp, stars },
+      byWorld,
+      timeline: att.slice(0, 20).map((a) => ({ worldId: a.worldId, levelNumber: a.levelNumber, accuracy: a.accuracy, completed: a.completed, errorCount: a.errorCount, at: new Date(a.endedAt).toISOString() })),
+    });
+  });
+
+  /* ----- GET /api/teachers/:id (detail) ----- */
+  app.get("/api/teachers/:id", async (req, reply) => {
+    const actor = await requireStaff(req);
+    const { id } = req.params as { id: string };
+    const [t] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
+    if (!t || t.role !== "profesor") return reply.code(404).send({ error: "Docente no encontrado." });
+    if (!canActOnSede({ role: actor.role, sedeId: actor.sede }, t.sedeId)) {
+      return reply.code(403).send({ error: "El docente es de otra sede." });
+    }
+    const classRows = await db
+      .select({ id: schema.classes.id, name: schema.classes.name, grade: schema.classes.grade })
+      .from(schema.classTeachers)
+      .innerJoin(schema.classes, eq(schema.classes.id, schema.classTeachers.classId))
+      .where(eq(schema.classTeachers.userId, id))
+      .orderBy(schema.classes.name);
+    const classIds = classRows.map((c) => c.id);
+    const counts = classIds.length
+      ? await db.select({ classId: schema.classStudents.classId, n: sql<number>`count(*)::int` }).from(schema.classStudents).where(inArray(schema.classStudents.classId, classIds)).groupBy(schema.classStudents.classId)
+      : [];
+    const countById = new Map(counts.map((c) => [c.classId, c.n]));
+    const classes = classRows.map((c) => ({ ...c, studentCount: countById.get(c.id) ?? 0 }));
+    const studentCount = classes.reduce((a, c) => a + c.studentCount, 0);
+
+    // Recent activity from this teacher's students.
+    const studentIds = classIds.length
+      ? (await db.select({ userId: schema.classStudents.userId }).from(schema.classStudents).where(inArray(schema.classStudents.classId, classIds))).map((r) => r.userId)
+      : [];
+    const recent = studentIds.length
+      ? await db.select({ userId: schema.attempts.userId, worldId: schema.attempts.worldId, completed: schema.attempts.completed, endedAt: schema.attempts.endedAt }).from(schema.attempts).where(inArray(schema.attempts.userId, studentIds)).orderBy(desc(schema.attempts.endedAt)).limit(8)
+      : [];
+    const nameRows = studentIds.length
+      ? await db.select({ id: schema.users.id, fullName: schema.users.fullName }).from(schema.users).where(inArray(schema.users.id, studentIds))
+      : [];
+    const nameById = new Map(nameRows.map((n) => [n.id, n.fullName]));
+
+    return reply.send({
+      teacher: { id: t.id, fullName: t.fullName, username: t.username, email: t.email, lastLoginAt: t.lastLoginAt },
+      classes,
+      stats: { classCount: classes.length, studentCount },
+      recent: recent.map((r) => ({ studentName: nameById.get(r.userId) ?? "Alumno", worldId: r.worldId, completed: r.completed, at: new Date(r.endedAt).toISOString() })),
     });
   });
 }

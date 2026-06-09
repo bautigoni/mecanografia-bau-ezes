@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, X, KeyRound, Trash2, Pencil } from "lucide-react";
 import { SedeShell } from "../../components/admin/SedeShell";
 import { DataTable } from "../../components/admin/DataTable";
@@ -12,6 +13,7 @@ function slugEmail(name: string): string {
 }
 
 export function StudentsListPage() {
+  const navigate = useNavigate();
   const { user, viewAs } = useAuth();
   const siteId = user?.role === "superadmin" && viewAs?.sedeId ? viewAs.sedeId : user?.siteId;
 
@@ -106,6 +108,7 @@ export function StudentsListPage() {
       <DataTable
         rows={filtered}
         getKey={(s) => s.id}
+        onRowClick={(s) => navigate(`/admin-sede/alumnos/${s.id}`)}
         columns={[
           { key: "classId", header: "Curso", render: (s) => <span className="text-muted">{s.classId ? classMap.get(s.classId) ?? "—" : "Sin curso"}</span> },
           { key: "fullName", header: "Nombre", render: (s) => <strong className="font-bold text-text">{s.fullName}</strong> },

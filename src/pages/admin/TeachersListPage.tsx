@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, Send, X, KeyRound, Trash2 } from "lucide-react";
 import { SedeShell } from "../../components/admin/SedeShell";
 import { DataTable } from "../../components/admin/DataTable";
@@ -18,6 +19,7 @@ export function relTime(iso?: string | null): string {
 }
 
 export function TeachersListPage() {
+  const navigate = useNavigate();
   const { user, viewAs } = useAuth();
   const siteId = user?.role === "superadmin" && viewAs?.sedeId ? viewAs.sedeId : user?.siteId;
 
@@ -98,6 +100,7 @@ export function TeachersListPage() {
       <DataTable
         rows={filtered}
         getKey={(t) => t.id}
+        onRowClick={(t) => navigate(`/admin-sede/docentes/${t.id}`)}
         columns={[
           { key: "fullName", header: "Nombre", render: (t) => <strong className="font-bold text-text">{t.fullName}</strong> },
           { key: "email", header: "Email", render: (t) => <span className="text-muted">{t.email}</span> },
