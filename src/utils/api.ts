@@ -60,8 +60,12 @@ async function call<T = unknown>(path: string, opts: FetchOpts = {}): Promise<T>
   if (!res.ok) {
     let message = "Error desconocido.";
     try {
-      const data = (await res.json()) as { error?: string };
-      if (data?.error) message = data.error;
+      // Fastify's default 4xx body is { statusCode, error, message }. Our
+      // custom setErrorHandler usually sends a friendlier Spanish body of
+      // just { error: "..." }. We try `message` first (the localized one),
+      // then fall back to `error`.
+      const data = (await res.json()) as { error?: string; message?: string };
+      message = data?.message || data?.error || message;
     } catch {
       /* ignore */
     }
