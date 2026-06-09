@@ -2,7 +2,6 @@ import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GlassInput } from "../components/auth/GlassInput";
 import { AnimatedButton } from "../components/auth/AnimatedButton";
-import { Toast } from "../components/common/Toast";
 import { useAuth } from "../hooks/useAuth";
 import { assets } from "../utils/assets";
 import { routeForRole } from "../utils/storage";
@@ -35,9 +34,18 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
+  // Bumped on every error so the top red popup re-animates even if the
+  // message text is identical to the previous attempt.
+  const [errKey, setErrKey] = useState(0);
   const [showDemoModal, setShowDemoModal] = useState(false);
   const { loginAny, loginDemo, loginGoogle } = useAuth();
   const navigate = useNavigate();
+
+  /** Show an error in the red popup above the card (re-animates each time). */
+  const showError = (msg: string) => {
+    setMessage(msg);
+    setErrKey((k) => k + 1);
+  };
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -45,7 +53,7 @@ export function LoginPage() {
     const nextUser = await loginAny(trimUser, password);
 
     if (!nextUser) {
-      setMessage("Revisá tu usuario y contraseña para ingresar.");
+      showError("Revisá tu usuario y contraseña para ingresar.");
       return;
     }
 
@@ -86,10 +94,10 @@ export function LoginPage() {
    *  then matches the returned email against Typely's user store. */
   async function googleLogin() {
     if (!getGoogleClientId()) {
-      setMessage("Google Login no está configurado. Pedile a tu administrador que cargue VITE_GOOGLE_CLIENT_ID en el servidor.");
+      showError("Google Login no está configurado. Pedile a tu administrador que cargue VITE_GOOGLE_CLIENT_ID en el servidor.");
       return;
     }
-    setMessage(""); // clear any prior error before opening the prompt
+    showError(""); // clear any prior error before opening the prompt
     await promptGoogleSignIn({
       onCredential: async (credential) => {
         const result = await loginGoogle(credential);
@@ -106,22 +114,22 @@ export function LoginPage() {
           return;
         }
         if (result.reason === "DOMAIN_NOT_ALLOWED") {
-          setMessage("Tu dominio de correo no está habilitado para Typely.");
+          showError("Tu dominio de correo no está habilitado para Typely.");
         } else if (result.reason === "USER_NOT_FOUND") {
-          setMessage("No encontramos una cuenta asociada a este correo. Pedile acceso a tu administrador.");
+          showError("No encontramos una cuenta asociada a este correo. Pedile acceso a tu administrador.");
         } else if (result.reason === "NETWORK_ERROR") {
-          setMessage("No pudimos conectar con el servidor. Probá de nuevo.");
+          showError("No pudimos conectar con el servidor. Probá de nuevo.");
         } else {
-          setMessage("No pudimos validar tu cuenta de Google. Probá de nuevo.");
+          showError("No pudimos validar tu cuenta de Google. Probá de nuevo.");
         }
       },
       onError: (reason) => {
         if (reason === "MISSING_CLIENT_ID") {
-          setMessage("Google Login no está configurado.");
+          showError("Google Login no está configurado.");
         } else if (reason === "GIS_LOAD_FAILED") {
-          setMessage("No se pudo cargar Google. Revisá tu conexión.");
+          showError("No se pudo cargar Google. Revisá tu conexión.");
         } else {
-          setMessage("No se pudo abrir el inicio con Google. Probá de nuevo.");
+          showError("No se pudo abrir el inicio con Google. Probá de nuevo.");
         }
       },
     });
@@ -132,6 +140,9 @@ export function LoginPage() {
       className="relative min-h-dvh overflow-hidden bg-cover bg-center flex items-center justify-center animate-page-fade"
       style={{ backgroundImage: `url("${assets.loginBg}")` }}
     >
+      {/* Animated colourful aura over the background art (brand colours drifting). */}
+      <div className="login-aura absolute inset-0 pointer-events-none z-0" aria-hidden="true" />
+
       {/* Mascots stand ON the green islands: lifted off the bottom edge and
           nudged inward so they read as "standing on" the painted platforms. */}
       <img
@@ -179,11 +190,9 @@ export function LoginPage() {
         </span>
 
         <div className="text-center">
-          <h1 className="font-display text-3xl font-extrabold mb-1 text-gradient-loop">
+          <h1 className="font-display text-4xl font-black mb-2 text-gradient-loop">
             ¡Bienvenido a TYPELY!
           </h1>
-          {/* Colourful accent divider under the heading. */}
-          <span className="block h-1.5 w-20 mx-auto rounded-full bg-gradient-to-r from-mint via-accent-sky to-accent-pink my-2" aria-hidden="true" />
           <p className="text-muted font-semibold">Aprendé a escribir jugando entre las nubes ✨</p>
         </div>
 
@@ -292,7 +301,28 @@ export function LoginPage() {
         </div>
       )}
 
-      <Toast message={message} />
+      {/* Error popup — red, floating ABOVE the card at the top-centre. */}
+      {message && (
+        <div
+          key={errKey}
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[min(34rem,92vw)] animate-banner-drop"
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="flex items-start gap-3 rounded-2xl px-5 py-3.5 bg-gradient-to-r from-rose-500 to-red-500 text-white shadow-[0_18px_40px_rgba(225,29,72,0.4)] border border-white/30">
+            <ShieldCheck size={20} className="shrink-0 mt-0.5" aria-hidden="true" />
+            <p className="font-bold text-sm leading-snug flex-1">{message}</p>
+            <button
+              type="button"
+              onClick={() => setMessage("")}
+              className="shrink-0 w-7 h-7 grid place-items-center rounded-full bg-white/20 hover:bg-white/35 transition cursor-pointer text-white font-black leading-none"
+              aria-label="Cerrar"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
