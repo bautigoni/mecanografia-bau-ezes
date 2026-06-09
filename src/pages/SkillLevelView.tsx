@@ -141,11 +141,13 @@ function Island5Shell({
         </button>
       </header>
 
-      <div className="flex items-center gap-2 px-5 py-3">
-        <span className="text-sm font-bold text-muted">
-          Objetivo {Math.min(progress + (completed ? 0 : 1), total)} / {total}
-        </span>
-        <h2 className="font-display font-extrabold text-text text-base">{goal}</h2>
+      <div className="flex justify-center px-5 py-2">
+        <div className="glass-strong rounded-full px-5 py-2 flex items-center gap-2.5 shadow-md">
+          <span className="text-xs font-black uppercase tracking-wider text-accent-strong whitespace-nowrap">
+            Objetivo {Math.min(progress + (completed ? 0 : 1), total)} / {total}
+          </span>
+          <h2 className="font-display font-extrabold text-text text-base">{goal}</h2>
+        </div>
       </div>
 
       <section className="flex-1 flex items-center justify-center relative min-h-0 overflow-hidden" aria-label="Escena">
@@ -157,19 +159,22 @@ function Island5Shell({
         <div className="flex items-center justify-center w-full h-full">{children}</div>
       </section>
 
-      <div className="flex items-center justify-between px-5 py-2 text-sm font-bold">
-        <span>★</span>
-        <div><b>{metrics.left}:</b> {metrics.leftValue}</div>
-        <div className="w-px h-5 bg-white/40 mx-3" />
-        <div><b>{metrics.mid}:</b> {metrics.midValue}</div>
-        <div className="w-px h-5 bg-white/40 mx-3" />
-        <div><b>Precisión:</b> {metrics.precision}%</div>
-        <span>★</span>
-      </div>
+      {/* Readable glass bar for stats + instruction + actions (was plain text
+          floating over the bright art). */}
+      <div className="glass-strong mx-3 mb-3 rounded-2xl px-4 py-2.5 flex flex-col gap-2 shadow-md">
+        <div className="flex items-center justify-center gap-4 text-sm font-bold text-text">
+          <span className="text-amber-400">★</span>
+          <div><b>{metrics.left}:</b> {metrics.leftValue}</div>
+          <div className="w-px h-5 bg-text/15" />
+          <div><b>{metrics.mid}:</b> {metrics.midValue}</div>
+          <div className="w-px h-5 bg-text/15" />
+          <div><b>Precisión:</b> {metrics.precision}%</div>
+          <span className="text-amber-400">★</span>
+        </div>
 
-      <footer className="flex items-center justify-between px-4 sm:px-6 py-3 gap-3">
-        <div className="text-sm text-muted font-medium flex-1">
-          <span aria-hidden="true">★</span>
+      <footer className="flex items-center justify-between gap-3">
+        <div className="text-sm text-text font-semibold flex-1 min-w-0">
+          <span aria-hidden="true" className="text-amber-400">★ </span>
           {feedback ?? instruction}
         </div>
         <button
@@ -187,6 +192,7 @@ function Island5Shell({
           <RotateCcw size={16} /> Reintentar
         </button>
       </footer>
+      </div>
 
       {completed && (
         <CompletionModal
@@ -378,13 +384,23 @@ function LeftClickLevel({ activity }: { activity: Activity }) {
         </div>
       </div>
       {bursts.map((b) => (
-        <span
-          key={b.id}
-          className="fixed flex items-center justify-center pointer-events-none animate-burst text-4xl select-none -translate-x-1/2 -translate-y-1/2"
-          style={{ left: `${b.x}px`, top: `${b.y}px` }}
-          aria-hidden="true"
-        >
-          ✨
+        <span key={b.id} className="fixed z-50 pointer-events-none -translate-x-1/2 -translate-y-1/2" style={{ left: `${b.x}px`, top: `${b.y}px` }} aria-hidden="true">
+          {/* expanding ring */}
+          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full border-4 border-amber-300/80 animate-burst-ring" />
+          {/* particles flying outward */}
+          {["⭐", "✨", "💫", "⭐", "✨", "💫"].map((p, i) => {
+            const ang = (i / 6) * Math.PI * 2;
+            const dist = 46;
+            return (
+              <span
+                key={i}
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl animate-burst-fly"
+                style={{ ["--bx" as never]: `${Math.cos(ang) * dist}px`, ["--by" as never]: `${Math.sin(ang) * dist}px`, animationDelay: `${i * 12}ms` }}
+              >
+                {p}
+              </span>
+            );
+          })}
         </span>
       ))}
     </Island5Shell>
