@@ -101,12 +101,15 @@ function Island5Shell({
   }
 
   return (
-    <main className="flex flex-col h-dvh relative overflow-hidden bg-gradient-to-b from-blue-50/80 to-sky-100/60 animate-page-fade">
+    <main className="flex flex-col h-dvh relative overflow-hidden animate-page-fade" style={{ backgroundColor: "#cfeef8" }}>
+      {/* Full vivid scene background (was washed to 40% → looked grey). */}
       <div
-        className="absolute inset-0 bg-cover bg-center pointer-events-none -z-10 opacity-40"
+        className="absolute inset-0 bg-cover bg-center pointer-events-none -z-10"
         aria-hidden="true"
         style={{ backgroundImage: `url("${getGameplayBackground(activity.worldId)}")` }}
       />
+      {/* Whisper-light top scrim only for header legibility. */}
+      <div className="absolute inset-x-0 top-0 h-40 -z-5 pointer-events-none bg-gradient-to-b from-white/35 to-transparent" aria-hidden="true" />
       <div className="absolute inset-0 pointer-events-none overflow-hidden -z-5" aria-hidden="true">
         {Array.from({ length: 14 }).map((_, i) => (
           <span
@@ -881,7 +884,7 @@ function WindowsLevel({ activity }: { activity: Activity }) {
 
         {/* Clean, illustrated windows — bodies are CSS-only so they never
             clash with painted artwork or stack messily. */}
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 p-6 flex-1 overflow-y-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 p-3 flex-1 overflow-y-auto no-scrollbar content-start">
           {windows.filter((w) => w.open).map((w, idx) => (
             <div
               key={w.id}
@@ -931,15 +934,15 @@ function WindowsLevel({ activity }: { activity: Activity }) {
                   ×
                 </button>
               </div>
-              <div className="p-4 flex flex-col gap-3 min-h-[12rem]">
+              <div className="p-2.5 flex flex-col gap-2 min-h-[5.5rem]">
                 {w.id === "browser" && (
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/40 text-xs text-muted">
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-white/40 text-[11px] text-muted">
                       <span className="w-2 h-2 rounded-full bg-mint" />
                       typely.test/aventura
                     </div>
-                    <div className="flex items-center justify-center text-6xl py-4">🌐</div>
-                    <p className="text-sm text-muted text-center">Página de inicio</p>
+                    <div className="flex items-center justify-center text-4xl py-1">🌐</div>
+                    <p className="text-xs text-muted text-center">Página de inicio</p>
                   </div>
                 )}
                 {w.id === "drawings" && (
@@ -950,7 +953,7 @@ function WindowsLevel({ activity }: { activity: Activity }) {
                       <span className="w-3 h-3 rounded-full inline-block" style={{ background: "#536bff" }} />
                       <span className="w-3 h-3 rounded-full inline-block" style={{ background: "#facc15" }} />
                     </div>
-                    <div className="flex items-center justify-center text-3xl h-24">🎨</div>
+                    <div className="flex items-center justify-center text-3xl h-12">🎨</div>
                   </div>
                 )}
                 {w.id === "notes" && (
