@@ -135,6 +135,16 @@ export interface ClassMember {
   lastLoginAt: string | null;
 }
 
+export interface AdminOverview {
+  counts: { courses: number; teachers: number; students: number };
+  activeToday: number;
+  avgProgress: number;
+  weekly: { date: string; label: string; count: number }[];
+  alerts: { inactiveStudents: number; lowPrecisionStudents: number; inactiveTeachers: number; coursesNoTeacher: number };
+  attentionCourses: { id: string; name: string; reason: string }[];
+  recent: { studentName: string; worldId: string; completed: boolean; at: string }[];
+}
+
 export interface ClassProgressRow {
   id: string;
   fullName: string;
@@ -243,6 +253,7 @@ export const api = {
   assignStudent: (classId: string, userId: string) =>
     call<{ ok: true }>(`/classes/${classId}/students`, { method: "POST", json: { userId } }),
   classProgress: (id: string) => call<{ students: ClassProgressRow[] }>(`/classes/${id}/progress`),
+  adminOverview: (sedeId?: string) => call<AdminOverview>(`/admin/overview${sedeId ? `?sedeId=${sedeId}` : ""}`),
   /* Progress. */
   postProgressComplete: (payload: {
     worldId: string;

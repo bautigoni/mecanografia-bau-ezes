@@ -10,6 +10,7 @@ import { CoursesListPage } from "./pages/admin/CoursesListPage";
 import { TeachersListPage } from "./pages/admin/TeachersListPage";
 import { StudentsListPage } from "./pages/admin/StudentsListPage";
 import { ProgresoPage, ConfigPage } from "./pages/admin/SedeStubPages";
+import { InicioPage } from "./pages/admin/InicioPage";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { InvitePage } from "./pages/InvitePage";
 import { WorldsPage } from "./pages/WorldsPage";
@@ -32,9 +33,6 @@ const GameplayPage = lazy(() =>
 );
 const AdminGeneralPage = lazy(() =>
   import("./pages/AdminGeneralPage").then((m) => ({ default: m.AdminGeneralPage })),
-);
-const SiteAdminPage = lazy(() =>
-  import("./pages/SiteAdminPage").then((m) => ({ default: m.SiteAdminPage })),
 );
 
 function PageFallback() {
@@ -106,14 +104,9 @@ export function App() {
       </Route>
 
       <Route element={<ProtectedRoute roles={["admin-sede"]} />}>
-        <Route
-          path="/admin-sede"
-          element={
-            <Suspense fallback={<PageFallback />}>
-              <SiteAdminPage />
-            </Suspense>
-          }
-        />
+        {/* Inicio = executive dashboard (F3). The old monolithic SiteAdminPage
+            is superseded by the dedicated routed screens. */}
+        <Route path="/admin-sede" element={<InicioPage />} />
         {/* Dedicated admin-sede screens (F1 redesign). */}
         <Route path="/admin-sede/cursos" element={<CoursesListPage />} />
         <Route path="/admin-sede/docentes" element={<TeachersListPage />} />
