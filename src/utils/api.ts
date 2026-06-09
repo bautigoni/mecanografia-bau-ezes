@@ -127,6 +127,14 @@ export interface ApiClass {
   teacherCount: number;
 }
 
+export interface ClassMember {
+  id: string;
+  fullName: string;
+  email: string;
+  username: string | null;
+  lastLoginAt: string | null;
+}
+
 export const api = {
   async login(emailOrUsername: string, password: string): Promise<{ user: ApiActiveUser; access: string }> {
     const res = await call<{ user: ApiActiveUser; access: string }>("/auth/login", {
@@ -210,6 +218,17 @@ export const api = {
   createClass: (payload: { name: string; sedeId?: string; grade?: string }) =>
     call<ApiClass>("/classes", { method: "POST", json: payload }),
   deleteClass: (id: string) => call<{ ok: true }>(`/classes/${id}`, { method: "DELETE" }),
+  updateClass: (id: string, payload: { name?: string; grade?: string }) =>
+    call<ApiClass>(`/classes/${id}`, { method: "PATCH", json: payload }),
+  classMembers: (id: string) =>
+    call<{ class: { id: string; name: string; grade: string; sedeId: string }; teachers: ClassMember[]; students: ClassMember[] }>(`/classes/${id}/members`),
+  assignTeacher: (classId: string, userId: string) =>
+    call<{ ok: true }>(`/classes/${classId}/teachers`, { method: "POST", json: { userId } }),
+  unassignTeacher: (classId: string, userId: string) =>
+    call<{ ok: true }>(`/classes/${classId}/teachers/${userId}`, { method: "DELETE" }),
+  getClassWorlds: (id: string) => call<{ worldIds: string[] | null }>(`/classes/${id}/worlds`),
+  setClassWorlds: (id: string, worldIds: string[]) =>
+    call<{ ok: true }>(`/classes/${id}/worlds`, { method: "PUT", json: { worldIds } }),
   /* Progress. */
   postProgressComplete: (payload: {
     worldId: string;

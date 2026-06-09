@@ -531,15 +531,15 @@ export function SiteAdminPage() {
             </div>
           ) : (
             <>
-              <p className="text-sm text-muted font-semibold animate-soft-hint-in">Tocá un curso para ver y editar sus alumnos.</p>
+              <p className="text-sm text-muted font-semibold animate-soft-hint-in">Tocá un curso para gestionar docentes, alumnos y niveles.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {classes.map((c) => (
                   <button
                     type="button"
                     key={c.id}
                     className="glass-surface flex items-center gap-3 p-4 animate-card-in cursor-pointer border-0 text-left w-full hover:-translate-y-0.5 transition-transform"
-                    onClick={() => setOpenCourseId(c.id)}
-                    title="Abrir curso"
+                    onClick={() => navigate(`/admin-sede/curso/${c.id}`)}
+                    title="Gestionar curso"
                   >
                     <span className="grid place-items-center w-10 h-10 rounded-full bg-mint/20 text-accent-teal shrink-0">
                       <BookOpen size={20} />

@@ -3,7 +3,7 @@
  * superadmin/admin-general see all. profesor/alumno are read-only via the
  * teacher endpoints, not here. */
 
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
 import { eq, and, sql } from "drizzle-orm";
@@ -15,6 +15,21 @@ async function requireUser(req: FastifyRequest): Promise<AccessClaims> {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) throw Object.assign(new Error("Sin sesión."), { status: 401 });
   return verifyAccessToken(auth.slice("Bearer ".length));
+}
+
+/** Load a class and verify the actor may act on its sede. Replies 404/403 and
+ *  returns null when not allowed; otherwise returns the class row. */
+async function loadOwnedClass(actor: AccessClaims, id: string, reply: FastifyReply) {
+  const [cls] = await db.select().from(schema.classes).where(eq(schema.classes.id, id)).limit(1);
+  if (!cls) {
+    reply.code(404).send({ error: "Curso no encontrado." });
+    return null;
+  }
+  if (!canActOnSede({ role: actor.role, sedeId: actor.sede }, cls.sedeId)) {
+    reply.code(403).send({ error: "No podés gestionar cursos de otra sede." });
+    return null;
+  }
+  return cls;
 }
 
 const createSchema = z.object({
@@ -95,6 +110,112 @@ export async function classRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "No podés eliminar cursos de otra sede." });
     }
     await db.delete(schema.classes).where(eq(schema.classes.id, id));
+    return reply.send({ ok: true });
+  });
+
+  /* ----- PATCH /api/classes/:id (rename / grade) ----- */
+  app.patch("/api/classes/:id", async (req, reply) => {
+    const actor = await requireUser(req);
+    if (actor.role === "profesor" || actor.role === "alumno") return reply.code(403).send({ error: "No autorizado." });
+    const { id } = req.params as { id: string };
+    const cls = await loadOwnedClass(actor, id, reply);
+    if (!cls) return;
+    const parsed = z.object({ name: z.string().trim().min(1).optional(), grade: createSchema.shape.grade }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Datos inválidos." });
+    const [row] = await db
+      .update(schema.classes)
+      .set({ name: parsed.data.name ?? cls.name, grade: parsed.data.grade ?? cls.grade })
+      .where(eq(schema.classes.id, id))
+      .returning();
+    return reply.send({ id: row!.id, name: row!.name, grade: row!.grade, sedeId: row!.sedeId });
+  });
+
+  /* ----- GET /api/classes/:id/members (teachers + students) ----- */
+  app.get("/api/classes/:id/members", async (req, reply) => {
+    const actor = await requireUser(req);
+    const { id } = req.params as { id: string };
+    const cls = await loadOwnedClass(actor, id, reply);
+    if (!cls) return;
+    const cols = {
+      id: schema.users.id,
+      fullName: schema.users.fullName,
+      email: schema.users.email,
+      username: schema.users.username,
+      lastLoginAt: schema.users.lastLoginAt,
+    };
+    const teachers = await db
+      .select(cols)
+      .from(schema.classTeachers)
+      .innerJoin(schema.users, eq(schema.users.id, schema.classTeachers.userId))
+      .where(eq(schema.classTeachers.classId, id))
+      .orderBy(schema.users.fullName);
+    const students = await db
+      .select(cols)
+      .from(schema.classStudents)
+      .innerJoin(schema.users, eq(schema.users.id, schema.classStudents.userId))
+      .where(eq(schema.classStudents.classId, id))
+      .orderBy(schema.users.fullName);
+    return reply.send({
+      class: { id: cls.id, name: cls.name, grade: cls.grade, sedeId: cls.sedeId },
+      teachers,
+      students,
+    });
+  });
+
+  /* ----- POST /api/classes/:id/teachers (assign a teacher) ----- */
+  app.post("/api/classes/:id/teachers", async (req, reply) => {
+    const actor = await requireUser(req);
+    if (actor.role === "profesor" || actor.role === "alumno") return reply.code(403).send({ error: "No autorizado." });
+    const { id } = req.params as { id: string };
+    const cls = await loadOwnedClass(actor, id, reply);
+    if (!cls) return;
+    const parsed = z.object({ userId: z.string().uuid() }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Falta el docente." });
+    const [t] = await db.select().from(schema.users).where(eq(schema.users.id, parsed.data.userId)).limit(1);
+    if (!t || t.role !== "profesor") return reply.code(400).send({ error: "El usuario no es un docente." });
+    if (!canActOnSede({ role: actor.role, sedeId: actor.sede }, t.sedeId)) {
+      return reply.code(403).send({ error: "El docente es de otra sede." });
+    }
+    await db.insert(schema.classTeachers).values({ classId: id, userId: parsed.data.userId }).onConflictDoNothing();
+    return reply.send({ ok: true });
+  });
+
+  /* ----- DELETE /api/classes/:id/teachers/:userId (unassign) ----- */
+  app.delete("/api/classes/:id/teachers/:userId", async (req, reply) => {
+    const actor = await requireUser(req);
+    if (actor.role === "profesor" || actor.role === "alumno") return reply.code(403).send({ error: "No autorizado." });
+    const { id, userId } = req.params as { id: string; userId: string };
+    const cls = await loadOwnedClass(actor, id, reply);
+    if (!cls) return;
+    await db
+      .delete(schema.classTeachers)
+      .where(and(eq(schema.classTeachers.classId, id), eq(schema.classTeachers.userId, userId)));
+    return reply.send({ ok: true });
+  });
+
+  /* ----- GET /api/classes/:id/worlds (enabled level-worlds; null = all) ----- */
+  app.get("/api/classes/:id/worlds", async (req, reply) => {
+    const actor = await requireUser(req);
+    const { id } = req.params as { id: string };
+    const cls = await loadOwnedClass(actor, id, reply);
+    if (!cls) return;
+    const rows = await db.select().from(schema.classWorlds).where(eq(schema.classWorlds.classId, id));
+    return reply.send({ worldIds: rows.length ? rows.filter((r) => r.isEnabled).map((r) => r.worldId) : null });
+  });
+
+  /* ----- PUT /api/classes/:id/worlds (replace the enabled set) ----- */
+  app.put("/api/classes/:id/worlds", async (req, reply) => {
+    const actor = await requireUser(req);
+    if (actor.role === "alumno") return reply.code(403).send({ error: "No autorizado." });
+    const { id } = req.params as { id: string };
+    const cls = await loadOwnedClass(actor, id, reply);
+    if (!cls) return;
+    const parsed = z.object({ worldIds: z.array(z.string()).max(50) }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Datos inválidos." });
+    await db.delete(schema.classWorlds).where(eq(schema.classWorlds.classId, id));
+    if (parsed.data.worldIds.length) {
+      await db.insert(schema.classWorlds).values(parsed.data.worldIds.map((w) => ({ classId: id, worldId: w, isEnabled: true })));
+    }
     return reply.send({ ok: true });
   });
 }

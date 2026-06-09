@@ -5,6 +5,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { EntrarPage } from "./pages/EntrarPage";
 import { LoginLayoutEditorPage } from "./pages/LoginLayoutEditorPage";
 import { GlassEditorPage } from "./pages/GlassEditorPage";
+import { CourseDetailPage } from "./pages/CourseDetailPage";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { InvitePage } from "./pages/InvitePage";
 import { WorldsPage } from "./pages/WorldsPage";
@@ -109,6 +110,9 @@ export function App() {
             </Suspense>
           }
         />
+        {/* Per-course management: assign teachers, add students (single/bulk),
+            enable levels. */}
+        <Route path="/admin-sede/curso/:classId" element={<CourseDetailPage />} />
       </Route>
 
       <Route element={<ProtectedRoute roles={["profesor"]} />}>
