@@ -163,7 +163,7 @@ export function LoginPage() {
       />
 
       <section
-        className="liquid-glass glass-card-smooth relative w-[min(32rem,92vw)] mx-auto my-[7vh] p-8 pt-12 text-center flex flex-col items-center gap-6 animate-card-in z-20"
+        className="liquid-glass glass-card-smooth relative w-[min(92vw,clamp(32rem,48vmin,44rem))] mx-auto my-[7vh] p-8 pt-12 text-center flex flex-col items-center gap-6 animate-card-in z-20"
         aria-label="Ingreso a TYPELY"
       >
         <span
@@ -190,10 +190,10 @@ export function LoginPage() {
         </span>
 
         <div className="text-center">
-          <h1 className="font-display text-4xl font-black mb-2 text-gradient-loop">
+          <h1 className="font-display text-[clamp(2.75rem,4.6vmin,4.2rem)] font-black mb-2 text-gradient-loop">
             ¡Bienvenido a TYPELY!
           </h1>
-          <p className="text-muted font-semibold">Aprendé a escribir jugando entre las nubes ✨</p>
+          <p className="text-muted font-semibold text-[clamp(1.3rem,2.2vmin,1.9rem)]">Aprendé a escribir jugando entre las nubes ✨</p>
         </div>
 
         <form onSubmit={submit} className="flex flex-col gap-4 w-full">
@@ -241,7 +241,7 @@ export function LoginPage() {
             <span className="inline-flex items-center" aria-hidden="true">
               <GoogleGlyph />
             </span>
-            Ingresar con Google
+            <span className="text-[clamp(1.3rem,2.2vmin,1.9rem)]">Ingresar con Google</span>
           </button>
 
 
@@ -254,7 +254,7 @@ export function LoginPage() {
             Entrar en modo demo
           </AnimatedButton>
 
-          <p className="flex items-center justify-center gap-1.5 text-xs text-muted/70 font-semibold mt-1">
+          <p className="flex items-center justify-center gap-1.5 text-[clamp(0.95rem,1.6vmin,1.35rem)] text-muted/70 font-semibold mt-1">
             <LockKeyhole size={15} aria-hidden="true" />
             Entorno seguro para aprender y enseñar
           </p>

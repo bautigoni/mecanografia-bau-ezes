@@ -22,7 +22,7 @@ export function AnimatedButton({
   ...props
 }: AnimatedButtonProps) {
   const base =
-    "inline-flex items-center justify-center min-h-[3.65rem] px-6 gap-1.5 rounded-xl font-extrabold cursor-pointer transition-transform duration-180 ease hover:-translate-y-0.5 active:scale-[0.985] disabled:opacity-50 disabled:pointer-events-none";
+    "inline-flex items-center justify-center min-h-[clamp(3.65rem,6vmin,4.7rem)] px-6 gap-1.5 rounded-xl font-extrabold cursor-pointer transition-transform duration-180 ease hover:-translate-y-0.5 active:scale-[0.985] disabled:opacity-50 disabled:pointer-events-none";
 
   return (
     <button
@@ -30,7 +30,7 @@ export function AnimatedButton({
       {...props}
     >
       {iconLeft}
-      <span>{children}</span>
+      <span className="text-[clamp(1.3rem,2.2vmin,1.9rem)]">{children}</span>
       {iconRight}
     </button>
   );
