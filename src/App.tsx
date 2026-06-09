@@ -6,6 +6,10 @@ import { EntrarPage } from "./pages/EntrarPage";
 import { LoginLayoutEditorPage } from "./pages/LoginLayoutEditorPage";
 import { GlassEditorPage } from "./pages/GlassEditorPage";
 import { CourseDetailPage } from "./pages/CourseDetailPage";
+import { CoursesListPage } from "./pages/admin/CoursesListPage";
+import { TeachersListPage } from "./pages/admin/TeachersListPage";
+import { StudentsListPage } from "./pages/admin/StudentsListPage";
+import { ProgresoPage, ConfigPage } from "./pages/admin/SedeStubPages";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { InvitePage } from "./pages/InvitePage";
 import { WorldsPage } from "./pages/WorldsPage";
@@ -110,6 +114,12 @@ export function App() {
             </Suspense>
           }
         />
+        {/* Dedicated admin-sede screens (F1 redesign). */}
+        <Route path="/admin-sede/cursos" element={<CoursesListPage />} />
+        <Route path="/admin-sede/docentes" element={<TeachersListPage />} />
+        <Route path="/admin-sede/alumnos" element={<StudentsListPage />} />
+        <Route path="/admin-sede/progreso" element={<ProgresoPage />} />
+        <Route path="/admin-sede/config" element={<ConfigPage />} />
         {/* Per-course management: assign teachers, add students (single/bulk),
             enable levels. */}
         <Route path="/admin-sede/curso/:classId" element={<CourseDetailPage />} />

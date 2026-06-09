@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   Send,
+  Settings,
   Trash2,
   Upload,
   Users,
@@ -40,9 +41,18 @@ const NAV: DashNavItem[] = [
   { id: "cursos", label: "Cursos", icon: BookOpen },
   { id: "docentes", label: "Docentes", icon: GraduationCap },
   { id: "alumnos", label: "Alumnos", icon: Users },
-  { id: "invitaciones", label: "Invitaciones", icon: Mail },
   { id: "progreso", label: "Progreso", icon: LineChart },
+  { id: "config", label: "Configuración", icon: Settings },
 ];
+
+/* Map a sidebar id to its dedicated route (F1). "inicio" stays on this page. */
+const SECTION_ROUTE: Record<string, string> = {
+  cursos: "/admin-sede/cursos",
+  docentes: "/admin-sede/docentes",
+  alumnos: "/admin-sede/alumnos",
+  progreso: "/admin-sede/progreso",
+  config: "/admin-sede/config",
+};
 
 /* ── Shared Tailwind class fragments ── */
 const INPUT_CLS =
@@ -373,10 +383,10 @@ export function SiteAdminPage() {
 
   const kpis = (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-      <KpiCard icon={BookOpen} label="Cursos" value={classes.length} tone="gold" onClick={() => setSection("cursos")} />
-      <KpiCard icon={GraduationCap} label="Docentes" value={teachers.length} tone="blue" onClick={() => setSection("docentes")} />
-      <KpiCard icon={Users} label="Alumnos" value={students.length} tone="pink" onClick={() => setSection("alumnos")} />
-      <KpiCard icon={Send} label="Invitaciones" value={pendingInvites} tone="violet" onClick={() => setSection("invitaciones")} />
+      <KpiCard icon={BookOpen} label="Cursos" value={classes.length} tone="gold" onClick={() => navigate("/admin-sede/cursos")} />
+      <KpiCard icon={GraduationCap} label="Docentes" value={teachers.length} tone="blue" onClick={() => navigate("/admin-sede/docentes")} />
+      <KpiCard icon={Users} label="Alumnos" value={students.length} tone="pink" onClick={() => navigate("/admin-sede/alumnos")} />
+      <KpiCard icon={Send} label="Invitaciones" value={pendingInvites} tone="violet" onClick={() => navigate("/admin-sede/docentes")} />
       <KpiCard icon={Zap} label="Clases activas" value={classes.length} tone="green" />
     </div>
   );
@@ -419,8 +429,8 @@ export function SiteAdminPage() {
       </h1>
       <p className="text-muted font-semibold">Gestioná cursos, docentes, alumnos e invitaciones de tu sede. ✨</p>
       <div className="flex flex-wrap gap-3 mt-2">
-        <Button variant="secondary" onClick={() => setSection("invitaciones")}><Send size={18} /> Invitar docente</Button>
-        <Button onClick={() => setSection("cursos")}><Plus size={18} /> Crear curso</Button>
+        <Button variant="secondary" onClick={() => navigate("/admin-sede/docentes")}><Send size={18} /> Invitar docente</Button>
+        <Button onClick={() => navigate("/admin-sede/cursos")}><Plus size={18} /> Crear curso</Button>
       </div>
     </>
   );
@@ -435,7 +445,7 @@ export function SiteAdminPage() {
       sidebarMascot={assets.mascotFemaleLaptop}
       nav={NAV}
       activeId={section}
-      onNavigate={setSection}
+      onNavigate={(id) => (SECTION_ROUTE[id] ? navigate(SECTION_ROUTE[id]) : setSection(id))}
       onLogout={leave}
       search={{ value: search, onChange: setSearch, placeholder: "Buscar cursos, docentes, alumnos…" }}
       onBell={() => setMessage("No tenés notificaciones nuevas.")}
