@@ -6,7 +6,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { verifyAccessToken } from "../auth.js";
 import { canActOnSede } from "../rbac.js";
 import type { AccessClaims } from "../auth.js";
@@ -217,5 +217,95 @@ export async function classRoutes(app: FastifyInstance) {
       await db.insert(schema.classWorlds).values(parsed.data.worldIds.map((w) => ({ classId: id, worldId: w, isEnabled: true })));
     }
     return reply.send({ ok: true });
+  });
+
+  /* ----- POST /api/classes/:id/students (move/assign an existing student) ----- */
+  app.post("/api/classes/:id/students", async (req, reply) => {
+    const actor = await requireUser(req);
+    if (actor.role === "profesor" || actor.role === "alumno") return reply.code(403).send({ error: "No autorizado." });
+    const { id } = req.params as { id: string };
+    const cls = await loadOwnedClass(actor, id, reply);
+    if (!cls) return;
+    const parsed = z.object({ userId: z.string().uuid() }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Falta el alumno." });
+    const [s] = await db.select().from(schema.users).where(eq(schema.users.id, parsed.data.userId)).limit(1);
+    if (!s || s.role !== "alumno") return reply.code(400).send({ error: "El usuario no es un alumno." });
+    if (!canActOnSede({ role: actor.role, sedeId: actor.sede }, s.sedeId)) {
+      return reply.code(403).send({ error: "El alumno es de otra sede." });
+    }
+    // Move: drop from any class roster, attach to this one, set primary classId.
+    await db.delete(schema.classStudents).where(eq(schema.classStudents.userId, parsed.data.userId));
+    await db.insert(schema.classStudents).values({ classId: id, userId: parsed.data.userId }).onConflictDoNothing();
+    await db.update(schema.users).set({ classId: id }).where(eq(schema.users.id, parsed.data.userId));
+    return reply.send({ ok: true });
+  });
+
+  /* ----- GET /api/classes/:id/progress (per-student aggregate for heatmap) ----- */
+  app.get("/api/classes/:id/progress", async (req, reply) => {
+    const actor = await requireUser(req);
+    const { id } = req.params as { id: string };
+    const cls = await loadOwnedClass(actor, id, reply);
+    if (!cls) return;
+
+    const roster = await db
+      .select({ id: schema.users.id, fullName: schema.users.fullName, username: schema.users.username })
+      .from(schema.classStudents)
+      .innerJoin(schema.users, eq(schema.users.id, schema.classStudents.userId))
+      .where(eq(schema.classStudents.classId, id))
+      .orderBy(schema.users.fullName);
+
+    const ids = roster.map((r) => r.id);
+    const prog = ids.length
+      ? await db
+          .select({
+            userId: schema.levelProgress.userId,
+            worldId: schema.levelProgress.worldId,
+            completed: schema.levelProgress.completed,
+            bestAccuracy: schema.levelProgress.bestAccuracy,
+            lastAttemptAt: schema.levelProgress.lastAttemptAt,
+          })
+          .from(schema.levelProgress)
+          .where(inArray(schema.levelProgress.userId, ids))
+      : [];
+
+    const byUser = new Map<string, typeof prog>();
+    for (const p of prog) {
+      const arr = byUser.get(p.userId) ?? [];
+      arr.push(p);
+      byUser.set(p.userId, arr);
+    }
+
+    const students = roster.map((r) => {
+      const rows = byUser.get(r.id) ?? [];
+      const byWorld: Record<string, { completed: number; avgAccuracy: number }> = {};
+      let lastActivity: string | null = null;
+      let completedLevels = 0;
+      let accSum = 0;
+      for (const p of rows) {
+        const w = (byWorld[p.worldId] ??= { completed: 0, avgAccuracy: 0 });
+        if (p.completed) { w.completed += 1; completedLevels += 1; }
+        w.avgAccuracy += p.bestAccuracy;
+        accSum += p.bestAccuracy;
+        const t = p.lastAttemptAt ? new Date(p.lastAttemptAt).toISOString() : null;
+        if (t && (!lastActivity || t > lastActivity)) lastActivity = t;
+      }
+      for (const w of Object.values(byWorld)) w.avgAccuracy = Math.round(w.avgAccuracy / Math.max(1, rows.filter((x) => byWorld[x.worldId] === w).length));
+      const worldsWithProgress = Object.keys(byWorld);
+      const currentWorld = worldsWithProgress
+        .map((w) => Number(w.replace("island", "")) || 0)
+        .reduce((a, b) => Math.max(a, b), 0);
+      return {
+        id: r.id,
+        fullName: r.fullName,
+        username: r.username,
+        lastActivity,
+        completedLevels,
+        avgAccuracy: rows.length ? Math.round(accSum / rows.length) : 0,
+        currentWorld: currentWorld ? `island${currentWorld}` : null,
+        byWorld,
+      };
+    });
+
+    return reply.send({ students });
   });
 }

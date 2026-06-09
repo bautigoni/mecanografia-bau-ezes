@@ -135,6 +135,17 @@ export interface ClassMember {
   lastLoginAt: string | null;
 }
 
+export interface ClassProgressRow {
+  id: string;
+  fullName: string;
+  username: string | null;
+  lastActivity: string | null;
+  completedLevels: number;
+  avgAccuracy: number;
+  currentWorld: string | null;
+  byWorld: Record<string, { completed: number; avgAccuracy: number }>;
+}
+
 export const api = {
   async login(emailOrUsername: string, password: string): Promise<{ user: ApiActiveUser; access: string }> {
     const res = await call<{ user: ApiActiveUser; access: string }>("/auth/login", {
@@ -229,6 +240,9 @@ export const api = {
   getClassWorlds: (id: string) => call<{ worldIds: string[] | null }>(`/classes/${id}/worlds`),
   setClassWorlds: (id: string, worldIds: string[]) =>
     call<{ ok: true }>(`/classes/${id}/worlds`, { method: "PUT", json: { worldIds } }),
+  assignStudent: (classId: string, userId: string) =>
+    call<{ ok: true }>(`/classes/${classId}/students`, { method: "POST", json: { userId } }),
+  classProgress: (id: string) => call<{ students: ClassProgressRow[] }>(`/classes/${id}/progress`),
   /* Progress. */
   postProgressComplete: (payload: {
     worldId: string;
