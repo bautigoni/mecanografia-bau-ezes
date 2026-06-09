@@ -12,9 +12,10 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { verifyAccessToken, hashPassword } from "../auth.js";
 import { assertCanGrant, canActOnSede, ForbiddenError } from "../rbac.js";
+import { audit } from "../audit.js";
 import type { AccessClaims } from "../auth.js";
 
 async function requireUser(req: FastifyRequest): Promise<AccessClaims> {
@@ -53,10 +54,10 @@ function makeTempPassword(): string {
 }
 
 export async function userRoutes(app: FastifyInstance) {
-  /* ----- GET /api/users?role=&sedeId= ----- */
+  /* ----- GET /api/users?role=&sedeId=&includeDeleted= ----- */
   app.get("/api/users", async (req, reply) => {
     const actor = await requireUser(req);
-    const { role, sedeId } = req.query as { role?: string; sedeId?: string };
+    const { role, sedeId, includeDeleted } = req.query as { role?: string; sedeId?: string; includeDeleted?: string };
     const conditions = [];
     if (role) conditions.push(eq(schema.users.role, role as schema.Role));
     // admin_sede can only see their own sede
@@ -66,6 +67,9 @@ export async function userRoutes(app: FastifyInstance) {
     } else if (sedeId) {
       conditions.push(eq(schema.users.sedeId, sedeId));
     }
+    // F6: by default we hide soft-deleted accounts (Borrar cuenta from
+    // the superadmin panel). Superadmin can opt in via ?includeDeleted=1.
+    if (!includeDeleted) conditions.push(isNull(schema.users.deletedAt));
     const where = conditions.length ? and(...conditions) : undefined;
     const rows = await db
       .select({
@@ -80,6 +84,7 @@ export async function userRoutes(app: FastifyInstance) {
         active: schema.users.active,
         mustChangePassword: schema.users.mustChangePassword,
         lastLoginAt: schema.users.lastLoginAt,
+        deletedAt: schema.users.deletedAt,
       })
       .from(schema.users)
       .where(where as any)
@@ -138,6 +143,13 @@ export async function userRoutes(app: FastifyInstance) {
         await db.insert(schema.classTeachers).values({ classId: data.classId, userId: row.id }).onConflictDoNothing();
       }
     }
+    await audit({
+      actor,
+      action: "create_user",
+      entityType: "user",
+      entityId: row.id,
+      meta: { role: data.role, email: data.email, sedeId: targetSede, classId: data.classId ?? null, generatedPassword: !chosen },
+    });
     return reply.send({
       user: { id: row.id, email: row.email, name: row.fullName, username: row.username, role: row.role, sedeId: row.sedeId, classId: row.classId },
       // Only surface a password when WE generated it; a chosen one is not echoed.
@@ -174,7 +186,7 @@ export async function userRoutes(app: FastifyInstance) {
     return reply.send(row);
   });
 
-  /* ----- DELETE /api/users/:id ----- */
+  /* ----- DELETE /api/users/:id (F6: soft delete) ----- */
   app.delete("/api/users/:id", async (req, reply) => {
     const actor = await requireUser(req);
     const { id } = req.params as { id: string };
@@ -192,7 +204,50 @@ export async function userRoutes(app: FastifyInstance) {
     if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, target.sedeId)) {
       return reply.code(403).send({ error: "No podés eliminar usuarios de otra sede." });
     }
-    await db.delete(schema.users).where(eq(schema.users.id, id));
+    // F6: soft delete — keeps progress, attempts and audit history intact.
+    // The account can no longer log in, is hidden from listings, and is
+    // excluded from class rosters via the active=true filter (also flipped
+    // to false so any in-flight session sees "user inactive" on next call).
+    await db
+      .update(schema.users)
+      .set({ deletedAt: new Date(), active: false, updatedAt: new Date() })
+      .where(eq(schema.users.id, id));
+    await audit({
+      actor,
+      action: "delete_user",
+      entityType: "user",
+      entityId: id,
+      meta: { email: target.email, role: target.role },
+    });
+    return reply.send({ ok: true });
+  });
+
+  /* ----- POST /api/users/:id/restore (F6: re-activate a soft-deleted account) ----- */
+  app.post("/api/users/:id/restore", async (req, reply) => {
+    const actor = await requireUser(req);
+    const { id } = req.params as { id: string };
+    const [target] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
+    if (!target) return reply.code(404).send({ error: "Usuario no encontrado." });
+    try {
+      assertCanGrant(actor.role as schema.Role, target.role);
+    } catch (e) {
+      if (e instanceof ForbiddenError) return reply.code(e.status).send({ error: e.message });
+      throw e;
+    }
+    if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, target.sedeId)) {
+      return reply.code(403).send({ error: "No podés restaurar usuarios de otra sede." });
+    }
+    await db
+      .update(schema.users)
+      .set({ deletedAt: null, active: true, updatedAt: new Date() })
+      .where(eq(schema.users.id, id));
+    await audit({
+      actor,
+      action: "restore_user",
+      entityType: "user",
+      entityId: id,
+      meta: { email: target.email, role: target.role },
+    });
     return reply.send({ ok: true });
   });
 
@@ -217,6 +272,13 @@ export async function userRoutes(app: FastifyInstance) {
       .update(schema.users)
       .set({ passwordHash, mustChangePassword: true, temporaryPassword: true })
       .where(eq(schema.users.id, id));
+    await audit({
+      actor,
+      action: "reset_password",
+      entityType: "user",
+      entityId: id,
+      meta: { email: target.email, role: target.role },
+    });
     return reply.send({ temporaryPassword: tempPassword });
   });
 

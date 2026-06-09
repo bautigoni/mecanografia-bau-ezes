@@ -40,6 +40,17 @@ export const gradeEnum = pgEnum("grade_id", [
   "libre",
 ]);
 
+/* F6: class lifecycle (active vs archived) and student-enrollment status
+   (cursando / promovido / egresado / retirado) so we can keep the
+   year-over-year history even after a course is archived. */
+export const classStatusEnum = pgEnum("class_status", ["active", "archived"]);
+export const enrollmentStatusEnum = pgEnum("enrollment_status", [
+  "cursando",
+  "promovido",
+  "egresado",
+  "retirado",
+]);
+
 export const sedes = pgTable(
   "sedes",
   {
@@ -75,6 +86,9 @@ export const users = pgTable(
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    /* F6 soft-delete. Hard-deletes are reserved for GDPR; normal "borrar
+       cuenta" just flips this and the auth/listing endpoints filter it out. */
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => ({
     emailUnique: uniqueIndex("users_email_unique").on(sql`lower(${t.email})`),
@@ -95,12 +109,91 @@ export const classes = pgTable(
     name: text("name").notNull(),
     grade: gradeEnum("grade").notNull(),
     year: integer("year"),
+    /* F6: an academic year groups courses (1°A-2026 ≠ 1°A-2027). Nullable
+       only for the one-shot migration that back-fills existing data. */
+    academicYearId: uuid("academic_year_id"),
+    /* F6: lifecycle. `active` (default) vs `archived` (year closed). */
+    status: classStatusEnum("status").notNull().default("active"),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     sedeIdx: index("idx_classes_sede").on(t.sedeId),
+    yearIdx: index("idx_classes_year").on(t.academicYearId),
+  }),
+);
+
+/* F6: academic year per sede. Exactly one row has isActive = true per sede
+   (enforced in the route, not by the DB, because Postgres would need a
+   partial-unique index per sedeId that doesn't compose well with our simple
+   migration story). */
+export const academicYears = pgTable(
+  "academic_years",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sedeId: uuid("sede_id")
+      .notNull()
+      .references(() => sedes.id, { onDelete: "cascade" }),
+    label: text("label").notNull(), // "2026"
+    startsAt: date("starts_at"),
+    endsAt: date("ends_at"),
+    isActive: boolean("is_active").notNull().default(false),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    sedeIdx: index("idx_academic_years_sede").on(t.sedeId),
+    sedeLabelUnique: uniqueIndex("academic_years_sede_label_unique").on(t.sedeId, t.label),
+  }),
+);
+
+/* F6: per-student per-year enrollment. Multiple rows per student across
+   years is the whole point — it lets us keep `1°A-2026` history when the
+   student advances to `1°A-2027`. */
+export const classEnrollments = pgTable(
+  "class_enrollments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    classId: uuid("class_id")
+      .notNull()
+      .references(() => classes.id, { onDelete: "cascade" }),
+    academicYearId: uuid("academic_year_id")
+      .notNull()
+      .references(() => academicYears.id, { onDelete: "cascade" }),
+    status: enrollmentStatusEnum("status").notNull().default("cursando"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+  },
+  (t) => ({
+    studentIdx: index("idx_class_enrollments_student").on(t.studentId),
+    classIdx: index("idx_class_enrollments_class").on(t.classId),
+    yearIdx: index("idx_class_enrollments_year").on(t.academicYearId),
+  }),
+);
+
+/* F6: append-only audit log. Every privileged mutation writes one row in
+   the same DB transaction so the history is consistent. */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    sedeId: uuid("sede_id").references(() => sedes.id, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id"),
+    meta: text("meta"), // JSON-encoded; cheap and avoids a jsonb migration
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    atIdx: index("idx_audit_at").on(t.at),
+    sedeIdx: index("idx_audit_sede").on(t.sedeId),
+    entityIdx: index("idx_audit_entity").on(t.entityType, t.entityId),
+    actorIdx: index("idx_audit_actor").on(t.actorId),
   }),
 );
 

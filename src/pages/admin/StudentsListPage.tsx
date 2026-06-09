@@ -4,6 +4,7 @@ import { Plus, X, KeyRound, Trash2, Pencil } from "lucide-react";
 import { SedeShell } from "../../components/admin/SedeShell";
 import { DataTable } from "../../components/admin/DataTable";
 import { relTime } from "./TeachersListPage";
+import { useAcademicYear } from "../../hooks/useAcademicYear";
 import { useAuth } from "../../hooks/useAuth";
 import { api, type ApiUser, type ApiClass } from "../../utils/api";
 
@@ -16,6 +17,7 @@ export function StudentsListPage() {
   const navigate = useNavigate();
   const { user, viewAs } = useAuth();
   const siteId = user?.role === "superadmin" && viewAs?.sedeId ? viewAs.sedeId : user?.siteId;
+  const { selected: selectedYear } = useAcademicYear();
 
   const [students, setStudents] = useState<ApiUser[]>([]);
   const [classes, setClasses] = useState<ApiClass[]>([]);
@@ -30,7 +32,7 @@ export function StudentsListPage() {
 
   const load = useCallback(async () => {
     try {
-      const [s, c] = await Promise.all([api.listUsers({ role: "alumno", sedeId: siteId ?? undefined }), api.listClasses(siteId)]);
+      const [s, c] = await Promise.all([api.listUsers({ role: "alumno", sedeId: siteId ?? undefined }), api.listClasses(siteId, true)]);
       setStudents(s);
       setClasses(c);
     } catch { setMsg("No se pudieron cargar los alumnos."); }
@@ -38,14 +40,25 @@ export function StudentsListPage() {
   useEffect(() => { void load(); }, [load]);
 
   const classMap = useMemo(() => new Map(classes.map((c) => [c.id, c.name])), [classes]);
+  const classYearByClassId = useMemo(() => new Map(classes.map((c) => [c.id, c.academicYearId ?? null])), [classes]);
+  // F6: filter by selected year (through the student's class).
+  const yearClassIds = useMemo(() => {
+    if (!selectedYear) return new Set<string>();
+    return new Set(classes.filter((c) => c.academicYearId === selectedYear.id).map((c) => c.id));
+  }, [classes, selectedYear]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return students.filter((s) =>
-      (s.fullName.toLowerCase().includes(q) || (s.username ?? "").toLowerCase().includes(q)) &&
-      (!courseFilter || s.classId === courseFilter),
-    );
-  }, [students, search, courseFilter]);
+    return students.filter((s) => {
+      if (q && !(s.fullName.toLowerCase().includes(q) || (s.username ?? "").toLowerCase().includes(q))) return false;
+      if (courseFilter && s.classId !== courseFilter) return false;
+      if (selectedYear) {
+        if (!s.classId) return false;            // unassigned → not in any year
+        if (!yearClassIds.has(s.classId)) return false;
+      }
+      return true;
+    });
+  }, [students, search, courseFilter, selectedYear, yearClassIds]);
 
   async function createStudent(e: FormEvent) {
     e.preventDefault();
@@ -84,12 +97,14 @@ export function StudentsListPage() {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="font-display font-black text-2xl text-text">Alumnos</h1>
-            <p className="text-muted font-semibold text-sm">{students.length} alumno(s).</p>
+            <p className="text-muted font-semibold text-sm">
+              {selectedYear ? <>Año lectivo <b className="text-accent-teal">{selectedYear.label}</b> · {filtered.length} alumno(s).</> : `${filtered.length} alumno(s).`}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)} className="glass-surface rounded-xl px-3 h-11 font-bold text-text cursor-pointer">
               <option value="">Todos los cursos</option>
-              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {classes.filter((c) => !selectedYear || c.academicYearId === selectedYear.id).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <button type="button" onClick={() => { setCreating(true); setDraft({ name: "", classId: courseFilter }); }} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-accent to-accent-strong shadow-btn cursor-pointer"><Plus size={18} /> Agregar alumno</button>
           </div>

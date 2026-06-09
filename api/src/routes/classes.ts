@@ -9,6 +9,7 @@ import { db, schema } from "../db/index.js";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { verifyAccessToken } from "../auth.js";
 import { canActOnSede } from "../rbac.js";
+import { audit } from "../audit.js";
 import type { AccessClaims } from "../auth.js";
 
 async function requireUser(req: FastifyRequest): Promise<AccessClaims> {
@@ -39,12 +40,12 @@ const createSchema = z.object({
 });
 
 export async function classRoutes(app: FastifyInstance) {
-  /* ----- GET /api/classes?sedeId= ----- */
+  /* ----- GET /api/classes?sedeId=&includeArchived= ----- */
   app.get("/api/classes", async (req, reply) => {
     const actor = await requireUser(req);
     if (actor.role === "alumno") return reply.code(403).send({ error: "No autorizado." });
 
-    const { sedeId } = req.query as { sedeId?: string };
+    const { sedeId, includeArchived } = req.query as { sedeId?: string; includeArchived?: string };
     const conditions = [];
     if (actor.role === "admin-sede" || actor.role === "profesor") {
       if (!actor.sede) return reply.send([]);
@@ -52,6 +53,9 @@ export async function classRoutes(app: FastifyInstance) {
     } else if (sedeId) {
       conditions.push(eq(schema.classes.sedeId, sedeId));
     }
+    // F6: archived classes are hidden by default; pass ?includeArchived=1
+    // to surface them (for the "cursos archivados" view in the sede config).
+    if (!includeArchived) conditions.push(eq(schema.classes.status, "active"));
     const where = conditions.length ? and(...conditions) : undefined;
     const rows = await db.select().from(schema.classes).where(where as any).orderBy(schema.classes.name);
 
@@ -74,6 +78,8 @@ export async function classRoutes(app: FastifyInstance) {
         name: c.name,
         grade: c.grade,
         sedeId: c.sedeId,
+        academicYearId: c.academicYearId,
+        status: c.status,
         studentCount: sMap.get(c.id) ?? 0,
         teacherCount: tMap.get(c.id) ?? 0,
       })),
@@ -110,6 +116,42 @@ export async function classRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "No podés eliminar cursos de otra sede." });
     }
     await db.delete(schema.classes).where(eq(schema.classes.id, id));
+    await audit({ actor, action: "delete_class", entityType: "class", entityId: id, meta: { name: target.name } });
+    return reply.send({ ok: true });
+  });
+
+  /* ----- POST /api/classes/:id/archive (F6) ----- */
+  app.post("/api/classes/:id/archive", async (req, reply) => {
+    const actor = await requireUser(req);
+    if (actor.role === "profesor" || actor.role === "alumno") {
+      return reply.code(403).send({ error: "No autorizado." });
+    }
+    const { id } = req.params as { id: string };
+    const cls = await loadOwnedClass(actor, id, reply);
+    if (!cls) return;
+    if (cls.status === "archived") return reply.send({ ok: true, alreadyArchived: true });
+    await db
+      .update(schema.classes)
+      .set({ status: "archived", active: false, updatedAt: new Date() })
+      .where(eq(schema.classes.id, id));
+    await audit({ actor, action: "archive_class", entityType: "class", entityId: id, meta: { name: cls.name } });
+    return reply.send({ ok: true });
+  });
+
+  /* ----- POST /api/classes/:id/reactivate (F6) ----- */
+  app.post("/api/classes/:id/reactivate", async (req, reply) => {
+    const actor = await requireUser(req);
+    if (actor.role === "profesor" || actor.role === "alumno") {
+      return reply.code(403).send({ error: "No autorizado." });
+    }
+    const { id } = req.params as { id: string };
+    const cls = await loadOwnedClass(actor, id, reply);
+    if (!cls) return;
+    await db
+      .update(schema.classes)
+      .set({ status: "active", active: true, updatedAt: new Date() })
+      .where(eq(schema.classes.id, id));
+    await audit({ actor, action: "reactivate_class", entityType: "class", entityId: id, meta: { name: cls.name } });
     return reply.send({ ok: true });
   });
 

@@ -87,6 +87,9 @@ export function AdminGeneralPage() {
   const [tempPassword, setTempPassword] = useState("");
   /** Admin pending hard-delete confirmation (id + name for the dialog). */
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
+  /* F6: toggle that re-fetches users with includeDeleted=1 so the
+     superadmin can see + restore soft-deleted accounts. */
+  const [showDeleted, setShowDeleted] = useState(false);
 
   /* Dedicated "invite admin de sede by email" flow (mirrors the teacher one). */
   const [invitations, setInvitations] = useState<
@@ -94,6 +97,9 @@ export function AdminGeneralPage() {
   >([]);
   const [inviteDraft, setInviteDraft] = useState({ email: "", name: "", siteId: "" });
   const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
+  /* F6: confirm-and-expire dialog for a single invitation (also see bulk button). */
+  const [confirmExpireInv, setConfirmExpireInv] = useState<{ id: string; email: string } | null>(null);
+  const [confirmExpireAll, setConfirmExpireAll] = useState(false);
 
   /* Live ecosystem state, loaded from the API (Postgres = source of truth). */
   const [sites, setSites] = useState<Site[]>([]);
@@ -102,7 +108,12 @@ export function AdminGeneralPage() {
 
   const reload = useCallback(async () => {
     try {
-      const [s, u, c, inv] = await Promise.all([api.listSedes(), api.listUsers(), api.listClasses(), api.listInvitations()]);
+      const [s, u, c, inv] = await Promise.all([
+        api.listSedes(),
+        api.listUsers({ includeDeleted: showDeleted ? "1" : undefined } as any),
+        api.listClasses(),
+        api.listInvitations(),
+      ]);
       setInvitations(inv);
       setSites(s.map((x) => ({ id: x.id, name: x.name, city: x.city, photo: x.photo ?? undefined, active: x.active })));
       setUsers(
@@ -114,13 +125,15 @@ export function AdminGeneralPage() {
           role: x.role,
           siteId: x.sedeId ?? undefined,
           active: x.active,
-        }) as EduTicUser),
+          // F6: surface soft-delete state so the per-card Restaurar button works.
+          ...(x as any).deletedAt ? { deletedAt: (x as any).deletedAt } : {},
+        } as unknown as EduTicUser)),
       );
       setClasses(c.map((x) => ({ id: x.id, siteId: x.sedeId })));
     } catch (e) {
       setMessage(e instanceof ApiError ? e.message : "No se pudieron cargar los datos.");
     }
-  }, []);
+  }, [showDeleted]);
 
   useEffect(() => {
     void reload();
@@ -355,6 +368,26 @@ export function AdminGeneralPage() {
       setMessage(err instanceof Error ? err.message : "No se pudo eliminar el admin.");
     }
   }
+  /* F6: invitations — expire a single one or every pending one. */
+  async function doExpireInvitation() {
+    if (!confirmExpireInv) return;
+    try {
+      await api.expireInvitation(confirmExpireInv.id);
+      setConfirmExpireInv(null);
+      refresh(`Invitación de ${confirmExpireInv.email} expirada.`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo expirar la invitación.");
+    }
+  }
+  async function doExpireAll() {
+    try {
+      const res = await api.expireAllInvitations();
+      setConfirmExpireAll(false);
+      refresh(`${res.expired} invitación(es) expiradas.`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "No se pudo expirar las invitaciones.");
+    }
+  }
 
   const sedeAdmins = data.users.filter((u) => u.role === "admin-sede");
   const siteName = (id?: string) => data.sites.find((s) => s.id === id)?.name ?? "Sin sede";
@@ -453,36 +486,71 @@ export function AdminGeneralPage() {
     }
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {admins.map((admin) => (
-          <div
-            key={admin.id}
-            className={`glass-surface flex items-center gap-3 p-4 animate-card-in ${admin.active === false ? "opacity-60" : ""}`}
-          >
-            <span className="grid place-items-center w-10 h-10 rounded-full bg-accent/15 text-accent shrink-0">
-              <ShieldCheck size={20} />
-            </span>
-            <div className="flex flex-col min-w-0 flex-1">
-              <strong className="text-sm text-text truncate">{admin.name}</strong>
-              <span className="text-xs text-muted truncate">{admin.email ?? admin.username}</span>
-              <small className="text-xs text-muted/70 truncate">{siteName(admin.siteId)}</small>
+        {admins.map((admin) => {
+          const isDeleted = !!(admin as any).deletedAt;
+          return (
+            <div
+              key={admin.id}
+              className={`glass-surface flex items-center gap-3 p-4 animate-card-in ${admin.active === false || isDeleted ? "opacity-60" : ""}`}
+            >
+              <span className="grid place-items-center w-10 h-10 rounded-full bg-accent/15 text-accent shrink-0">
+                <ShieldCheck size={20} />
+              </span>
+              <div className="flex flex-col min-w-0 flex-1">
+                <strong className="text-sm text-text truncate">{admin.name}</strong>
+                <span className="text-xs text-muted truncate">{admin.email ?? admin.username}</span>
+                <small className="text-xs text-muted/70 truncate">{siteName(admin.siteId)}</small>
+              </div>
+              <span
+                className={`text-xs font-bold px-3 py-1 rounded-full text-white shrink-0 ${
+                  isDeleted
+                    ? "bg-rose/70"
+                    : admin.active === false
+                    ? "bg-muted/60"
+                    : "bg-mint"
+                }`}
+              >
+                {isDeleted ? "Borrado" : admin.active === false ? "Inactivo" : "Activo"}
+              </span>
+              <button
+                type="button"
+                className="grid place-items-center w-8 h-8 rounded-full bg-white/40 text-text/60 hover:text-text hover:bg-white/70 cursor-pointer border-0 transition-colors shrink-0"
+                aria-label={`Editar ${admin.name}`}
+                onClick={() => openEditAdmin(admin)}
+              >
+                <Pencil size={16} />
+              </button>
+              {isDeleted ? (
+                <button
+                  type="button"
+                  className="grid place-items-center px-2 h-8 rounded-full bg-mint/20 text-mint hover:text-white hover:bg-mint cursor-pointer border-0 transition-colors shrink-0 text-[10px] font-black uppercase tracking-wide"
+                  aria-label={`Restaurar ${admin.name}`}
+                  title="Restaurar"
+                  onClick={async () => {
+                    try {
+                      await api.restoreUser(admin.id);
+                      refresh("Cuenta restaurada.");
+                    } catch (err) {
+                      setMessage(err instanceof Error ? err.message : "No se pudo restaurar.");
+                    }
+                  }}
+                >
+                  Restaurar
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="grid place-items-center w-8 h-8 rounded-full bg-white/40 text-rose/80 hover:text-white hover:bg-rose cursor-pointer border-0 transition-colors shrink-0"
+                  aria-label={`Borrar cuenta de ${admin.name}`}
+                  title="Borrar cuenta"
+                  onClick={() => setConfirmDelete({ id: admin.id, name: admin.name })}
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </div>
-            <span
-              className={`text-xs font-bold px-3 py-1 rounded-full text-white shrink-0 ${
-                admin.active === false ? "bg-muted/60" : "bg-mint"
-              }`}
-            >
-              {admin.active === false ? "Inactivo" : "Activo"}
-            </span>
-            <button
-              type="button"
-              className="grid place-items-center w-8 h-8 rounded-full bg-white/40 text-text/60 hover:text-text hover:bg-white/70 cursor-pointer border-0 transition-colors shrink-0"
-              aria-label={`Editar ${admin.name}`}
-              onClick={() => openEditAdmin(admin)}
-            >
-              <Pencil size={16} />
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   }
@@ -665,14 +733,25 @@ export function AdminGeneralPage() {
               </h2>
               <p className="text-sm text-muted font-semibold">Cada admin gestiona únicamente su sede asignada.</p>
             </div>
-            <Button
-              className={BTN_SM}
-              onClick={openCreateAdmin}
-              disabled={data.sites.length === 0}
-              title={data.sites.length === 0 ? "Primero creá una sede para poder asignarle un administrador." : undefined}
-            >
-              <UserCog size={18} /> Crear admin de sede
-            </Button>
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="flex items-center gap-2 text-sm font-semibold text-muted cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded accent-accent-teal"
+                  checked={showDeleted}
+                  onChange={(e) => setShowDeleted(e.target.checked)}
+                />
+                Mostrar borrados
+              </label>
+              <Button
+                className={BTN_SM}
+                onClick={openCreateAdmin}
+                disabled={data.sites.length === 0}
+                title={data.sites.length === 0 ? "Primero creá una sede para poder asignarle un administrador." : undefined}
+              >
+                <UserCog size={18} /> Crear admin de sede
+              </Button>
+            </div>
           </div>
           <AdminCards admins={filteredAdmins} />
 
@@ -715,21 +794,47 @@ export function AdminGeneralPage() {
             </form>
             {invitations.filter((i) => i.role === "admin-sede").length > 0 && (
               <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <h4 className="text-sm font-bold text-text">Invitaciones pendientes y enviadas</h4>
+                  {invitations.some((i) => i.role === "admin-sede" && (i.status === "pending" || i.status === "sent")) && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className={BTN_SM}
+                      onClick={() => setConfirmExpireAll(true)}
+                    >
+                      <Trash2 size={15} /> Expirar todas
+                    </Button>
+                  )}
+                </div>
                 {invitations
                   .filter((i) => i.role === "admin-sede")
-                  .map((inv) => (
-                    <div key={inv.id} className="flex items-center gap-3 flex-wrap p-3 rounded-xl bg-white/40">
-                      <span className="flex items-center gap-2 text-sm font-semibold text-text min-w-0 flex-1">
-                        <Mail size={16} className="shrink-0" /> {inv.email}
-                      </span>
-                      <span className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 ${inviteStatusCls[inv.status] ?? "bg-white/40 text-muted"}`}>
-                        {inv.status}
-                      </span>
-                      <Button variant="secondary" className={BTN_SM} onClick={() => copyAdminInviteLink(inv.id)}>
-                        <Copy size={16} /> Copiar enlace
-                      </Button>
-                    </div>
-                  ))}
+                  .map((inv) => {
+                    const canExpire = inv.status === "pending" || inv.status === "sent";
+                    return (
+                      <div key={inv.id} className="flex items-center gap-3 flex-wrap p-3 rounded-xl bg-white/40">
+                        <span className="flex items-center gap-2 text-sm font-semibold text-text min-w-0 flex-1">
+                          <Mail size={16} className="shrink-0" /> {inv.email}
+                        </span>
+                        <span className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 ${inviteStatusCls[inv.status] ?? "bg-white/40 text-muted"}`}>
+                          {inv.status}
+                        </span>
+                        <Button variant="secondary" className={BTN_SM} onClick={() => copyAdminInviteLink(inv.id)}>
+                          <Copy size={16} /> Copiar enlace
+                        </Button>
+                        {canExpire && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1.5 text-sm font-bold text-rose hover:text-rose/80 cursor-pointer bg-transparent border-0"
+                            onClick={() => setConfirmExpireInv({ id: inv.id, email: inv.email })}
+                            title="Expirar esta invitación"
+                          >
+                            <Trash2 size={15} /> Expirar
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -872,6 +977,84 @@ export function AdminGeneralPage() {
               className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/30 border-0 cursor-pointer flex items-center justify-center text-text/60 hover:text-text hover:bg-white/50 transition-colors"
               aria-label="Cerrar"
               onClick={closeAdminModal}
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {confirmExpireInv && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="expire-inv-title">
+          <div className="absolute inset-0 bg-black/30 animate-overlay-fade" onClick={() => setConfirmExpireInv(null)} />
+          <div className="glass-card-smooth relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col gap-5 animate-menu-reveal text-center">
+            <span className="grid place-items-center w-12 h-12 rounded-full bg-rose/15 text-rose mx-auto" aria-hidden="true">
+              <Trash2 size={24} />
+            </span>
+            <h2 id="expire-inv-title" className="font-display text-xl font-bold text-text">¿Expirar invitación?</h2>
+            <p className="text-muted font-semibold text-sm">
+              Vas a invalidar el enlace enviado a <strong>{confirmExpireInv.email}</strong>. La persona ya no podrá aceptarlo.
+            </p>
+            <div className="flex gap-3 mt-2 justify-center">
+              <button
+                type="button"
+                className="flex-1 py-3 rounded-xl font-extrabold cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98] bg-rose text-white"
+                onClick={doExpireInvitation}
+              >
+                <Trash2 size={16} className="inline mr-1" /> Sí, expirar
+              </button>
+              <button
+                type="button"
+                className="flex-1 py-3 rounded-xl font-extrabold cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98] bg-white/50 text-text"
+                onClick={() => setConfirmExpireInv(null)}
+              >
+                Cancelar
+              </button>
+            </div>
+            <button
+              type="button"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/30 border-0 cursor-pointer flex items-center justify-center text-text/60 hover:text-text hover:bg-white/50 transition-colors"
+              aria-label="Cerrar"
+              onClick={() => setConfirmExpireInv(null)}
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {confirmExpireAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="expire-all-title">
+          <div className="absolute inset-0 bg-black/30 animate-overlay-fade" onClick={() => setConfirmExpireAll(false)} />
+          <div className="glass-card-smooth relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col gap-5 animate-menu-reveal text-center">
+            <span className="grid place-items-center w-12 h-12 rounded-full bg-rose/15 text-rose mx-auto" aria-hidden="true">
+              <Trash2 size={24} />
+            </span>
+            <h2 id="expire-all-title" className="font-display text-xl font-bold text-text">¿Expirar todas las invitaciones?</h2>
+            <p className="text-muted font-semibold text-sm">
+              Vas a invalidar todos los enlaces pendientes y enviados a admins de sede. Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3 mt-2 justify-center">
+              <button
+                type="button"
+                className="flex-1 py-3 rounded-xl font-extrabold cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98] bg-rose text-white"
+                onClick={doExpireAll}
+              >
+                <Trash2 size={16} className="inline mr-1" /> Sí, expirar todas
+              </button>
+              <button
+                type="button"
+                className="flex-1 py-3 rounded-xl font-extrabold cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98] bg-white/50 text-text"
+                onClick={() => setConfirmExpireAll(false)}
+              >
+                Cancelar
+              </button>
+            </div>
+            <button
+              type="button"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/30 border-0 cursor-pointer flex items-center justify-center text-text/60 hover:text-text hover:bg-white/50 transition-colors"
+              aria-label="Cerrar"
+              onClick={() => setConfirmExpireAll(false)}
             >
               <X size={18} />
             </button>

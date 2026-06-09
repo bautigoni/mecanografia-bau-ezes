@@ -166,6 +166,18 @@ export function CourseDetailPage() {
     if (!confirm("¿Eliminar el curso? Esta acción no se puede deshacer.")) return;
     try { await api.deleteClass(classId); navigate("/admin-sede/cursos"); } catch { flash("No se pudo eliminar."); }
   }
+  /* F6: archive (soft-close) the course. Keeps all the progress and
+     rosters, just hides the course from the active lists. A reactivated
+     course returns to "active" in the same academic year. */
+  async function archiveCourse() {
+    if (!confirm("¿Archivar el curso? Se conserva todo el progreso, pero el curso deja de aparecer en las listas activas. Podés reactivarlo desde Configuración → Año lectivo.")) return;
+    setBusy(true);
+    try {
+      await api.archiveClass(classId);
+      flash("Curso archivado.");
+      await load();
+    } catch { flash("No se pudo archivar."); } finally { setBusy(false); }
+  }
 
   /* ---- Print login cards ---- */
   function printCards() {
@@ -351,6 +363,16 @@ export function CourseDetailPage() {
           </section>
           <section className="glass-card-smooth rounded-2xl p-5 flex flex-col gap-2 border border-rose/20">
             <h2 className="font-display font-extrabold text-lg text-rose">Zona peligrosa</h2>
+            {/* F6: archive the course individually (preserves history). */}
+            <button
+              type="button"
+              onClick={archiveCourse}
+              disabled={busy}
+              className="self-start flex items-center gap-2 px-4 h-11 rounded-xl font-bold text-white bg-amber-500 shadow-btn disabled:opacity-50 cursor-pointer"
+              title="Archivar: conserva todo el progreso, oculta el curso de las listas activas."
+            >
+              <Layers size={18} /> Archivar curso
+            </button>
             <button type="button" onClick={deleteCourse} className="self-start flex items-center gap-2 px-4 h-11 rounded-xl font-bold text-white bg-rose shadow-btn cursor-pointer"><Trash2 size={18} /> Eliminar curso</button>
           </section>
         </div>

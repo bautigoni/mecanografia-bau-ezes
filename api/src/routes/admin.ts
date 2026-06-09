@@ -196,6 +196,40 @@ export async function adminRoutes(app: FastifyInstance) {
     });
   });
 
+  /* ----- GET /api/audit?sedeId=&limit= (F6: audit log) ----- */
+  app.get("/api/audit", async (req, reply) => {
+    const actor = await requireStaff(req);
+    if (actor.role === "alumno" || actor.role === "profesor") {
+      return reply.code(403).send({ error: "No autorizado." });
+    }
+    const { sedeId, limit } = req.query as { sedeId?: string; limit?: string };
+    const conditions: any[] = [];
+    if (actor.role === "admin-sede") {
+      if (!actor.sede) return reply.send([]);
+      conditions.push(eq(schema.auditLog.sedeId, actor.sede));
+    } else if (sedeId) {
+      conditions.push(eq(schema.auditLog.sedeId, sedeId));
+    }
+    const where = conditions.length ? and(...conditions) : undefined;
+    const rows = await db
+      .select({
+        id: schema.auditLog.id,
+        action: schema.auditLog.action,
+        entityType: schema.auditLog.entityType,
+        entityId: schema.auditLog.entityId,
+        meta: schema.auditLog.meta,
+        at: schema.auditLog.at,
+        actorId: schema.auditLog.actorId,
+        actorName: schema.users.fullName,
+      })
+      .from(schema.auditLog)
+      .leftJoin(schema.users, eq(schema.users.id, schema.auditLog.actorId))
+      .where(where as any)
+      .orderBy(desc(schema.auditLog.at))
+      .limit(Math.min(500, Math.max(10, Number(limit) || 100)));
+    return reply.send(rows);
+  });
+
   /* ----- GET /api/teachers/:id (detail) ----- */
   app.get("/api/teachers/:id", async (req, reply) => {
     const actor = await requireStaff(req);

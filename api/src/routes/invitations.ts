@@ -16,7 +16,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import {
   hashPassword,
   hashToken,
@@ -27,6 +27,7 @@ import {
 } from "../auth.js";
 import type { AccessClaims } from "../auth.js";
 import { assertCanGrant, canActOnSede, ForbiddenError } from "../rbac.js";
+import { audit } from "../audit.js";
 
 const REFRESH_COOKIE = "typely_refresh";
 const INVITE_TTL_DAYS = 14;
@@ -164,6 +165,13 @@ export async function invitationRoutes(app: FastifyInstance) {
     if (emailed) {
       await db.update(schema.invitations).set({ status: "sent", sentAt: new Date() }).where(eq(schema.invitations.id, row!.id));
     }
+    await audit({
+      actor,
+      action: "create_invitation",
+      entityType: "invitation",
+      entityId: row!.id,
+      meta: { email: data.email, role: data.role, sedeId, emailed },
+    });
 
     return reply.send({
       invitation: {
@@ -203,6 +211,64 @@ export async function invitationRoutes(app: FastifyInstance) {
       .where(where)
       .orderBy(desc(schema.invitations.createdAt));
     return reply.send(rows);
+  });
+
+  /* ----- DELETE /api/invitations/:id (F6: expire a single invitation) ----- */
+  app.delete("/api/invitations/:id", async (req, reply) => {
+    const actor = await requireAuth(req);
+    if (actor.role === "profesor" || actor.role === "alumno") {
+      return reply.code(403).send({ error: "No autorizado." });
+    }
+    const { id } = req.params as { id: string };
+    const [inv] = await db.select().from(schema.invitations).where(eq(schema.invitations.id, id)).limit(1);
+    if (!inv) return reply.code(404).send({ error: "Invitación no encontrada." });
+    if (actor.role === "admin-sede" && inv.sedeId !== actor.sede) {
+      return reply.code(403).send({ error: "La invitación es de otra sede." });
+    }
+    if (inv.status === "accepted") {
+      return reply.code(409).send({ error: "La invitación ya fue aceptada." });
+    }
+    await db
+      .update(schema.invitations)
+      .set({ status: "expired", expiresAt: new Date() })
+      .where(eq(schema.invitations.id, id));
+    await audit({
+      actor,
+      action: "expire_invitation",
+      entityType: "invitation",
+      entityId: id,
+      meta: { email: inv.email, role: inv.role },
+    });
+    return reply.send({ ok: true });
+  });
+
+  /* ----- POST /api/invitations/expire-all (F6: bulk-expire every pending) ----- */
+  app.post("/api/invitations/expire-all", async (req, reply) => {
+    const actor = await requireAuth(req);
+    if (actor.role === "profesor" || actor.role === "alumno") {
+      return reply.code(403).send({ error: "No autorizado." });
+    }
+    const conditions: any[] = [eq(schema.invitations.status, "pending")];
+    if (actor.role === "admin-sede") {
+      if (!actor.sede) return reply.send({ expired: 0 });
+      conditions.push(eq(schema.invitations.sedeId, actor.sede));
+    }
+    const pending = await db
+      .select({ id: schema.invitations.id, email: schema.invitations.email })
+      .from(schema.invitations)
+      .where(and(...conditions));
+    if (!pending.length) return reply.send({ expired: 0 });
+    await db
+      .update(schema.invitations)
+      .set({ status: "expired", expiresAt: new Date() })
+      .where(inArray(schema.invitations.id, pending.map((p) => p.id)));
+    await audit({
+      actor,
+      action: "expire_all_invitations",
+      entityType: "invitation",
+      meta: { count: pending.length, emails: pending.map((p) => p.email) },
+    });
+    return reply.send({ expired: pending.length });
   });
 
   /* ----- GET /api/invitations/by-token/:token (public) ----- */

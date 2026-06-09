@@ -34,6 +34,12 @@ interface DashboardShellProps {
   hero: ReactNode;
   /** Decorative floating art for the hero (robot + island). */
   heroArt?: { mascot?: string; island?: string };
+  /** F6: optional override of the role chip block (e.g. for the SedeShell
+   *  which renders the year selector instead of the plain role row). */
+  sidebarTop?: ReactNode;
+  /** F6: optional slot rendered immediately below the role chip so the
+   *  SedeShell can drop its academic-year selector there. */
+  sidebarBelowRole?: ReactNode;
   children: ReactNode;
 }
 
@@ -75,6 +81,8 @@ export function DashboardShell({
   bellCount,
   hero,
   heroArt,
+  sidebarTop,
+  sidebarBelowRole,
   children,
 }: DashboardShellProps) {
   return (
@@ -97,16 +105,21 @@ export function DashboardShell({
           </span>
         </div>
 
-        {/* ── Role chip ── */}
-        <div className="glass-surface flex items-center gap-2.5 p-3 rounded-xl">
-          <span className="grid place-items-center w-9 h-9 rounded-lg bg-accent/15 text-accent-strong">
-            <RoleIcon size={20} />
-          </span>
-          <div className="flex flex-col leading-tight">
-            <strong className="text-text text-sm font-extrabold">{roleLabel}</strong>
-            <span className="text-muted text-xs">{roleSubtitle}</span>
+        {/* ── Role chip (F6: overridable via `sidebarTop` for the SedeShell) ── */}
+        {sidebarTop ?? (
+          <div className="glass-surface flex items-center gap-2.5 p-3 rounded-xl">
+            <span className="grid place-items-center w-9 h-9 rounded-lg bg-accent/15 text-accent-strong">
+              <RoleIcon size={20} />
+            </span>
+            <div className="flex flex-col leading-tight">
+              <strong className="text-text text-sm font-extrabold">{roleLabel}</strong>
+              <span className="text-muted text-xs">{roleSubtitle}</span>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* ── F6: optional slot right below the role chip (academic-year selector) ── */}
+        {sidebarBelowRole}
 
         {/* ── Navigation (grows + scrolls so the footer logout always pins
             to the bottom and stays visible) ── */}

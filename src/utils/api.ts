@@ -125,6 +125,8 @@ export interface ApiClass {
   sedeId: string;
   studentCount: number;
   teacherCount: number;
+  academicYearId?: string | null;
+  status?: "active" | "archived";
 }
 
 export interface ClassMember {
@@ -169,6 +171,28 @@ export interface ClassProgressRow {
   avgAccuracy: number;
   currentWorld: string | null;
   byWorld: Record<string, { completed: number; avgAccuracy: number }>;
+}
+
+export interface AcademicYear {
+  id: string;
+  sedeId: string;
+  label: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  isActive: boolean;
+  closedAt: string | null;
+  createdAt: string;
+}
+
+export interface AuditEntry {
+  id: number;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  meta: string | null;
+  at: string;
+  actorId: string | null;
+  actorName: string | null;
 }
 
 export const api = {
@@ -224,10 +248,11 @@ export const api = {
   deleteSede: (id: string) => call<{ ok: true }>(`/sedes/${id}`, { method: "DELETE" }),
 
   /* ---- Users ---- */
-  listUsers: (q: { role?: string; sedeId?: string } = {}) => {
+  listUsers: (q: { role?: string; sedeId?: string; includeDeleted?: "1" } = {}) => {
     const params = new URLSearchParams();
     if (q.role) params.set("role", q.role);
     if (q.sedeId) params.set("sedeId", q.sedeId);
+    if (q.includeDeleted) params.set("includeDeleted", q.includeDeleted);
     const qs = params.toString();
     return call<ApiUser[]>(`/users${qs ? `?${qs}` : ""}`);
   },
@@ -247,15 +272,19 @@ export const api = {
   updateUser: (id: string, payload: Partial<{ fullName: string; email: string; sedeId: string | null; classId: string | null; active: boolean }>) =>
     call<ApiUser>(`/users/${id}`, { method: "PATCH", json: payload }),
   deleteUser: (id: string) => call<{ ok: true }>(`/users/${id}`, { method: "DELETE" }),
+  restoreUser: (id: string) => call<{ ok: true }>(`/users/${id}/restore`, { method: "POST" }),
   resetUserPassword: (id: string) => call<{ temporaryPassword: string }>(`/users/${id}/reset-password`, { method: "POST" }),
 
   /* ---- Classes (cursos) ---- */
-  listClasses: (sedeId?: string) => call<ApiClass[]>(`/classes${sedeId ? `?sedeId=${sedeId}` : ""}`),
+  listClasses: (sedeId?: string, includeArchived = false) =>
+    call<ApiClass[]>(`/classes${sedeId || includeArchived ? `?${[sedeId ? `sedeId=${sedeId}` : "", includeArchived ? "includeArchived=1" : ""].filter(Boolean).join("&")}` : ""}`),
   createClass: (payload: { name: string; sedeId?: string; grade?: string }) =>
     call<ApiClass>("/classes", { method: "POST", json: payload }),
   deleteClass: (id: string) => call<{ ok: true }>(`/classes/${id}`, { method: "DELETE" }),
   updateClass: (id: string, payload: { name?: string; grade?: string }) =>
     call<ApiClass>(`/classes/${id}`, { method: "PATCH", json: payload }),
+  archiveClass: (id: string) => call<{ ok: true; alreadyArchived?: boolean }>(`/classes/${id}/archive`, { method: "POST" }),
+  reactivateClass: (id: string) => call<{ ok: true }>(`/classes/${id}/reactivate`, { method: "POST" }),
   classMembers: (id: string) =>
     call<{ class: { id: string; name: string; grade: string; sedeId: string }; teachers: ClassMember[]; students: ClassMember[] }>(`/classes/${id}/members`),
   assignTeacher: (classId: string, userId: string) =>
@@ -271,6 +300,31 @@ export const api = {
   adminOverview: (sedeId?: string) => call<AdminOverview>(`/admin/overview${sedeId ? `?sedeId=${sedeId}` : ""}`),
   studentDetail: (id: string) => call<StudentDetail>(`/students/${id}`),
   teacherDetail: (id: string) => call<TeacherDetail>(`/teachers/${id}`),
+
+  /* Academic years (F6). */
+  listAcademicYears: (sedeId?: string) => call<AcademicYear[]>(`/academic-years${sedeId ? `?sedeId=${sedeId}` : ""}`),
+  createAcademicYear: (payload: { label: string; startsAt?: string; endsAt?: string; sedeId?: string }) =>
+    call<AcademicYear>("/academic-years", { method: "POST", json: payload }),
+  activateAcademicYear: (id: string) => call<{ ok: true }>(`/academic-years/${id}/activate`, { method: "PATCH" }),
+  closePreview: (id: string) => call<{
+    year: { id: string; label: string; courseCount: number; studentCount: number };
+    target: { id: string; label: string } | null;
+    byGrade: Record<string, number>;
+  }>(`/academic-years/${id}/close-preview`),
+  closeAcademicYear: (id: string, payload: { targetYearId?: string; promotion?: Record<string, string> } = {}) =>
+    call<{ ok: true; closedCourses: number; promoted: number; graduated: number; targetYear: { id: string; label: string } | null }>(
+      `/academic-years/${id}/close`,
+      { method: "POST", json: payload },
+    ),
+
+  /* Audit log (F6). */
+  listAudit: (params: { sedeId?: string; limit?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.sedeId) qs.set("sedeId", params.sedeId);
+    if (params.limit) qs.set("limit", String(params.limit));
+    const s = qs.toString();
+    return call<AuditEntry[]>(`/audit${s ? `?${s}` : ""}`);
+  },
   /* Progress. */
   postProgressComplete: (payload: {
     worldId: string;
@@ -290,6 +344,8 @@ export const api = {
     ),
   listInvitations: () =>
     call<Array<{ id: string; email: string; name?: string | null; role: string; status: string; sedeId?: string | null; createdAt: string }>>("/invitations"),
+  expireInvitation: (id: string) => call<{ ok: true }>(`/invitations/${id}`, { method: "DELETE" }),
+  expireAllInvitations: () => call<{ expired: number }>("/invitations/expire-all", { method: "POST" }),
   getInvitation: (token: string) =>
     call<{ invitation: { email: string; name?: string | null; role: string; status: string; sedeName?: string } }>(
       `/invitations/by-token/${encodeURIComponent(token)}`,
