@@ -31,6 +31,15 @@ html, body, #root { min-height: 100%; margin: 0; }
 /* Pastel base behind everything: no white flash on reload and no white
    borders behind the art at any browser zoom level. */
 html, body { background-color: #e9e6f7; }
+
+/* ── Liquid-glass tunables (the /editor-glass dev tool writes these live) ── */
+:root {
+  --glass-blur: 26px;        /* backdrop blur amount */
+  --glass-saturate: 1.6;     /* colour boost behind the glass = "liquid" feel */
+  --glass-white: 0.55;       /* translucency of the white film (lower = more see-through) */
+  --glass-border: 0.65;      /* border highlight opacity */
+  --glass-sheen: 0.6;        /* top inner highlight (the wet/liquid shine) */
+}
 /* Apply the app body font everywhere (was missing → fell back to default
    sans). Headings opt into the display font via the `font-display` utility. */
 body { overflow-x: hidden; font-family: var(--font-body); color: var(--color-text); }
@@ -43,45 +52,46 @@ a { color: inherit; text-decoration: none; }
 
 /* ── Reusable Utilities ── */
 @utility glass {
-  background: rgba(255, 255, 255, 0.64);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, calc(var(--glass-white) + 0.06));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid rgba(255, 255, 255, calc(var(--glass-border) - 0.2));
 }
 
 @utility glass-strong {
-  background: rgba(255, 255, 255, 0.84);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, calc(var(--glass-white) + 0.18));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid rgba(255, 255, 255, var(--glass-border));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, var(--glass-sheen));
 }
 
 @utility glass-card {
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(239, 248, 255, 0.64)),
+    linear-gradient(135deg, rgba(255, 255, 255, calc(var(--glass-white) + 0.2)), rgba(239, 248, 255, var(--glass-white))),
     radial-gradient(circle at 25% 12%, rgba(51, 199, 240, 0.18), transparent 56%);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.84);
-  box-shadow: 0 24px 44px rgba(40, 70, 120, 0.12);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid rgba(255, 255, 255, calc(var(--glass-border) + 0.18));
+  box-shadow: 0 24px 44px rgba(40, 70, 120, 0.12), inset 0 1px 0 rgba(255, 255, 255, var(--glass-sheen));
   border-radius: 1.5rem;
 }
 
 @utility glass-card-smooth {
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(244, 250, 255, 0.74));
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.76);
-  box-shadow: 0 24px 70px rgba(58, 89, 132, 0.22);
+    linear-gradient(135deg, rgba(255, 255, 255, calc(var(--glass-white) + 0.24)), rgba(244, 250, 255, calc(var(--glass-white) + 0.12)));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid rgba(255, 255, 255, calc(var(--glass-border) + 0.1));
+  box-shadow: 0 24px 70px rgba(58, 89, 132, 0.22), inset 0 1px 0 rgba(255, 255, 255, var(--glass-sheen));
   border-radius: 1.5rem;
 }
 
 @utility glass-surface {
-  background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, calc(var(--glass-white) + 0.08));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid rgba(255, 255, 255, calc(var(--glass-border) - 0.15));
   border-radius: 1rem;
 }
 
@@ -215,16 +225,31 @@ a { color: inherit; text-decoration: none; }
 .animate-twinkle { animation: i5-twinkle 3s ease-in-out infinite; }
 .animate-soft-hint-in { animation: softHintIn 400ms ease both; }
 
-/* ── Looping pastel gradient text (login heading: green → pink → green) ── */
-@keyframes gradientSweepLR { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+/* ── Fun celebratory stars (level-complete rating) ── */
+@keyframes starBounceIn {
+  0%   { transform: scale(0) rotate(-40deg); opacity: 0; }
+  55%  { transform: scale(1.35) rotate(14deg); opacity: 1; }
+  78%  { transform: scale(0.88) rotate(-8deg); }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes starWiggle {
+  0%, 100% { transform: rotate(-7deg) scale(1); }
+  50%      { transform: rotate(7deg) scale(1.1); }
+}
+.animate-star-bounce { animation: starBounceIn 0.6s cubic-bezier(0.2, 1.5, 0.5, 1) both; }
+.animate-star-wiggle { animation: starWiggle 1.7s ease-in-out infinite; }
+
+/* ── Looping brand-gradient text (login heading), using the app palette:
+   mint → sky → electric blue → violet → pink → mint ── */
+@keyframes gradientSweepLR { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
 .text-gradient-loop {
-  background-image: linear-gradient(90deg, #6fd6a8 0%, #ff9ecd 35%, #7c9bff 65%, #6fd6a8 100%);
-  background-size: 200% auto;
+  background-image: linear-gradient(90deg, #54e8c6, #25c8df, #536bff, #9b7cff, #ff9fca, #54e8c6);
+  background-size: 300% auto;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
-  animation: gradientSweepLR 5s linear infinite;
+  animation: gradientSweepLR 6s linear infinite;
 }
 
 /* ── App-wide pretty scrollbars (replace the chunky default ones) ── */

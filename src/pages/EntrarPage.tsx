@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Wrench,
   Move,
+  Droplet,
   ArrowRight,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
@@ -151,6 +152,12 @@ export function EntrarPage() {
             title="Editor de login"
             subtitle="Mover los robots del login y copiar sus posiciones."
             onClick={() => navigate("/editor-login")}
+          />
+          <ChoiceCard
+            icon={Droplet}
+            title="Editor liquid-glass"
+            subtitle="Ajustar blur, saturación y transparencia del glass."
+            onClick={() => navigate("/editor-glass")}
           />
         </div>
       </section>

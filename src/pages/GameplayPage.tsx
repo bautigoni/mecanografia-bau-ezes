@@ -857,7 +857,7 @@ export function GameplayPage() {
               >
                 <strong
                   ref={targetScrollRef}
-                  className={`font-display font-black text-text leading-none overflow-x-auto no-scrollbar whitespace-nowrap max-w-[82vw] ${isLongTarget ? "text-2xl sm:text-3xl" : targetCardSize}`}
+                  className={`font-display font-black text-text leading-none overflow-x-auto no-scrollbar whitespace-nowrap max-w-[82vw] [text-shadow:0_2px_8px_rgba(83,107,255,0.18)] ${isLongTarget ? "text-2xl sm:text-3xl" : targetCardSize}`}
                 >
                   {target}
                 </strong>
@@ -977,8 +977,8 @@ export function GameplayPage() {
         const rightPhrase = phrasePool[(targetIndex + Math.max(1, Math.floor(phrasePool.length / 2))) % phrasePool.length];
         return (
           <>
-            {/* Robots flank the bottom corners — bigger and lower than before. */}
-            <figure className="absolute bottom-0 left-1 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
+            {/* Robots flank the sides, vertically centred (middle of Y, edges of X). */}
+            <figure className="absolute top-1/2 -translate-y-1/2 left-0 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
               <div
                 className={`glass-surface rounded-2xl rounded-br-sm px-2.5 py-1.5 text-xs font-semibold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
               >
@@ -991,7 +991,7 @@ export function GameplayPage() {
                 className="w-28 sm:w-40 h-auto object-contain animate-mascot-float"
               />
             </figure>
-            <figure className="absolute bottom-0 right-1 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
+            <figure className="absolute top-1/2 -translate-y-1/2 right-0 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
               <div
                 className={`glass-surface rounded-2xl rounded-bl-sm px-2.5 py-1.5 text-xs font-semibold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
               >
@@ -1040,7 +1040,7 @@ export function GameplayPage() {
                   const isWide = key === "Backspace" || key === "Shift" || key === "Enter";
 
                   const keyClasses = [
-                    "relative rounded-lg font-extrabold shadow-sm transition-all duration-100 border-2",
+                    "relative rounded-lg font-black shadow-sm transition-all duration-100 border-2",
                     "flex items-center justify-center select-none",
                     isSpace ? "w-48 sm:w-72 h-8 sm:h-9 text-sm" : isWide ? "w-16 sm:w-24 h-8 sm:h-9 text-xs" : "w-10 h-8 sm:w-12 sm:h-9 text-sm",
                     // Target/combo override the row colour with the accent blue.
@@ -1100,15 +1100,23 @@ export function GameplayPage() {
               ¡Nivel completado!
             </h2>
             <p className="text-muted font-bold text-lg">Sumaste {accuracy}% de precisión.</p>
-            <div className="flex items-center gap-3" aria-hidden="true">
+            <div className="flex items-end gap-4" aria-hidden="true">
               {[1, 2, 3].map((index) => {
                 const isOn = getStarsFromAccuracy(accuracy) >= index;
-                return (
+                // The middle star sits a touch higher for a playful arc.
+                const lift = index === 2 ? "-translate-y-2" : "";
+                return isOn ? (
                   <span
                     key={index}
-                    className={`text-5xl ${isOn ? "text-amber-400 animate-star-pop" : "text-gray-300"}`}
-                    style={{ animationDelay: `${0.18 + index * 0.18}s` }}
+                    className={`inline-block text-6xl animate-star-bounce ${lift}`}
+                    style={{ animationDelay: `${0.18 + index * 0.16}s` }}
                   >
+                    <span className="inline-block text-amber-400 animate-star-wiggle drop-shadow-[0_4px_12px_rgba(250,204,21,0.7)]">
+                      ★
+                    </span>
+                  </span>
+                ) : (
+                  <span key={index} className={`inline-block text-5xl text-gray-300/80 ${lift}`}>
                     ★
                   </span>
                 );

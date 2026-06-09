@@ -650,21 +650,21 @@ export function WorldsPage() {
                   {!isLocked && (
                     <span
                       className={[
-                        "absolute -bottom-3 left-1/2 -translate-x-1/2",
-                        "flex items-center gap-1 px-2.5 py-1 rounded-full",
-                        "text-xs font-bold whitespace-nowrap pointer-events-none",
-                        "shadow-sm",
+                        "absolute -bottom-3.5 left-1/2 -translate-x-1/2",
+                        "flex items-center gap-1.5 pl-2 pr-3 py-1 rounded-full",
+                        "text-sm font-black whitespace-nowrap pointer-events-none",
+                        "shadow-md border border-white/60",
                         isCompleted
                           ? "bg-gradient-to-r from-emerald-400 to-teal-400 text-white"
-                          : "glass text-text",
+                          : "glass-strong text-text",
                       ].join(" ")}
                       aria-hidden="true"
                     >
                       <Star
-                        size={14}
-                        strokeWidth={2.4}
-                        className={isCompleted ? "text-white" : "text-amber-400"}
-                        fill={isCompleted ? "currentColor" : "none"}
+                        size={17}
+                        strokeWidth={1.5}
+                        className={`${isCompleted ? "text-white" : "text-amber-400"} drop-shadow-[0_1px_3px_rgba(250,204,21,0.7)]`}
+                        fill="currentColor"
                       />
                       {starInfo.earnedStars}/{starInfo.totalStars}
                     </span>

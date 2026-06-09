@@ -4,6 +4,7 @@ import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
 import { EntrarPage } from "./pages/EntrarPage";
 import { LoginLayoutEditorPage } from "./pages/LoginLayoutEditorPage";
+import { GlassEditorPage } from "./pages/GlassEditorPage";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { InvitePage } from "./pages/InvitePage";
 import { WorldsPage } from "./pages/WorldsPage";
@@ -66,6 +67,8 @@ export function App() {
         {/* Superadmin-only sandbox to drag the login mascots and read off
             their positions. Does not affect the real login screen. */}
         <Route path="/editor-login" element={<LoginLayoutEditorPage />} />
+        {/* Superadmin-only liquid-glass tuner. */}
+        <Route path="/editor-glass" element={<GlassEditorPage />} />
       </Route>
 
       {/* Student game experience — exclusive to students. Admins/teachers

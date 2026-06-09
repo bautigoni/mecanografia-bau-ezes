@@ -550,7 +550,9 @@ export function IslandDetailPage() {
           This is what kills the white borders during the entrance zoom and
           when navigating back to the worlds map. */}
       <img
-        className={`absolute inset-0 w-full h-full object-cover z-0 ${bgReady ? "animate-island-zoom" : "opacity-0"}`}
+        /* Reveal only when BOTH the background AND the island art are ready, so
+           the island never pops in a frame after the bg/platforms. */
+        className={`absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-300 ${bgReady && (!islandImgPath || islandImgSize) ? "animate-island-zoom" : "opacity-0"}`}
         src={islandBgPath}
         alt={world.title}
         decoding="async"
