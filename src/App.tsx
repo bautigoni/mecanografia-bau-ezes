@@ -12,6 +12,7 @@ import { StudentsListPage } from "./pages/admin/StudentsListPage";
 import { ProgresoPage } from "./pages/admin/SedeStubPages";
 import { ConfigPage } from "./pages/admin/SedeConfigPage";
 import { InicioPage } from "./pages/admin/InicioPage";
+import { ApiInspectorPage } from "./pages/admin/ApiInspectorPage";
 import { StudentDetailPage } from "./pages/admin/StudentDetailPage";
 import { TeacherDetailPage } from "./pages/admin/TeacherDetailPage";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
@@ -93,6 +94,13 @@ export function App() {
         <Route path="/logros" element={<RewardsPage />} />
         <Route path="/mi-cuenta" element={<AccountPage />} />
         <Route path="/misiones" element={<MissionsPage />} />
+      </Route>
+
+      {/* Inspector de API — solo administración (superadmin entra por su
+          bypass; alumnos/profesores y el modo demo quedan afuera). El
+          endpoint /api/admin/inspector re-verifica el rol server-side. */}
+      <Route element={<ProtectedRoute roles={["admin-general", "admin-sede"]} />}>
+        <Route path="/admin/api" element={<ApiInspectorPage />} />
       </Route>
 
       <Route element={<ProtectedRoute roles={["admin-general"]} />}>

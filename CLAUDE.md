@@ -185,8 +185,11 @@ touchpad, windows, tabs, shortcuts, text editing, UI literacy). `SkillLevelView`
 - `src/App.tsx` — routes + protected-route composition (lazy-loads heavy pages).
 - `src/pages/` — `LoginPage`, `WorldsPage`, `IslandDetailPage`, `GameplayPage`,
   `RewardsPage`, `AccountPage`, `MissionsPage`, `SkillLevelView`,
-  `ShortcutLevelView`, `ChangePasswordPage`, `AdminGeneralPage`, `SiteAdminPage`,
-  `TeacherPage`, `TeacherClassPage`, `TeacherStudentPage`.
+  `ShortcutLevelView`, `ChangePasswordPage`, `AdminGeneralPage`,
+  `TeacherPage`, `TeacherClassPage`, `TeacherStudentPage`, plus the routed
+  admin-sede screens in `src/pages/admin/` (incl. `ApiInspectorPage` at
+  `/admin/api` — superadmin/admin-general/admin-sede only, backed by
+  `GET /api/admin/inspector`).
 - `src/components/` — `auth/`, `common/` (`Brand`, `Button`, `Toast`),
   `dashboard/DashboardShell`, `dev/LevelPositionEditor`, `digitalSkills/`,
   `layout/TopNav`.
@@ -194,7 +197,7 @@ touchpad, windows, tabs, shortcuts, text editing, UI literacy). `SkillLevelView`
   `digitalSkills.ts`, `seed.ts`.
 - `src/hooks/useAuth.tsx` — API-aware auth provider (async, localStorage fallback).
 - `src/utils/` — `api.ts` (typed API client), `assets.ts` (public-URL map),
-  `progress.ts`, `storage.ts`, `image.ts`, `googleAuth.ts`, `emailService.ts`,
+  `progress.ts`, `storage.ts`, `image.ts`, `googleAuth.ts`,
   `studentStatus.ts`, `userContext.ts`.
 - `src/styles/global.css` — entire visual system + page CSS + the responsive pass.
 - `api/src/` — `server.ts`, `auth.ts`, `rbac.ts`, `seed.ts`, `db/{index,schema}.ts`,

@@ -91,7 +91,7 @@ export async function authRoutes(app: FastifyInstance) {
 
     await db
       .update(schema.users)
-      .set({ lastLoginAt: new Date(), mustChangePassword: user.mustChangePassword })
+      .set({ lastLoginAt: new Date() })
       .where(eq(schema.users.id, user.id));
 
     const { access, refresh, refreshExpiresAt } = await buildAccessAndRefresh(user);

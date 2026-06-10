@@ -57,6 +57,12 @@ export async function userRoutes(app: FastifyInstance) {
   /* ----- GET /api/users?role=&sedeId=&includeDeleted= ----- */
   app.get("/api/users", async (req, reply) => {
     const actor = await requireUser(req);
+    // Solo superficies de administración listan usuarios. Un token de alumno
+    // o profesor no puede enumerar emails/usuarios de toda la plataforma
+    // (los profesores tienen /api/teacher/students para su propio alcance).
+    if (actor.role === "alumno" || actor.role === "profesor") {
+      return reply.code(403).send({ error: "No autorizado." });
+    }
     const { role, sedeId, includeDeleted } = req.query as { role?: string; sedeId?: string; includeDeleted?: string };
     const conditions = [];
     if (role) conditions.push(eq(schema.users.role, role as schema.Role));
@@ -167,6 +173,14 @@ export async function userRoutes(app: FastifyInstance) {
     if (!target) return reply.code(404).send({ error: "Usuario no encontrado." });
     if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, target.sedeId)) {
       return reply.code(403).send({ error: "No podés modificar usuarios de otra sede." });
+    }
+    // El destino del cambio de sede también tiene que estar dentro del
+    // alcance del actor (un admin-sede no puede mover usuarios a otra sede).
+    if (
+      parsed.data.sedeId !== undefined &&
+      !canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, parsed.data.sedeId ?? null)
+    ) {
+      return reply.code(403).send({ error: "No podés mover usuarios a otra sede." });
     }
     if (target.role === "superadmin" && actor.role !== "superadmin") {
       return reply.code(403).send({ error: "Solo el superadmin puede modificar al superadmin." });
@@ -289,8 +303,10 @@ export async function userRoutes(app: FastifyInstance) {
     if (actor.sub !== id) {
       return reply.code(403).send({ error: "Solo podés cambiar tu propia contraseña." });
     }
-    const body = z.object({ newPassword: z.string().min(8) }).safeParse(req.body);
-    if (!body.success) return reply.code(400).send({ error: "La contraseña nueva debe tener al menos 8 caracteres." });
+    // Mínimo 6 — consistente con la creación de usuarios, la aceptación de
+    // invitaciones y el formulario "Cambiar contraseña" del frontend.
+    const body = z.object({ newPassword: z.string().min(6) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: "La contraseña nueva debe tener al menos 6 caracteres." });
     const passwordHash = await hashPassword(body.data.newPassword);
     await db
       .update(schema.users)

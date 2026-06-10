@@ -45,7 +45,13 @@ const PROMOTION: Record<Grade, Grade | "egresado"> = {
 async function requireStaff(req: FastifyRequest): Promise<AccessClaims> {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) throw Object.assign(new Error("Sin sesión."), { status: 401 });
-  return verifyAccessToken(auth.slice("Bearer ".length));
+  const claims = await verifyAccessToken(auth.slice("Bearer ".length));
+  // Los años lectivos son una superficie de administración: ni alumnos ni
+  // profesores pueden listarlos ni previsualizar cierres.
+  if (claims.role === "alumno" || claims.role === "profesor") {
+    throw Object.assign(new Error("No autorizado."), { status: 403 });
+  }
+  return claims;
 }
 
 export async function academicYearRoutes(app: FastifyInstance) {

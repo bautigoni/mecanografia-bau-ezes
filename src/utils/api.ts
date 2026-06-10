@@ -199,6 +199,25 @@ export interface AuditEntry {
   actorName: string | null;
 }
 
+export interface ApiInspectorReport {
+  service: { name: string; version: string; node: string; env: string; startedAt: string; uptimeSeconds: number };
+  db: { ok: boolean; latencyMs: number | null; error: string | null };
+  env: Array<{ name: string; scope: "server" | "client"; public: boolean; set: boolean; value: string | null; note: string }>;
+  config: {
+    accessTokenTtlMinutes: number;
+    refreshTokenTtlDays: number;
+    invitationTtlDays: number;
+    bodyLimitBytes: number;
+    bcryptCost: number;
+    corsOrigin: string;
+    googleLoginEnabled: boolean;
+    inviteEmailsEnabled: boolean;
+  };
+  routes: Array<{ method: string; url: string; sample: unknown }>;
+  recentErrors: Array<{ at: string; status: number; method: string; url: string; message: string }>;
+  recentAudit: Array<{ action: string; entityType: string; entityId: string | null; at: string; actorName: string | null }>;
+}
+
 export const api = {
   async login(emailOrUsername: string, password: string): Promise<{ user: ApiActiveUser; access: string }> {
     const res = await call<{ user: ApiActiveUser; access: string }>("/auth/login", {
@@ -278,6 +297,10 @@ export const api = {
   deleteUser: (id: string) => call<{ ok: true }>(`/users/${id}`, { method: "DELETE" }),
   restoreUser: (id: string) => call<{ ok: true }>(`/users/${id}/restore`, { method: "POST" }),
   resetUserPassword: (id: string) => call<{ temporaryPassword: string }>(`/users/${id}/reset-password`, { method: "POST" }),
+  /* Self-service: set the signed-in user's own password (clears the
+     mustChangePassword flag server-side). */
+  changeOwnPassword: (id: string, newPassword: string) =>
+    call<{ ok: true }>(`/users/${id}/change-password`, { method: "POST", json: { newPassword } }),
 
   /* ---- Classes (cursos) ---- */
   listClasses: (sedeId?: string, includeArchived = false) =>
@@ -320,6 +343,9 @@ export const api = {
       `/academic-years/${id}/close`,
       { method: "POST", json: payload },
     ),
+
+  /* Inspector de API (F7) — superadmin / admin-general / admin-sede. */
+  inspector: () => call<ApiInspectorReport>("/admin/inspector"),
 
   /* Audit log (F6). */
   listAudit: (params: { sedeId?: string; limit?: number } = {}) => {

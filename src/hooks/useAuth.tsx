@@ -172,14 +172,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const completePasswordChange = useCallback(async (newPassword: string): Promise<ActiveUser | null> => {
     if (!user) return null;
     if (usingApi) {
+      // API-backed session: the server is the source of truth. If this call
+      // fails the flag stays set and the guard keeps the user on the page.
       try {
-        await api.logout(); // placeholder — real endpoint is /api/users/:id/change-password, called from the page
-        // The page should call api.post("/users/:id/change-password", ...) directly. We don't expose that
-        // here so the typed contract stays small. For the localStorage path the old behaviour applies.
-      } catch { /* ignore */ }
+        await api.changeOwnPassword(user.id, newPassword);
+      } catch {
+        return null;
+      }
+    } else {
+      const ok = setUserPassword(user.id, newPassword);
+      if (!ok) return null;
     }
-    const ok = setUserPassword(user.id, newPassword);
-    if (!ok) return null;
     const refreshed: ActiveUser = { ...user, mustChangePassword: false };
     setActiveUser(refreshed);
     setUser(refreshed);

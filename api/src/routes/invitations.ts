@@ -325,6 +325,12 @@ export async function invitationRoutes(app: FastifyInstance) {
       .limit(1);
 
     let user;
+    if (existing && (existing.role === "superadmin" || existing.role === "admin-general")) {
+      // Nunca degradar una cuenta de mayor privilegio aceptando una
+      // invitación de rol inferior (un admin-sede podría "invitar" el email
+      // del superadmin y pisarle rol y contraseña).
+      return reply.code(409).send({ error: "Ese email ya tiene una cuenta con un rol superior. Iniciá sesión directamente." });
+    }
     if (existing) {
       [user] = await db
         .update(schema.users)

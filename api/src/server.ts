@@ -160,6 +160,7 @@ import { invitationRoutes } from "./routes/invitations.js";
 import { classRoutes } from "./routes/classes.js";
 import { adminRoutes } from "./routes/admin.js";
 import { academicYearRoutes } from "./routes/academicYears.js";
+import { inspectorRoutes, registerRoute, recordError } from "./routes/inspector.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const ORIGIN = process.env.CORS_ORIGIN ?? "https://typely.bauhub.online";
@@ -175,6 +176,12 @@ async function main() {
   await app.register(cors, {
     origin: ORIGIN,
     credentials: true,
+  });
+
+  /* Inventario de rutas para el inspector de API (/api/admin/inspector).
+     El hook tiene que registrarse ANTES de las rutas para verlas todas. */
+  app.addHook("onRoute", (route) => {
+    registerRoute(route.method as string | string[], route.url);
   });
 
   /* Apply post-001 migrations (gamification / academic-year tables, etc.). */
@@ -197,11 +204,19 @@ async function main() {
   await app.register(classRoutes);
   await app.register(adminRoutes);
   await app.register(academicYearRoutes);
+  await app.register(inspectorRoutes);
 
   /* Top-level error handler: never leak stack traces, always Spanish. */
-  app.setErrorHandler((err, _req, reply) => {
+  app.setErrorHandler((err, req, reply) => {
     const status = (err as any).status ?? 500;
     if (status >= 500) app.log.error({ err }, "unhandled error");
+    recordError({
+      at: new Date().toISOString(),
+      status,
+      method: req.method,
+      url: req.url,
+      message: status >= 500 ? "Error interno del servidor." : err.message,
+    });
     reply.code(status).send({
       error: status >= 500 ? "Error interno del servidor." : err.message,
     });
