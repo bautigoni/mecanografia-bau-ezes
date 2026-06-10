@@ -662,8 +662,8 @@ export function AdminGeneralPage() {
           en la misma lista, para no romper la jerarquía visual). */}
       {showSiteForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="site-modal-title">
-          <div className="absolute inset-0 bg-black/30 animate-overlay-fade" onClick={() => setShowSiteForm(false)} />
-          <div className="glass-card-smooth relative max-h-[88vh] overflow-y-auto p-8 w-[min(34rem,92vw)] flex flex-col gap-5 animate-menu-reveal">
+          <div className="modal-overlay animate-overlay-fade" onClick={() => setShowSiteForm(false)} />
+          <div className="glass-card-smooth modal-card relative max-h-[88vh] overflow-y-auto p-8 w-[min(34rem,92vw)] flex flex-col gap-5 animate-menu-reveal">
             <span className="grid place-items-center w-12 h-12 rounded-full bg-mint/20 text-mint" aria-hidden="true">
               <School size={24} />
             </span>
@@ -866,8 +866,8 @@ export function AdminGeneralPage() {
 
       {showAdminModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
-          <div className="absolute inset-0 bg-black/30 animate-overlay-fade" onClick={closeAdminModal} />
-          <div className="glass-card-smooth relative max-h-[88vh] overflow-y-auto p-8 w-[min(30rem,92vw)] flex flex-col gap-5 animate-menu-reveal">
+          <div className="modal-overlay animate-overlay-fade" onClick={closeAdminModal} />
+          <div className="glass-card-smooth modal-card relative max-h-[88vh] overflow-y-auto p-8 w-[min(30rem,92vw)] flex flex-col gap-5 animate-menu-reveal">
             <span className="grid place-items-center w-12 h-12 rounded-full bg-accent/15 text-accent" aria-hidden="true">
               <UserCog size={24} />
             </span>
@@ -1018,8 +1018,8 @@ export function AdminGeneralPage() {
 
       {confirmExpireInv && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="expire-inv-title">
-          <div className="absolute inset-0 bg-black/30 animate-overlay-fade" onClick={() => setConfirmExpireInv(null)} />
-          <div className="glass-card-smooth relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col gap-5 animate-menu-reveal text-center">
+          <div className="modal-overlay animate-overlay-fade" onClick={() => setConfirmExpireInv(null)} />
+          <div className="glass-card-smooth modal-card relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col gap-5 animate-menu-reveal text-center">
             <span className="grid place-items-center w-12 h-12 rounded-full bg-rose/15 text-rose mx-auto" aria-hidden="true">
               <Trash2 size={24} />
             </span>
@@ -1057,8 +1057,8 @@ export function AdminGeneralPage() {
 
       {confirmExpireAll && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="expire-all-title">
-          <div className="absolute inset-0 bg-black/30 animate-overlay-fade" onClick={() => setConfirmExpireAll(false)} />
-          <div className="glass-card-smooth relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col gap-5 animate-menu-reveal text-center">
+          <div className="modal-overlay animate-overlay-fade" onClick={() => setConfirmExpireAll(false)} />
+          <div className="glass-card-smooth modal-card relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col gap-5 animate-menu-reveal text-center">
             <span className="grid place-items-center w-12 h-12 rounded-full bg-rose/15 text-rose mx-auto" aria-hidden="true">
               <Trash2 size={24} />
             </span>
@@ -1096,8 +1096,8 @@ export function AdminGeneralPage() {
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="confirm-delete-title">
-          <div className="absolute inset-0 bg-black/30 animate-overlay-fade" onClick={() => setConfirmDelete(null)} />
-          <div className="glass-card-smooth relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col gap-5 animate-menu-reveal text-center">
+          <div className="modal-overlay animate-overlay-fade" onClick={() => setConfirmDelete(null)} />
+          <div className="glass-card-smooth modal-card relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col gap-5 animate-menu-reveal text-center">
             <span className="grid place-items-center w-12 h-12 rounded-full bg-rose/15 text-rose mx-auto" aria-hidden="true">
               <Trash2 size={24} />
             </span>

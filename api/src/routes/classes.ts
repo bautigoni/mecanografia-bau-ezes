@@ -235,8 +235,14 @@ export async function classRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: "Falta el docente." });
     const [t] = await db.select().from(schema.users).where(eq(schema.users.id, parsed.data.userId)).limit(1);
     if (!t || t.role !== "profesor") return reply.code(400).send({ error: "El usuario no es un docente." });
-    if (!canActOnSede({ role: actor.role, sedeId: actor.sede }, t.sedeId)) {
+    // Un docente sin sede (p. ej. una invitación aceptada sin sede asociada)
+    // adopta la sede del curso al ser asignado. Cross-sede sigue bloqueado
+    // para admin-sede; superadmin/admin-general pueden asignar de cualquiera.
+    if (t.sedeId && !canActOnSede({ role: actor.role, sedeId: actor.sede }, t.sedeId)) {
       return reply.code(403).send({ error: "El docente es de otra sede." });
+    }
+    if (!t.sedeId) {
+      await db.update(schema.users).set({ sedeId: cls.sedeId }).where(eq(schema.users.id, t.id));
     }
     await db.insert(schema.classTeachers).values({ classId: id, userId: parsed.data.userId }).onConflictDoNothing();
     return reply.send({ ok: true });

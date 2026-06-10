@@ -69,8 +69,8 @@ export function CloseYearWizard({ year, onClose, onDone }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="close-year-title">
-      <div className="absolute inset-0 bg-black/30 animate-overlay-fade" onClick={onClose} />
-      <div className="glass-card-smooth relative max-h-[88vh] overflow-y-auto p-8 w-[min(36rem,94vw)] flex flex-col gap-5 animate-menu-reveal">
+      <div className="modal-overlay animate-overlay-fade" onClick={onClose} />
+      <div className="glass-card-smooth modal-card relative max-h-[88vh] overflow-y-auto p-8 w-[min(36rem,94vw)] flex flex-col gap-5 animate-menu-reveal">
         <button
           type="button"
           onClick={onClose}

@@ -95,12 +95,16 @@ export function DashboardShell({
       />
 
       <aside className="sticky top-0 h-dvh glass flex flex-col gap-3 p-4 w-[clamp(14rem,18vw,16rem)]">
-        {/* ── Brand ── */}
+        {/* ── Brand: el robot de TYPELY + wordmark con la tipografía display
+            y el gradiente de marca (igual que el login). ── */}
         <div className="flex items-center gap-2.5 px-1">
-          <span className="grid place-items-center w-9 h-9 rounded-[1.05rem] border border-white/95 bg-gradient-to-br from-accent-sky/30 via-accent/20 to-accent-teal/15 shadow-card text-accent-strong font-black text-lg">
-            T
-          </span>
-          <span className="text-[clamp(1.25rem,2vw,1.55rem)] font-black text-text">
+          <img
+            src="/favicon-256.png"
+            alt=""
+            decoding="async"
+            className="w-10 h-10 rounded-xl shadow-card border border-white/80 bg-gradient-to-br from-accent-sky/20 to-accent/10 object-contain"
+          />
+          <span className="font-display text-[clamp(1.25rem,2vw,1.5rem)] font-black tracking-wide bg-gradient-to-r from-accent-sky via-accent to-accent-pink bg-clip-text text-transparent">
             TYPELY
           </span>
         </div>
@@ -220,7 +224,12 @@ export function DashboardShell({
         </header>
 
         {/* ── Hero section ── */}
-        <section className="glass-card-smooth p-6 rounded-2xl flex gap-4 mx-4 mb-2">
+        <section className="glass-card-smooth relative overflow-hidden p-6 rounded-2xl flex gap-4 mx-4 mb-2">
+          {/* Hairline de gradiente de marca en el borde superior del hero. */}
+          <span
+            className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent-teal via-accent to-accent-pink opacity-80 pointer-events-none"
+            aria-hidden="true"
+          />
           <div className="flex-1 flex flex-col gap-2">{hero}</div>
           {heroArt ? (
             <div className="relative w-32 shrink-0 hidden sm:block" aria-hidden="true">

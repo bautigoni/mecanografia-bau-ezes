@@ -148,9 +148,9 @@ export function StudentsListPage() {
       />
 
       {creating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 animate-overlay-fade" role="dialog" aria-modal="true">
-          <div className="absolute inset-0" onClick={() => setCreating(false)} />
-          <form onSubmit={createStudent} className="glass-card-smooth relative z-10 p-6 w-[min(26rem,92vw)] flex flex-col gap-4 animate-card-pop">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-overlay-fade" role="dialog" aria-modal="true">
+          <div className="modal-overlay" onClick={() => setCreating(false)} />
+          <form onSubmit={createStudent} className="glass-card-smooth modal-card relative z-10 p-6 w-[min(26rem,92vw)] flex flex-col gap-4 animate-card-pop">
             <div className="flex items-center justify-between">
               <h2 className="font-display font-bold text-xl text-text">Nuevo alumno</h2>
               <button type="button" onClick={() => setCreating(false)} className="w-8 h-8 grid place-items-center rounded-full bg-white/40 text-text/60 hover:text-text cursor-pointer"><X size={16} /></button>
@@ -171,9 +171,9 @@ export function StudentsListPage() {
       )}
 
       {edit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 animate-overlay-fade" role="dialog" aria-modal="true">
-          <div className="absolute inset-0" onClick={() => setEdit(null)} />
-          <form onSubmit={saveEdit} className="glass-card-smooth relative z-10 p-6 w-[min(24rem,92vw)] max-h-[88vh] overflow-y-auto flex flex-col gap-4 animate-card-pop">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-overlay-fade" role="dialog" aria-modal="true">
+          <div className="modal-overlay" onClick={() => setEdit(null)} />
+          <form onSubmit={saveEdit} className="glass-card-smooth modal-card relative z-10 p-6 w-[min(24rem,92vw)] max-h-[88vh] overflow-y-auto flex flex-col gap-4 animate-card-pop">
             <h2 className="font-display font-bold text-xl text-text">Editar alumno</h2>
             <label className="flex flex-col gap-1 text-sm font-bold text-text">Nombre
               <input autoFocus value={edit.name} onChange={(e) => setEdit((x) => x && { ...x, name: e.target.value })} className="h-11 px-4 rounded-xl bg-white/70 border border-white/60 outline-none font-semibold" />

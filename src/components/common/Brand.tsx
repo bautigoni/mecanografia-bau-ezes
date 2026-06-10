@@ -5,16 +5,15 @@ export function Brand({ compact = false }: { compact?: boolean }) {
         compact ? "gap-2.5" : "gap-3.2"
       }`}
     >
-      <span
-        className={`grid place-items-center border border-white/95 rounded-[1.05rem] bg-gradient-to-br from-accent-sky/30 via-accent/20 to-accent-teal/15 shadow-card text-accent-strong font-black ${
-          compact
-            ? "w-[2.5rem] h-[2.5rem] text-[1.25rem]"
-            : "w-[3.1rem] h-[3.1rem] text-[1.55rem]"
+      <img
+        src="/favicon-256.png"
+        alt=""
+        decoding="async"
+        className={`rounded-xl shadow-card border border-white/80 bg-gradient-to-br from-accent-sky/20 to-accent/10 object-contain ${
+          compact ? "w-[2.5rem] h-[2.5rem]" : "w-[3.1rem] h-[3.1rem]"
         }`}
-      >
-        T
-      </span>
-      <span className="text-[clamp(1.45rem,2.5vw,2rem)] font-black">
+      />
+      <span className="font-display text-[clamp(1.45rem,2.5vw,2rem)] font-black tracking-wide bg-gradient-to-r from-accent-sky via-accent to-accent-pink bg-clip-text text-transparent">
         TYPELY
       </span>
     </div>

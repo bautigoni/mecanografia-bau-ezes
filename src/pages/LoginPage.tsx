@@ -150,16 +150,14 @@ export function LoginPage() {
         src={assets.mascotFemaleWave}
         alt="Mascota saludando"
         decoding="async"
-        // @ts-expect-error — fetchPriority is supported by Chrome/Edge/Safari
-        fetchpriority="high"
+        fetchPriority="high"
       />
       <img
         className="absolute bottom-[7.5vh] right-[8vw] w-auto max-h-[72vh] animate-mascot-float pointer-events-none select-none z-10"
         src={assets.mascotMaleWave}
         alt="Mascota saludando"
         decoding="async"
-        // @ts-expect-error — fetchPriority is supported by Chrome/Edge/Safari
-        fetchpriority="high"
+        fetchPriority="high"
       />
 
       <section

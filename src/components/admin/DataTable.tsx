@@ -31,7 +31,7 @@ export function DataTable<T>({
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[40rem]">
           <thead>
-            <tr className="bg-white/40 border-b border-white/50">
+            <tr className="bg-gradient-to-r from-accent-sky/10 via-white/45 to-accent/10 border-b border-white/60">
               {columns.map((c) => (
                 <th
                   key={c.key}
@@ -54,7 +54,7 @@ export function DataTable<T>({
               rows.map((row) => (
                 <tr
                   key={getKey(row)}
-                  className={`border-b border-white/30 last:border-0 transition-colors hover:bg-white/40 ${onRowClick ? "cursor-pointer" : ""}`}
+                  className={`border-b border-white/30 last:border-0 odd:bg-white/15 transition-colors duration-150 hover:bg-accent-sky/10 ${onRowClick ? "cursor-pointer" : ""}`}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                 >
                   {columns.map((c) => (

@@ -46,6 +46,16 @@ export async function sedeRoutes(app: FastifyInstance) {
     const parsed = sedeSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "Datos inválidos." });
     const [row] = await db.insert(schema.sedes).values(parsed.data).returning();
+    // Toda sede nace con su año lectivo ACTIVO del año calendario actual —
+    // sin esto, los cursos nuevos quedarían sin año (el backfill de
+    // ensureSchema solo corre en el boot del API).
+    if (row) {
+      const year = String(new Date().getUTCFullYear());
+      await db
+        .insert(schema.academicYears)
+        .values({ sedeId: row.id, label: year, isActive: true })
+        .onConflictDoNothing();
+    }
     return reply.send(row);
   });
 

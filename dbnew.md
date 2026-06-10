@@ -259,4 +259,29 @@ order.
 - Borrados: `src/pages/SiteAdminPage.tsx`, `src/utils/emailService.ts`,
   `docs/ADMIN_SEDE_ARCHITECTURE.md` (spec vieja, ya implementada).
 
+## Phase H — Crash de /admin-sede, modales con blur real, marca (2026-06-10)
+
+- **Crash crítico**: `/admin-sede/cursos` y `/admin-sede/alumnos` montaban en
+  gris SIEMPRE — las páginas llaman `useAcademicYear()` en su propio cuerpo,
+  fuera del `AcademicYearProvider` que vivía dentro de `SedeShell`, y el hook
+  tira si no hay provider. Fix: provider movido a un layout de ruta
+  (`SedeAcademicYearLayout` en `SedeShell.tsx`, montado en App.tsx sobre TODO
+  el grupo admin-sede) y quitado de SedeShell. Verificado en preview.
+- `ErrorBoundary` global (App) — un crash de render ya nunca deja la pantalla
+  gris muda: tarjeta amigable con Recargar / Ir al inicio.
+- **Modales**: nuevo sistema `.modal-overlay` (oscurece + `backdrop-filter:
+  blur(16px)` sobre TODO el fondo) + `.modal-card` (glass más opaco) aplicado
+  a todos los modales de admin (AdminGeneral ×5, Cursos, Alumnos ×2, Docentes,
+  CourseDetail, CloseYearWizard). Lo de atrás ya no compite con el modal.
+- **Docentes**: asignar a un curso un profesor SIN sede ahora adopta la sede
+  del curso (invitaciones aceptadas sin sede quedaban inasignables con 403
+  "de otra sede"). POST /api/sedes crea el año lectivo activo del año
+  calendario (las sedes nuevas no tenían año → cursos sin año).
+- **Marca**: el "T" + wordmark en tipografía body se reemplaza por el robot
+  (favicon-256) + "TYPELY" en font-display con gradiente de marca, en
+  `DashboardShell` y `Brand`.
+- DataTable: header con tinte de gradiente, zebra suave y hover celeste.
+  Hero de los dashboards con hairline de gradiente superior.
+- LoginPage: `fetchpriority` → `fetchPriority` (warning de React 19).
+
 

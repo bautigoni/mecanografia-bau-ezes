@@ -13,6 +13,8 @@ import { ProgresoPage } from "./pages/admin/SedeStubPages";
 import { ConfigPage } from "./pages/admin/SedeConfigPage";
 import { InicioPage } from "./pages/admin/InicioPage";
 import { ApiInspectorPage } from "./pages/admin/ApiInspectorPage";
+import { SedeAcademicYearLayout } from "./components/admin/SedeShell";
+import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { StudentDetailPage } from "./pages/admin/StudentDetailPage";
 import { TeacherDetailPage } from "./pages/admin/TeacherDetailPage";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
@@ -61,6 +63,7 @@ function PageFallback() {
 
 export function App() {
   return (
+    <ErrorBoundary>
     <Routes>
       <Route path="/" element={<LoginPage />} />
       <Route path="/login" element={<LoginPage />} />
@@ -115,20 +118,24 @@ export function App() {
       </Route>
 
       <Route element={<ProtectedRoute roles={["admin-sede"]} />}>
-        {/* Inicio = executive dashboard (F3). The old monolithic SiteAdminPage
-            is superseded by the dedicated routed screens. */}
-        <Route path="/admin-sede" element={<InicioPage />} />
-        {/* Dedicated admin-sede screens (F1 redesign). */}
-        <Route path="/admin-sede/cursos" element={<CoursesListPage />} />
-        <Route path="/admin-sede/docentes" element={<TeachersListPage />} />
-        <Route path="/admin-sede/docentes/:id" element={<TeacherDetailPage />} />
-        <Route path="/admin-sede/alumnos" element={<StudentsListPage />} />
-        <Route path="/admin-sede/alumnos/:id" element={<StudentDetailPage />} />
-        <Route path="/admin-sede/progreso" element={<ProgresoPage />} />
-        <Route path="/admin-sede/config" element={<ConfigPage />} />
-        {/* Per-course management: assign teachers, add students (single/bulk),
-            enable levels. */}
-        <Route path="/admin-sede/curso/:classId" element={<CourseDetailPage />} />
+        {/* The academic-year context wraps every admin-sede page at the ROUTE
+            level (the pages call useAcademicYear() in their own bodies, so a
+            provider inside SedeShell can never reach them). */}
+        <Route element={<SedeAcademicYearLayout />}>
+          {/* Inicio = executive dashboard (F3). */}
+          <Route path="/admin-sede" element={<InicioPage />} />
+          {/* Dedicated admin-sede screens (F1 redesign). */}
+          <Route path="/admin-sede/cursos" element={<CoursesListPage />} />
+          <Route path="/admin-sede/docentes" element={<TeachersListPage />} />
+          <Route path="/admin-sede/docentes/:id" element={<TeacherDetailPage />} />
+          <Route path="/admin-sede/alumnos" element={<StudentsListPage />} />
+          <Route path="/admin-sede/alumnos/:id" element={<StudentDetailPage />} />
+          <Route path="/admin-sede/progreso" element={<ProgresoPage />} />
+          <Route path="/admin-sede/config" element={<ConfigPage />} />
+          {/* Per-course management: assign teachers, add students (single/bulk),
+              enable levels. */}
+          <Route path="/admin-sede/curso/:classId" element={<CourseDetailPage />} />
+        </Route>
       </Route>
 
       <Route element={<ProtectedRoute roles={["profesor"]} />}>
@@ -139,5 +146,6 @@ export function App() {
 
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
+    </ErrorBoundary>
   );
 }

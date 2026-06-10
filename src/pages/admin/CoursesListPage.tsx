@@ -130,9 +130,9 @@ export function CoursesListPage() {
       </div>
 
       {creating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 animate-overlay-fade" role="dialog" aria-modal="true">
-          <div className="absolute inset-0" onClick={() => setCreating(false)} />
-          <form onSubmit={createCourse} className="glass-card-smooth relative z-10 p-6 w-[min(26rem,92vw)] flex flex-col gap-4 animate-card-pop">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-overlay-fade" role="dialog" aria-modal="true">
+          <div className="modal-overlay" onClick={() => setCreating(false)} />
+          <form onSubmit={createCourse} className="glass-card-smooth modal-card relative z-10 p-6 w-[min(26rem,92vw)] flex flex-col gap-4 animate-card-pop">
             <div className="flex items-center justify-between">
               <h2 className="font-display font-bold text-xl text-text">Nuevo curso</h2>
               <button type="button" onClick={() => setCreating(false)} className="w-8 h-8 grid place-items-center rounded-full bg-white/40 text-text/60 hover:text-text cursor-pointer"><X size={16} /></button>

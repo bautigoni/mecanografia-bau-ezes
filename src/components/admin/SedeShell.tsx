@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Home, BookOpen, GraduationCap, Users, LineChart, Settings, Calendar } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { DashboardShell } from "../dashboard/DashboardShell";
 import { useAuth } from "../../hooks/useAuth";
 import { AcademicYearProvider, useAcademicYear } from "../../hooks/useAcademicYear";
@@ -10,6 +10,22 @@ import { AcademicYearProvider, useAcademicYear } from "../../hooks/useAcademicYe
    admin-sede screen so navigation is consistent (F1 of the redesign).
    F6 added: the academic-year context + a small year selector in the
    sidebar so every screen can be scoped to a single año lectivo. */
+
+/* Route-level provider for the academic-year context. It MUST wrap the
+   admin-sede pages from App.tsx (an <Outlet/> layout): the pages call
+   useAcademicYear() in their own bodies, OUTSIDE of <SedeShell/>'s subtree,
+   so a provider inside SedeShell can never reach them. (Having it inside
+   SedeShell crashed /admin-sede/cursos and /admin-sede/alumnos on mount —
+   the hook throws without a provider and React unmounted to a grey page.) */
+export function SedeAcademicYearLayout() {
+  const { user, viewAs } = useAuth();
+  const sedeId = (user?.role === "superadmin" && viewAs?.sedeId ? viewAs.sedeId : user?.siteId) ?? null;
+  return (
+    <AcademicYearProvider sedeId={sedeId}>
+      <Outlet />
+    </AcademicYearProvider>
+  );
+}
 
 const NAV = [
   { id: "inicio", label: "Inicio", icon: Home, path: "/admin-sede" },
@@ -22,22 +38,7 @@ const NAV = [
 
 export type SedeNavId = (typeof NAV)[number]["id"];
 
-export function SedeShell(props: {
-  active: SedeNavId;
-  hero: ReactNode;
-  search?: { value: string; onChange: (v: string) => void; placeholder?: string };
-  children: ReactNode;
-}) {
-  const { user } = useAuth();
-  const sedeId = (user as any)?.siteId ?? (user as any)?.sedeId ?? null;
-  return (
-    <AcademicYearProvider sedeId={sedeId}>
-      <SedeShellInner {...props} />
-    </AcademicYearProvider>
-  );
-}
-
-function SedeShellInner({
+export function SedeShell({
   active,
   hero,
   search,

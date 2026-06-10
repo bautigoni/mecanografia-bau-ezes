@@ -421,9 +421,9 @@ function Cell({ s }: { s: number | null }) {
 
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 animate-overlay-fade" role="dialog" aria-modal="true">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="glass-card-smooth relative z-10 p-6 w-[min(24rem,92vw)] flex flex-col gap-4 animate-card-pop">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-overlay-fade" role="dialog" aria-modal="true">
+      <div className="modal-overlay" onClick={onClose} />
+      <div className="glass-card-smooth modal-card relative z-10 p-6 w-[min(24rem,92vw)] flex flex-col gap-4 animate-card-pop">
         <h2 className="font-display font-bold text-xl text-text">{title}</h2>
         {children}
       </div>
