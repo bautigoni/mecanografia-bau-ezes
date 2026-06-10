@@ -23,7 +23,7 @@ interface GlassVars {
   modalTint: number;  // 0..1 — oscurecido del fondo detrás de popups
 }
 
-const DEFAULTS: GlassVars = { blur: 26, saturate: 1.6, white: 0.55, border: 0.65, sheen: 0.6, modalBlur: 22, modalTint: 0.16 };
+const DEFAULTS: GlassVars = { blur: 26, saturate: 1.6, white: 0.55, border: 0.65, sheen: 0.6, modalBlur: 26, modalTint: 0.1 };
 const STORAGE_KEY = "typely.glassEditor.v1";
 const round2 = (n: number) => Math.round(n * 100) / 100;
 

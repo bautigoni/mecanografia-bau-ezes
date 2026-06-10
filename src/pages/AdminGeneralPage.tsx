@@ -98,7 +98,6 @@ export function AdminGeneralPage() {
   const [invitations, setInvitations] = useState<
     Array<{ id: string; email: string; name?: string | null; role: string; status: string; createdAt: string }>
   >([]);
-  const [inviteDraft, setInviteDraft] = useState({ email: "", name: "", siteId: "" });
   const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
   /* F6: confirm-and-expire dialog for a single invitation (also see bulk button). */
   const [confirmExpireInv, setConfirmExpireInv] = useState<{ id: string; email: string } | null>(null);
@@ -226,6 +225,9 @@ export function AdminGeneralPage() {
     setEditingAdminId("");
     setTempPassword("");
   }
+  /* Flujo SIMPLE: crear un admin = mandar una invitación. Solo email + sede
+     (nombre opcional). El admin elige su propia contraseña desde el link —
+     sin usuario/contraseña manual, sin pasos extra. */
   async function submitAdmin(event: FormEvent) {
     event.preventDefault();
     if (!adminDraft.email.trim()) {
@@ -234,10 +236,6 @@ export function AdminGeneralPage() {
     }
     if (!adminDraft.siteId) {
       setMessage("Elegí una sede para el administrador.");
-      return;
-    }
-    if (adminDraft.password && adminDraft.password.length < 6) {
-      setMessage("La contraseña debe tener al menos 6 caracteres (o dejala vacía para una temporal).");
       return;
     }
     try {
@@ -252,86 +250,25 @@ export function AdminGeneralPage() {
         closeAdminModal();
         refresh("Admin de sede actualizado.");
       } else {
-        const res = await api.createUser({
-          fullName: adminDraft.name,
+        const res = await api.createInvitation({
           email: adminDraft.email,
+          name: adminDraft.name || undefined,
           role: "admin-sede",
           sedeId: adminDraft.siteId,
-          username: adminDraft.username || undefined,
-          password: adminDraft.password || undefined,
         });
+        setInviteLinks((prev) => ({ ...prev, [res.invitation.id]: res.link }));
+        if (!res.emailed) {
+          try { await navigator.clipboard.writeText(res.link); } catch { /* clipboard bloqueado */ }
+        }
         closeAdminModal();
         refresh(
-          res.temporaryPassword
-            ? `Admin creado · usuario ${res.user.username ?? adminDraft.email} · clave temporal ${res.temporaryPassword}`
-            : `Admin creado · usuario ${res.user.username ?? adminDraft.email} · ya puede iniciar sesión con la contraseña elegida`,
+          res.emailed
+            ? `Invitación enviada a ${res.invitation.email}. Cuando la acepte va a aparecer en la lista.`
+            : "Invitación creada y enlace copiado — compartilo con el admin.",
         );
       }
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "No se pudo guardar el admin.");
-    }
-  }
-  /** Invite the admin by email instead of creating them directly — they set
-   *  their own password from the link. */
-  async function inviteAdmin() {
-    if (!adminDraft.email.trim()) {
-      setMessage("Ingresá el email para enviar la invitación.");
-      return;
-    }
-    if (!adminDraft.siteId) {
-      setMessage("Elegí una sede para el administrador.");
-      return;
-    }
-    try {
-      const res = await api.createInvitation({
-        email: adminDraft.email,
-        name: adminDraft.name || undefined,
-        role: "admin-sede",
-        sedeId: adminDraft.siteId,
-      });
-      closeAdminModal();
-      refresh(
-        res.emailed
-          ? `Invitación enviada a ${res.invitation.email}`
-          : "Invitación creada. Copiá el enlace para compartirlo.",
-      );
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "No se pudo enviar la invitación.");
-    }
-  }
-  /* Dedicated invite form (Admins section). Same mechanism as teacher invites. */
-  async function submitSuperInvite(event: FormEvent) {
-    event.preventDefault();
-    const siteId = inviteDraft.siteId || data.sites[0]?.id || "";
-    if (!inviteDraft.email.trim()) {
-      setMessage("Ingresá el email del admin a invitar.");
-      return;
-    }
-    if (!siteId) {
-      setMessage("Elegí una sede.");
-      return;
-    }
-    try {
-      const res = await api.createInvitation({
-        email: inviteDraft.email,
-        name: inviteDraft.name || undefined,
-        role: "admin-sede",
-        sedeId: siteId,
-      });
-      setInviteDraft({ email: "", name: "", siteId });
-      setInviteLinks((prev) => ({ ...prev, [res.invitation.id]: res.link }));
-      try {
-        await navigator.clipboard.writeText(res.link);
-      } catch {
-        /* clipboard may be unavailable */
-      }
-      refresh(
-        res.emailed
-          ? `Invitación enviada por email a ${res.invitation.email}`
-          : "Invitación creada. Enlace copiado para compartir.",
-      );
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "No se pudo enviar la invitación.");
+      setMessage(err instanceof Error ? err.message : "No se pudo completar la acción.");
     }
   }
   async function copyAdminInviteLink(id: string) {
@@ -406,6 +343,12 @@ export function AdminGeneralPage() {
   const filteredAdmins = q
     ? sedeAdmins.filter((a) => `${a.name} ${a.email ?? ""}`.toLowerCase().includes(q))
     : sedeAdmins;
+  /* Solo invitaciones EN CURSO: las aceptadas ya son cuentas reales (lista de
+     arriba) y las expiradas no aportan — mostrarlas confundía ("accepted"
+     pero sin admin nuevo visible). */
+  const pendingAdminInvites = invitations.filter(
+    (i) => i.role === "admin-sede" && (i.status === "pending" || i.status === "sent"),
+  );
 
   const kpis = (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -593,7 +536,7 @@ export function AdminGeneralPage() {
           disabled={data.sites.length === 0}
           title={data.sites.length === 0 ? "Primero creá una sede para poder asignarle un administrador." : undefined}
         >
-          <UserCog size={18} /> Crear admin de sede
+          <UserCog size={18} /> Invitar admin de sede
         </Button>
       </div>
     </>
@@ -786,95 +729,52 @@ export function AdminGeneralPage() {
                 disabled={data.sites.length === 0}
                 title={data.sites.length === 0 ? "Primero creá una sede para poder asignarle un administrador." : undefined}
               >
-                <UserCog size={18} /> Crear admin de sede
+                <UserCog size={18} /> Invitar admin de sede
               </Button>
             </div>
           </div>
           <AdminCards admins={filteredAdmins} />
 
-          {/* Invitar admin de sede por email — mismo flujo que invitar docente. */}
-          <div className="mt-2 pt-5 border-t border-white/40 flex flex-col gap-4">
-            <div>
-              <h3 className="font-display text-lg font-bold text-text flex items-center gap-2">
-                <Mail size={20} /> Invitar admin de sede por email
-              </h3>
-              <p className="text-sm text-muted font-semibold">
-                El admin recibe un enlace y elige su propia contraseña. (También podés crearlo con usuario y contraseña desde "Crear admin de sede".)
-              </p>
-            </div>
-            <form className="flex flex-row flex-wrap items-end gap-4" onSubmit={submitSuperInvite}>
-              <input
-                required
-                type="email"
-                className={`${INPUT_CLS} flex-1 min-w-[12rem]`}
-                placeholder="Email del admin"
-                value={inviteDraft.email}
-                onChange={(e) => setInviteDraft({ ...inviteDraft, email: e.target.value })}
-              />
-              <input
-                className={`${INPUT_CLS} flex-1 min-w-[10rem]`}
-                placeholder="Nombre (opcional)"
-                value={inviteDraft.name}
-                onChange={(e) => setInviteDraft({ ...inviteDraft, name: e.target.value })}
-              />
-              <select
-                required
-                className={`${SELECT_CLS} flex-1 min-w-[10rem]`}
-                value={inviteDraft.siteId || data.sites[0]?.id || ""}
-                onChange={(e) => setInviteDraft({ ...inviteDraft, siteId: e.target.value })}
-              >
-                {data.sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-              <Button type="submit" className={BTN_SM} disabled={data.sites.length === 0}>
-                <Send size={18} /> Invitar
-              </Button>
-            </form>
-            {invitations.filter((i) => i.role === "admin-sede").length > 0 && (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <h4 className="text-sm font-bold text-text">Invitaciones pendientes y enviadas</h4>
-                  {invitations.some((i) => i.role === "admin-sede" && (i.status === "pending" || i.status === "sent")) && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className={BTN_SM}
-                      onClick={() => setConfirmExpireAll(true)}
-                    >
-                      <Trash2 size={15} /> Expirar todas
-                    </Button>
-                  )}
-                </div>
-                {invitations
-                  .filter((i) => i.role === "admin-sede")
-                  .map((inv) => {
-                    const canExpire = inv.status === "pending" || inv.status === "sent";
-                    return (
-                      <div key={inv.id} className="flex items-center gap-3 flex-wrap p-3 rounded-xl bg-white/40">
-                        <span className="flex items-center gap-2 text-sm font-semibold text-text min-w-0 flex-1">
-                          <Mail size={16} className="shrink-0" /> {inv.email}
-                        </span>
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 ${inviteStatusCls[inv.status] ?? "bg-white/40 text-muted"}`}>
-                          {inv.status}
-                        </span>
-                        <Button variant="secondary" className={BTN_SM} onClick={() => copyAdminInviteLink(inv.id)}>
-                          <Copy size={16} /> Copiar enlace
-                        </Button>
-                        {canExpire && (
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1.5 text-sm font-bold text-rose hover:text-rose/80 cursor-pointer bg-transparent border-0"
-                            onClick={() => setConfirmExpireInv({ id: inv.id, email: inv.email })}
-                            title="Expirar esta invitación"
-                          >
-                            <Trash2 size={15} /> Expirar
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
+          {/* Invitaciones EN CURSO (pendientes/enviadas). Las aceptadas no se
+              listan acá: el admin ya aparece arriba como cuenta real. */}
+          {pendingAdminInvites.length > 0 && (
+            <div className="mt-2 pt-5 border-t border-white/40 flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <h3 className="font-display text-lg font-bold text-text flex items-center gap-2">
+                  <Mail size={20} /> Invitaciones en curso
+                </h3>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className={BTN_SM}
+                  onClick={() => setConfirmExpireAll(true)}
+                >
+                  <Trash2 size={15} /> Expirar todas
+                </Button>
               </div>
-            )}
-          </div>
+              {pendingAdminInvites.map((inv) => (
+                <div key={inv.id} className="flex items-center gap-3 flex-wrap p-3 rounded-xl bg-white/40">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-text min-w-0 flex-1">
+                    <Mail size={16} className="shrink-0" /> {inv.email}
+                  </span>
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 ${inviteStatusCls[inv.status] ?? "bg-white/40 text-muted"}`}>
+                    {inv.status === "sent" ? "enviada" : "pendiente"}
+                  </span>
+                  <Button variant="secondary" className={BTN_SM} onClick={() => copyAdminInviteLink(inv.id)}>
+                    <Copy size={16} /> Copiar enlace
+                  </Button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 text-sm font-bold text-rose hover:text-rose/80 cursor-pointer bg-transparent border-0"
+                    onClick={() => setConfirmExpireInv({ id: inv.id, email: inv.email })}
+                    title="Expirar esta invitación"
+                  >
+                    <Trash2 size={15} /> Expirar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -886,16 +786,16 @@ export function AdminGeneralPage() {
               <UserCog size={24} />
             </span>
             <h2 id="admin-modal-title" className="font-display text-xl font-bold text-text">
-              {editingAdminId ? "Editar admin de sede" : "Nuevo admin de sede"}
+              {editingAdminId ? "Editar admin de sede" : "Invitar admin de sede"}
             </h2>
             <p className="text-muted font-semibold text-sm">
-              {editingAdminId ? "Actualizá los datos y la sede asignada." : "Creá un administrador y asignalo a una sede."}
+              {editingAdminId ? "Actualizá los datos y la sede asignada." : "Solo necesitás el email — la invitación se envía automáticamente."}
             </p>
             <form className="flex flex-col gap-4" onSubmit={submitAdmin}>
               <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-bold text-text">Nombre completo</span>
+                <span className="text-sm font-bold text-text">{editingAdminId ? "Nombre completo" : "Nombre (opcional)"}</span>
                 <input
-                  required
+                  required={!!editingAdminId}
                   className={INPUT_CLS}
                   placeholder="Nombre y apellido"
                   value={adminDraft.name}
@@ -930,30 +830,10 @@ export function AdminGeneralPage() {
               </label>
 
               {!editingAdminId && (
-                <div className="flex flex-col gap-4 p-4 rounded-xl bg-white/40 border border-white/50">
-                  <p className="text-xs text-muted font-semibold">
-                    Opcional: definí usuario y contraseña ahora, o dejalos vacíos y usá <b>Invitar por email</b> para que el admin elija su propia contraseña.
-                  </p>
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-sm font-bold text-text">Usuario (opcional)</span>
-                    <input
-                      className={INPUT_CLS}
-                      placeholder="se genera automático si lo dejás vacío"
-                      value={adminDraft.username}
-                      onChange={(e) => setAdminDraft({ ...adminDraft, username: e.target.value })}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-sm font-bold text-text">Contraseña (opcional)</span>
-                    <input
-                      type="text"
-                      className={INPUT_CLS}
-                      placeholder="mín. 6 — vacío = clave temporal"
-                      value={adminDraft.password}
-                      onChange={(e) => setAdminDraft({ ...adminDraft, password: e.target.value })}
-                    />
-                  </label>
-                </div>
+                <p className="text-xs text-muted font-semibold rounded-xl bg-white/40 border border-white/50 px-3 py-2.5">
+                  Le llega un email con un enlace para activar su cuenta y elegir su propia
+                  contraseña. Cuando lo acepte, aparece automáticamente en esta lista.
+                </p>
               )}
 
               {editingAdminId && (
@@ -1000,13 +880,8 @@ export function AdminGeneralPage() {
 
               <div className="flex flex-wrap gap-3">
                 <Button type="submit" className={BTN_SM}>
-                  {editingAdminId ? <><Pencil size={16} /> Guardar cambios</> : <><Plus size={16} /> Crear admin</>}
+                  {editingAdminId ? <><Pencil size={16} /> Guardar cambios</> : <><Send size={16} /> Enviar invitación</>}
                 </Button>
-                {!editingAdminId && (
-                  <Button type="button" variant="secondary" className={BTN_SM} onClick={inviteAdmin}>
-                    <UserCog size={16} /> Invitar por email
-                  </Button>
-                )}
               </div>
               {editingAdminId && (
                 <button

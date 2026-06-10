@@ -138,6 +138,26 @@ export async function invitationRoutes(app: FastifyInstance) {
       throw new ForbiddenError("No podés invitar fuera de tu sede.");
     }
 
+    // Consistencia: si el email ya pertenece a una cuenta con rol IGUAL o
+    // SUPERIOR, la invitación no tiene sentido (al aceptarla no cambiaría
+    // nada — o quedaría "accepted" sin que aparezca ningún admin nuevo, como
+    // pasó al invitar el email del propio superadmin). Mensaje claro y 409.
+    const [existingUser] = await db
+      .select({ role: schema.users.role, fullName: schema.users.fullName })
+      .from(schema.users)
+      .where(sql`lower(${schema.users.email}) = ${data.email}`)
+      .limit(1);
+    if (existingUser && (existingUser.role === "superadmin" || existingUser.role === "admin-general")) {
+      return reply.code(409).send({
+        error: `Ese email ya pertenece a ${existingUser.fullName} (${existingUser.role}). No hace falta invitarlo.`,
+      });
+    }
+    if (existingUser && existingUser.role === data.role) {
+      return reply.code(409).send({
+        error: "Ese email ya tiene una cuenta con ese rol. Editá la cuenta existente en lugar de invitarla de nuevo.",
+      });
+    }
+
     const rawToken = newOpaqueToken();
     const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000);
     const [row] = await db

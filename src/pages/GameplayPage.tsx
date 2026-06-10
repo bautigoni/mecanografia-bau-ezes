@@ -1038,7 +1038,7 @@ export function GameplayPage() {
 
       <section className="px-4 pb-2 shrink-0" aria-label="Teclado visual">
         <div
-          className={`flex flex-col gap-1.5 w-fit mx-auto rounded-2xl transition-all duration-150 ${
+          className={`flex flex-col gap-2 w-fit mx-auto rounded-2xl transition-all duration-150 ${
             isErrorActive ? "animate-error-shake ring-2 ring-rose-400/70" : ""
           }`}
         >
@@ -1046,12 +1046,15 @@ export function GameplayPage() {
             /* Each row has its own pastel colour so kids can scan home-row
                position by colour (gold numbers, pink top, mint home, violet
                bottom, sky modifiers). Applied to the KEYS, not a panel. */
+            /* Keycaps con profundidad real: borde inferior grueso (el "lado"
+               de la tecla), brillo superior tipo keycap y sombra suave en
+               capas. El color sigue identificando cada fila. */
             const rowKeyTone: Record<string, string> = {
-              num: "bg-gradient-to-b from-amber-50 to-amber-200 border-amber-300 text-amber-900",
-              top: "bg-gradient-to-b from-pink-50 to-pink-200 border-pink-300 text-pink-900",
-              home: "bg-gradient-to-b from-emerald-50 to-emerald-200 border-emerald-300 text-emerald-900",
-              bot: "bg-gradient-to-b from-violet-50 to-violet-200 border-violet-300 text-violet-900",
-              mod: "bg-gradient-to-b from-sky-50 to-sky-200 border-sky-300 text-sky-900",
+              num: "bg-gradient-to-b from-amber-50 via-amber-100 to-amber-200 border-amber-300 border-b-amber-400 text-amber-900",
+              top: "bg-gradient-to-b from-pink-50 via-pink-100 to-pink-200 border-pink-300 border-b-pink-400 text-pink-900",
+              home: "bg-gradient-to-b from-emerald-50 via-emerald-100 to-emerald-200 border-emerald-300 border-b-emerald-400 text-emerald-900",
+              bot: "bg-gradient-to-b from-violet-50 via-violet-100 to-violet-200 border-violet-300 border-b-violet-400 text-violet-900",
+              mod: "bg-gradient-to-b from-sky-50 via-sky-100 to-sky-200 border-sky-300 border-b-sky-400 text-sky-900",
             };
             return (
               <div
@@ -1067,14 +1070,17 @@ export function GameplayPage() {
                   const isWide = key === "Backspace" || key === "Shift" || key === "Enter";
 
                   const keyClasses = [
-                    "gp-key relative rounded-lg font-black shadow-sm transition-all duration-100 border-2",
+                    "gp-key relative rounded-[0.6rem] font-black transition-all duration-100 border-2 border-b-[4px]",
+                    "shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_5px_12px_rgba(23,53,95,0.16)]",
+                    "hover:-translate-y-[2px] hover:brightness-[1.04]",
+                    "active:translate-y-[1px] active:border-b-2 active:shadow-[inset_0_1px_2px_rgba(23,53,95,0.18)]",
                     "flex items-center justify-center select-none",
                     isSpace ? "w-48 sm:w-72 h-8 sm:h-9 text-sm" : isWide ? "w-16 sm:w-24 h-8 sm:h-9 text-xs" : "w-10 h-8 sm:w-12 sm:h-9 text-sm",
                     // Target/combo override the row colour with the accent blue.
                     isTarget && !isCombo
-                      ? "bg-accent text-white border-accent-strong shadow-lg scale-105 animate-target-pulse"
+                      ? "bg-accent text-white border-accent-strong border-b-accent-strong shadow-[0_6px_18px_rgba(49,89,232,0.45),inset_0_1px_0_rgba(255,255,255,0.4)] scale-105 animate-target-pulse"
                       : isCombo
-                        ? "bg-accent-strong text-white border-accent-strong shadow-lg scale-110 animate-target-pulse"
+                        ? "bg-accent-strong text-white border-accent-strong border-b-accent-strong shadow-[0_6px_18px_rgba(49,89,232,0.5),inset_0_1px_0_rgba(255,255,255,0.4)] scale-110 animate-target-pulse"
                         : rowKeyTone[row.tone],
                     isFindHint ? "animate-key-find ring-4 ring-accent-pink/50" : "",
                     isPressed ? "animate-key-pop scale-90" : "",
@@ -1094,8 +1100,8 @@ export function GameplayPage() {
         </div>
       </section>
 
-      {/* Aire inferior mínimo — el botón de consigna vive arriba a la derecha. */}
-      <div className="pb-3 shrink-0" aria-hidden="true" />
+      {/* Aire inferior: levanta el teclado del borde de la pantalla. */}
+      <div className="pb-6 shrink-0" aria-hidden="true" />
 
       {isCompleted && (
         <div

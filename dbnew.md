@@ -354,4 +354,32 @@ order.
   [[backdrop-filter-transform-gotcha]].
 - `browserslist` moderno agregado en package.json.
 
+## Phase L — admins simples, blur focalizado, teclado 3D, SEO (2026-06-10)
+
+- **Admins de sede, flujo simple**: "Invitar admin de sede" = un solo modal con
+  email (+nombre opcional) + sede → la invitación se envía sola. Eliminado el
+  bloque usuario/contraseña manual y el formulario inline duplicado. La lista
+  de invitaciones muestra solo las EN CURSO (pendiente/enviada) — las
+  aceptadas ya aparecen arriba como cuentas reales.
+- **Consistencia de invitaciones (API)**: POST /api/invitations rechaza con
+  409 si el email ya pertenece a una cuenta superadmin/admin-general o a una
+  cuenta con el mismo rol (la causa del "accepted" fantasma: se había invitado
+  al email del propio superadmin).
+- **Blur focalizado**: .modal-overlay ahora lleva una mask-image radial — el
+  difuminado se concentra detrás del componente y se desvanece hacia los
+  bordes (profundidad de campo) en vez de empañar TODA la pantalla; tinte
+  bajado a 0.10 (menos velo gris). Defaults del editor actualizados.
+- **Teclado del juego**: keycaps con profundidad 3D (borde inferior grueso en
+  el tono de la fila, brillo superior inset, sombra en capas), hover lift,
+  efecto de presión al click, filas con más aire y teclado levantado del borde
+  (pb-6). La tecla objetivo brilla con sombra azul propia.
+- **SEO/Lighthouse**: public/robots.txt (antes el fallback SPA devolvía HTML)
+  + sitemap.xml; title descriptivo, meta description, Open Graph completo y
+  Twitter card en index.html; source maps en el build (vite sourcemap);
+  headers de seguridad en nginx.conf: HSTS, X-Frame-Options, COOP
+  (same-origin-allow-popups por Google Sign-In), nosniff, Referrer-Policy,
+  Permissions-Policy y CSP completa (self + accounts.google.com + Google
+  Fonts + data:/blob: para fotos de sede). Trusted Types NO se activó:
+  rompería React (require-trusted-types-for bloquea innerHTML del runtime).
+
 
