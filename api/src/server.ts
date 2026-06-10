@@ -191,24 +191,13 @@ async function main() {
     app.log.error({ err: e }, "ensureSchema failed");
   }
 
-  /* Health check — used by the Caddy reverse-proxy to know we're up. */
-  app.get("/health", async () => ({ ok: true, service: "typely-api", ts: new Date().toISOString() }));
-
-  /* Domain routes */
-  await app.register(authRoutes);
-  await app.register(sedeRoutes);
-  await app.register(userRoutes);
-  await app.register(progressRoutes);
-  await app.register(importRoutes);
-  await app.register(invitationRoutes);
-  await app.register(classRoutes);
-  await app.register(adminRoutes);
-  await app.register(academicYearRoutes);
-  await app.register(inspectorRoutes);
-
-  /* Top-level error handler: never leak stack traces, always Spanish. */
+  /* Top-level error handler: never leak stack traces, always Spanish.
+     IMPORTANT: must be set BEFORE registering the route plugins — Fastify
+     only propagates a custom error handler to child contexts created
+     after it is set. (Set after the routes, every thrown 401/403 fell
+     through to Fastify's default English `{statusCode,error,message}`.) */
   app.setErrorHandler((err, req, reply) => {
-    const status = (err as any).status ?? 500;
+    const status = (err as any).status ?? (err as any).statusCode ?? 500;
     if (status >= 500) app.log.error({ err }, "unhandled error");
     recordError({
       at: new Date().toISOString(),
@@ -221,6 +210,25 @@ async function main() {
       error: status >= 500 ? "Error interno del servidor." : err.message,
     });
   });
+
+  /* Health check — used by the Caddy reverse-proxy to know we're up.
+     Also exposed as /api/health so the PUBLIC https://…/api/health probe
+     works through Caddy (which proxies /api/* preserving the path). */
+  const health = async () => ({ ok: true, service: "typely-api", ts: new Date().toISOString() });
+  app.get("/health", health);
+  app.get("/api/health", health);
+
+  /* Domain routes */
+  await app.register(authRoutes);
+  await app.register(sedeRoutes);
+  await app.register(userRoutes);
+  await app.register(progressRoutes);
+  await app.register(importRoutes);
+  await app.register(invitationRoutes);
+  await app.register(classRoutes);
+  await app.register(adminRoutes);
+  await app.register(academicYearRoutes);
+  await app.register(inspectorRoutes);
 
   /* Graceful shutdown. */
   const shutdown = async (signal: string) => {
