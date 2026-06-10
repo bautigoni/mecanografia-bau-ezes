@@ -24,6 +24,14 @@ for backward compat; only user-facing strings say "TYPELY".
 - **`dbnew.md`** — backend implementation log. **`DEPLOY.md`** — ops runbook.
 - **`Skills/`** — `skill.md` (EduTic design spec) and `frontend-design/SKILL.md`.
 
+## Branching (read before you commit)
+
+**Work on `dev`, never commit to `master`.** `master` is the host/production
+branch (deployed to `mecanografia.bauhub.online`); there is no `main` — "main"
+means `master`. All development lands on `dev`; `master` only changes through a
+reviewed **pull request from `dev`**, and only when everything is ready and
+`npm run build` passes. Full rules in `CLAUDE.md` §17.
+
 ## Non-negotiables (summary — see CLAUDE.md §15)
 
 1. Never modify originals in `Images/` or `Images-new/`; use/regenerate the web
@@ -38,3 +46,5 @@ for backward compat; only user-facing strings say "TYPELY".
    deploy or change the `127.0.0.1:3005`/`:3006` ports.
 6. Keep the app responsive (monitors / Chromebooks / phones — see CLAUDE.md §6).
 7. After any change run `npm run build`; report files changed and how to test.
+8. Branch on `dev`; never commit to `master`. `master` (production/host) only
+   updates via a reviewed PR from `dev` when everything is ready.

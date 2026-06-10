@@ -279,6 +279,9 @@ docs. Full runbook in `DEPLOY.md`.
 - Keep Docker building; do not bind host ports 80/443 in app compose; keep the
   `127.0.0.1:3005` / `:3006` ports stable. Don't ship dead buttons.
 - Spanish must be correct: tildes (á é í ó ú), ñ, mayúsculas, inverted `¿` `¡`.
+- **Branch on `dev`, never commit directly to `master`.** `master` is the
+  host/production branch; it only changes through a reviewed pull request from
+  `dev` when everything is ready (see §17).
 - After any code change run `npm run build` (= `tsc --noEmit && vite build`); fix
   failures before claiming done. Report which files changed and how to test.
 
@@ -293,3 +296,33 @@ npm run build        # tsc --noEmit && vite build
 Demo: the login "Entrar en modo demo" button enters as a student. Staff/admin and
 the API/DB require the backend (see `DEPLOY.md`). Reset demo data by clearing the
 `edutic_*` localStorage keys (listed in `README.md`).
+
+## 17. Branching & Git Workflow
+
+The repo has two long-lived branches. **The primary/production branch is
+`master`** (there is no `main` — when anyone says "main" they mean `master`).
+
+- **`dev` — all development happens here.** Branch off `dev`, commit your work to
+  `dev` (or to short-lived feature branches that merge back into `dev`), and push
+  `dev`. This is the default working branch for everyone.
+- **`master` — host/production only.** It is deployed to
+  `mecanografia.bauhub.online` and must stay releasable at all times.
+
+Hard rules:
+
+1. **Never commit or push directly to `master`.** It changes *only* through a
+   pull request, and *only* when the work is finished and tested.
+2. **`dev` → `master` via Pull Request.** When everything is ready, open a PR from
+   `dev` into `master`, review it, then merge. Do not fast-forward random branches
+   into `master` by hand.
+3. **Before opening the PR**, run `npm run build` (`tsc --noEmit && vite build`)
+   and the deploy checklist (see `DEPLOY.md` / §13) so `master` never breaks.
+4. Keep `dev` rebased/merged up to date with `master` after each release so the
+   two don't drift.
+
+```bash
+git checkout dev          # work happens here
+# …edit, commit…
+git push                  # pushes to origin/dev
+# when ready for production: open a PR  dev → master  and merge it
+```

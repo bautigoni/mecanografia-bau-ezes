@@ -10,6 +10,18 @@ back to localStorage-only when the API is offline (demo mode).
 > **Authoritative docs:** see `CLAUDE.md` (architecture, structure, design +
 > responsive systems, rules), `dbnew.md` (backend log) and `DEPLOY.md` (ops).
 
+## Branching workflow
+
+Work happens on **`dev`**; **`master`** is the host/production branch (there is
+no `main`). Never commit directly to `master` — it only updates through a
+reviewed **pull request from `dev` → `master`** when everything is ready and
+`npm run build` passes. See `CLAUDE.md` §17 for the full rules.
+
+```bash
+git checkout dev    # develop here, push to origin/dev
+# when ready for production: open a PR  dev → master  and merge it
+```
+
 ## Roles & dashboards
 
 After login each role lands on its own experience (see `routeForRole`):

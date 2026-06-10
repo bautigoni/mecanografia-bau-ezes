@@ -105,3 +105,12 @@ are taught.
 ## 20. Never deploy blindly
 Before telling the user to deploy, confirm `git status`, build success,
 container status, and the correct exposed port.
+
+## 21. Branch on `dev`, never commit to `master`
+The repo has two long-lived branches. **`dev`** is where all development
+happens — branch off it, commit there (or via short-lived feature branches
+that merge back into `dev`), and push `dev`. **`master`** is the
+host/production branch deployed to `mecanografia.bauhub.online` and there is
+no `main` ("main" means `master`). Never commit or push directly to `master`:
+it only changes through a reviewed **pull request from `dev` → `master`**, and
+only when the work is finished and `npm run build` passes. See `CLAUDE.md` §17.
