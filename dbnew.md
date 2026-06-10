@@ -336,4 +336,22 @@ order.
     desactiva el refresh silencioso en modo lectura para no restaurar al admin.
 - `.env.local` (gitignored) creado con SUPERADMIN admin/admin para desarrollo.
 
+## Phase K — el blur SÍ rompía en prod: Lightning CSS (2026-06-10)
+
+- **2º causa raíz del blur** (la de Phase J era real pero parcial): escribir
+  `backdrop-filter: blur(var(--x))` a mano hace que el Lightning CSS de
+  Tailwind v4 ELIMINE la propiedad estándar en el build de prod y deje solo
+  `-webkit-backdrop-filter` (que el Chrome del usuario no aplica). Por eso en
+  el preview dev (CSS sin minificar) difuminaba y en producción no — en NINGÚN
+  modal ni superficie glass. Diagnosticado curleando el CSS desplegado y
+  grepeando: solo había `-webkit-`.
+- Fix: TODAS las utilidades glass (`glass`, `glass-strong`, `glass-card`,
+  `glass-card-smooth`, `glass-surface`) y `.modal-overlay` ahora hacen el blur
+  con `@apply backdrop-blur-[var(--glass-blur)] backdrop-saturate-[...]`
+  (utilidad nativa de Tailwind), que emite el `backdrop-filter` estándar
+  (`var(--tw-backdrop-blur,) …`). Verificado en el bundle: 13 ocurrencias del
+  estándar; computed `blur(22px)`/`blur(48px)` en overlay/card. Ver memoria
+  [[backdrop-filter-transform-gotcha]].
+- `browserslist` moderno agregado en package.json.
+
 

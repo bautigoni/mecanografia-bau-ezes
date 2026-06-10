@@ -68,18 +68,21 @@ button, input, select { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
 a { color: inherit; text-decoration: none; }
 
-/* ── Reusable Utilities ── */
+/* ── Reusable Utilities ──
+   IMPORTANTE: el blur va con `@apply backdrop-blur-[var(--glass-blur)]`
+   (utilidad NATIVA de Tailwind), NO con `backdrop-filter: blur(var(...))` a
+   mano. Lightning CSS (Tailwind v4) descarta la propiedad ESTÁNDAR cuando se
+   escribe a mano y deja solo `-webkit-`, que Chrome no aplica → el liquid
+   glass no difuminaba en producción. La utilidad nativa emite ambas formas. */
 @utility glass {
   background: rgba(255, 255, 255, calc(var(--glass-white) + 0.06));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  @apply backdrop-blur-[var(--glass-blur)] backdrop-saturate-[var(--glass-saturate)];
   border: 1px solid rgba(255, 255, 255, calc(var(--glass-border) - 0.2));
 }
 
 @utility glass-strong {
   background: rgba(255, 255, 255, calc(var(--glass-white) + 0.18));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  @apply backdrop-blur-[var(--glass-blur)] backdrop-saturate-[var(--glass-saturate)];
   border: 1px solid rgba(255, 255, 255, var(--glass-border));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, var(--glass-sheen));
 }
@@ -88,8 +91,7 @@ a { color: inherit; text-decoration: none; }
   background:
     linear-gradient(135deg, rgba(255, 255, 255, calc(var(--glass-white) + 0.2)), rgba(239, 248, 255, var(--glass-white))),
     radial-gradient(circle at 25% 12%, rgba(51, 199, 240, 0.18), transparent 56%);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  @apply backdrop-blur-[var(--glass-blur)] backdrop-saturate-[var(--glass-saturate)];
   border: 1px solid rgba(255, 255, 255, calc(var(--glass-border) + 0.18));
   box-shadow: 0 24px 44px rgba(40, 70, 120, 0.12), inset 0 1px 0 rgba(255, 255, 255, var(--glass-sheen));
   border-radius: 1.5rem;
@@ -98,8 +100,7 @@ a { color: inherit; text-decoration: none; }
 @utility glass-card-smooth {
   background:
     linear-gradient(135deg, rgba(255, 255, 255, calc(var(--glass-white) + 0.24)), rgba(244, 250, 255, calc(var(--glass-white) + 0.12)));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  @apply backdrop-blur-[var(--glass-blur)] backdrop-saturate-[var(--glass-saturate)];
   border: 1px solid rgba(255, 255, 255, calc(var(--glass-border) + 0.1));
   box-shadow: 0 24px 70px rgba(58, 89, 132, 0.22), inset 0 1px 0 rgba(255, 255, 255, var(--glass-sheen));
   border-radius: 1.5rem;
@@ -111,15 +112,22 @@ a { color: inherit; text-decoration: none; }
    .modal-card: sube la opacidad/blur del liquid glass del propio modal para
    que el formulario sea 100% legible aunque el backdrop-filter no esté
    disponible (Safari viejo / GPU bloqueada). Usar SIEMPRE juntos. */
-@utility modal-overlay {
+/* Estilo Apple: lo de atrás se DIFUMINA con fuerza y apenas se oscurece —
+   nunca se tapa con una película opaca. Ambos valores son ajustables en vivo
+   desde /editor-glass (--modal-blur / --modal-tint).
+   NOTA: regla PLANA, no `@utility`. Tailwind v4 elimina la propiedad estándar
+   `backdrop-filter` (deja solo `-webkit-`) cuando vive dentro de `@utility`,
+   y Chrome no la aplica → los popups no difuminaban. Como regla plana,
+   Lightning CSS conserva ambas. */
+.modal-overlay {
   position: absolute;
   inset: 0;
-  /* Estilo Apple: lo de atrás se DIFUMINA con fuerza y apenas se oscurece —
-     nunca se tapa con una película opaca. Ambos valores son ajustables en
-     vivo desde /editor-glass (--modal-blur / --modal-tint). */
   background: rgba(23, 53, 95, var(--modal-tint));
-  backdrop-filter: blur(var(--modal-blur)) saturate(1.25);
-  -webkit-backdrop-filter: blur(var(--modal-blur)) saturate(1.25);
+  /* Usamos la utilidad NATIVA de Tailwind (vía @apply): es la única forma que
+     emite el `backdrop-filter` estándar que Chrome aplica. Lightning CSS
+     descarta la propiedad estándar cuando se escribe a mano como
+     `blur(var(...))`. */
+  @apply backdrop-blur-[var(--modal-blur)] backdrop-saturate-125;
 }
 
 .modal-card {
@@ -133,8 +141,7 @@ a { color: inherit; text-decoration: none; }
 
 @utility glass-surface {
   background: rgba(255, 255, 255, calc(var(--glass-white) + 0.08));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  @apply backdrop-blur-[var(--glass-blur)] backdrop-saturate-[var(--glass-saturate)];
   border: 1px solid rgba(255, 255, 255, calc(var(--glass-border) - 0.15));
   border-radius: 1rem;
 }
