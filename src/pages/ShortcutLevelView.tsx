@@ -25,6 +25,7 @@ import { useNavigate } from "react-router-dom";
 import type { Activity } from "../data/activities";
 import { assets } from "../utils/assets";
 import { getGameplayBackground } from "../data/worlds";
+import { StarCounter } from "../components/common/StarCounter";
 import { getStarsFromAccuracy, markLevelComplete } from "../utils/progress";
 
 /* ------------------------------------------------------------------ */
@@ -359,15 +360,18 @@ export function ShortcutLevelView({ activity }: { activity: Activity }) {
           <strong className="font-display text-base sm:text-lg text-text leading-tight">{activity.title}</strong>
           <em className="text-xs text-muted not-italic">{activity.subtitle}</em>
         </div>
-        <button
-          type="button"
-          className="glass rounded-full px-3 py-2 text-sm font-semibold text-text shadow-btn transition hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0 flex items-center gap-1.5"
-          onClick={() => navigate(`/worlds/${activity.worldId}`)}
-          aria-label="Salir"
-        >
-          <X size={16} />
-          <span>Salir</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <StarCounter />
+          <button
+            type="button"
+            className="glass rounded-full px-3 py-2 text-sm font-semibold text-text shadow-btn transition hover:-translate-y-0.5 hover:shadow-btn-hover active:translate-y-0 flex items-center gap-1.5"
+            onClick={() => navigate(`/worlds/${activity.worldId}`)}
+            aria-label="Salir"
+          >
+            <X size={16} />
+            <span>Salir</span>
+          </button>
+        </div>
       </header>
 
       {/* Goal strip */}

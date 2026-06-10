@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
+import { StarCounter } from "../components/common/StarCounter";
 import { getWorldBySlug, getWorlds, worldStarProgress, WORLD_PEDAGOGY_ORDER, type Level, type LevelPosition } from "../data/worlds";
 import { LevelPositionEditor } from "../components/dev/LevelPositionEditor";
 import { assets } from "../utils/assets";
@@ -37,33 +38,6 @@ const ISLAND_BG: Partial<Record<string, string>> = {
   island1: assets.homeBg,
 };
 
-
-function getShipAsset(from: LevelPosition, to?: LevelPosition) {
-  if (!to) {
-    return assets.shipFront;
-  }
-
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-
-  if (Math.abs(dx) < 4 && dy < 0) {
-    return assets.shipBack;
-  }
-
-  if (Math.abs(dx) < 4 && dy >= 0) {
-    return assets.shipFront;
-  }
-
-  if (dx > 0 && Math.abs(dy) < 7) {
-    return assets.shipRight;
-  }
-
-  if (dx < 0 && Math.abs(dy) < 7) {
-    return assets.shipLeft;
-  }
-
-  return dx >= 0 ? assets.shipDiagonalRight : assets.shipDiagonalLeft;
-}
 
 /* ---- Status-pill colour map (state → Tailwind classes) ---- */
 const STATUS_PILL_CLASSES: Record<string, string> = {
@@ -205,8 +179,9 @@ export function IslandDetailPage() {
       ? editorPositions
       : world.levelPositions;
   const currentPosition = activePositions[currentIndex] ?? activePositions[0];
-  const nextPosition = activePositions[currentIndex + 1];
-  const shipAsset = getShipAsset(currentPosition, nextPosition);
+  /* The ship is ALWAYS the same front-facing sprite (ship-front) in every
+     world — it's the game's main character, not a directional indicator. */
+  const shipAsset = assets.shipFront;
   /* Star progress toward unlocking the next world (70% gate). */
   const starProgress = worldStarProgress(world.slug);
   const isLastWorld = worldNumber >= WORLD_PEDAGOGY_ORDER.length;
@@ -644,7 +619,7 @@ export function IslandDetailPage() {
               style={{ left: `${currentPosition.x}%`, top: `${currentPosition.y - 3}%`, transform: "translate(-50%,-100%)" }}
             >
               <img
-                className="block w-[clamp(3.4rem,12vmin,11rem)] animate-ship-hover"
+                className="block w-[clamp(5rem,18vmin,16rem)] animate-ship-hover"
                 src={shipAsset}
                 alt="Nave de los estudiantes en el nivel actual"
                 decoding="async"
@@ -853,6 +828,9 @@ export function IslandDetailPage() {
         <ArrowLeft size={20} />
         <span className="text-[clamp(1rem,1.8vmin,1.35rem)]">Volver a mundos</span>
       </button>
+
+      {/* Contador de estrellas de la cuenta (siempre visible, arriba a la derecha). */}
+      <StarCounter className="fixed top-4 right-4 z-30" />
 
       {editorAvailable() && (
         <button

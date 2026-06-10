@@ -29,11 +29,12 @@ import {
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { getWorldStatesForUser, getWorldsForUser, worldStarProgress, type World } from "../data/worlds";
+import { getWorldStarRequirements, getWorldStatesForUser, getWorldsForUser, worldStarProgress, type World } from "../data/worlds";
 import { Toast } from "../components/common/Toast";
+import { StarCounter } from "../components/common/StarCounter";
 import { assets } from "../utils/assets";
 import { getUserContext, makeRapidClickDetector } from "../utils/userContext";
-import { loadProgress } from "../utils/progress";
+import { getTotalStars, loadProgress } from "../utils/progress";
 
 /* ------------------------------------------------------------------ */
 /* Asset pre-fetch cache                                               */
@@ -325,7 +326,11 @@ export function WorldsPage() {
 
   function enterWorld(world: World, bypassLock = false) {
     if (worldStates[world.slug] === "locked" && !bypassLock) {
-      setMessage("Conseguí el 70% de estrellas del mundo anterior para desbloquear este mundo.");
+      const need = starRequirements[world.id] ?? 0;
+      setMessage(
+        `Necesitás ${need} estrellas para abrir este mundo. Llevás ${totalStars}. ` +
+          "¡Conseguí más estrellas en los mundos anteriores!",
+      );
       return;
     }
     /* Pre-fetch the island background so the destination page paints instantly.
@@ -353,8 +358,8 @@ export function WorldsPage() {
 
     /* Hidden dev bypass: 5 quick clicks on the same island open it even when
        locked (for testing / presenting the full product). Everyone else —
-       including the admin/superadmin player — must earn 70% of the previous
-       world's stars first, so the unlock gate actually blocks during play. */
+       including the admin/superadmin player — must reach this world's
+       cumulative star requirement first, so the gate actually blocks play. */
     const devBypass = devClickRef.current(world.id);
     if (devBypass && isLocked) {
       enterWorld(world, true);
@@ -367,10 +372,13 @@ export function WorldsPage() {
     prefetchImage(world.background);
   }
 
-  /* Real running star total for the menu chip (was a hardcoded "1280"). */
-  const totalEarnedStars = useMemo(
-    () => visibleWorlds.reduce((sum, w) => sum + worldStarProgress(w.id, progress).earnedStars, 0),
-    [visibleWorlds, progress],
+  /* Real running account-wide star total — drives the menu chip, the top-right
+     StarCounter and the world-unlock gate (was a per-visible-world sum). */
+  const totalStars = useMemo(() => getTotalStars(progress), [progress]);
+  /* Stars needed to UNLOCK each visible world (cumulative max of prior worlds). */
+  const starRequirements = useMemo(
+    () => getWorldStarRequirements(visibleWorlds.map((w) => w.id)),
+    [visibleWorlds],
   );
 
   return (
@@ -394,17 +402,20 @@ export function WorldsPage() {
         aria-hidden="true"
       />
 
-      {/* ── Hamburger menu ── */}
+      {/* ── Star counter + hamburger menu (top-right, always visible) ── */}
       <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-2">
-        <button
-          type="button"
-          className="glass w-11 h-11 grid place-items-center rounded-full border-0 cursor-pointer text-text shadow-md transition-transform hover:scale-105 active:scale-95"
-          aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((v) => !v)}
-        >
-          {menuOpen ? <X size={25} /> : <Menu size={27} />}
-        </button>
+        <div className="flex items-center gap-2">
+          <StarCounter />
+          <button
+            type="button"
+            className="glass w-11 h-11 grid place-items-center rounded-full border-0 cursor-pointer text-text shadow-md transition-transform hover:scale-105 active:scale-95"
+            aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            {menuOpen ? <X size={25} /> : <Menu size={27} />}
+          </button>
+        </div>
 
         {menuOpen && (
           <div
@@ -441,7 +452,7 @@ export function WorldsPage() {
               onClick={() => navigate("/logros")}
             >
               <Star size={19} />
-              <span>{totalEarnedStars} estrellas</span>
+              <span>{totalStars} estrellas</span>
             </button>
             {/* Superadmin-only shortcut to the teacher/admin panel. */}
             {context.isSuperAdmin && (
@@ -595,6 +606,9 @@ export function WorldsPage() {
             const isCompleted = state === "completed";
             const isCurrent = state === "current";
             const starInfo = worldStarProgress(world.id, progress);
+            /* Unlock price for this island (cumulative ★ of all prior worlds):
+               0 for the first island, 21 for the 2nd, 42 for the 3rd, … */
+            const cost = starRequirements[world.id] ?? 0;
             const ctaLabel = isCompleted
               ? "Volver a jugar"
               : isCurrent
@@ -643,7 +657,11 @@ export function WorldsPage() {
                   onPointerEnter={() => !isLocked && prefetchWorld(world)}
                   onFocus={() => !isLocked && prefetchWorld(world)}
                   aria-label={`${worldLabels[world.slug]}${
-                    isLocked ? " (bloqueado)" : isCompleted ? " (completado)" : ""
+                    isLocked
+                      ? ` (bloqueado, necesitás ${cost} estrellas)`
+                      : isCompleted
+                        ? " (completado)"
+                        : ""
                   }`}
                   aria-disabled={isLocked}
                 >
@@ -710,15 +728,6 @@ export function WorldsPage() {
                     </span>
                   )}
 
-                  {/* Locked islands show a padlock centred on the island. */}
-                  {isLocked && (
-                    <span
-                      className="absolute inset-0 grid place-items-center text-white/80"
-                      aria-hidden="true"
-                    >
-                      <Lock size={30} strokeWidth={2.5} />
-                    </span>
-                  )}
 
                   {/* Celebratory sparkle burst when this island is unlocked. */}
                   {justUnlocked.has(world.slug) && (
@@ -740,6 +749,33 @@ export function WorldsPage() {
                     </span>
                   )}
                 </button>
+                {/* Precio de desbloqueo (en estrellas) — se muestra en TODAS las
+                    islas con costo (la 1ª es gratis). Va FUERA del <button> para
+                    que el filtro de gris de las bloqueadas nunca lo apague.
+                    Bloqueada → centrado y grande con candado; ya abierta →
+                    etiqueta chica arriba a la izquierda. */}
+                {cost > 0 && (
+                  <span
+                    className={[
+                      "absolute z-30 flex items-center gap-1 rounded-full glass-strong",
+                      "border border-white/70 shadow-md font-black whitespace-nowrap pointer-events-none",
+                      isLocked
+                        ? "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 text-base"
+                        : "left-1 top-1 px-2 py-0.5 text-xs",
+                    ].join(" ")}
+                    aria-hidden="true"
+                  >
+                    {isLocked && <Lock size={15} strokeWidth={2.6} className="text-slate-600" />}
+                    <Star
+                      size={isLocked ? 16 : 13}
+                      strokeWidth={1.5}
+                      className="text-amber-400 drop-shadow-[0_1px_3px_rgba(250,204,21,0.7)]"
+                      fill="currentColor"
+                    />
+                    <span className="text-text">{cost}</span>
+                  </span>
+                )}
+
                 {/* Kept for visual continuity with prior layout — also gives
                     a label that screen-readers can announce. */}
                 <span className="sr-only">{ctaLabel}: {worldLabels[world.slug]}</span>

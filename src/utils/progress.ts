@@ -55,6 +55,12 @@ export function loadProgress(): CurriculumProgress {
 
 export function saveProgress(progress: CurriculumProgress) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  /* Notify live UI (the global StarCounter) that the cumulative star total may
+     have changed, so it bumps the instant a level is completed. Covers every
+     mutation path since markLevelComplete / resetProgress both call this. */
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("edutic:progress"));
+  }
 }
 
 export function markLevelComplete(
@@ -100,12 +106,19 @@ export function isLevelCompleted(progress: CurriculumProgress, worldId: WorldKey
 
 /* ===================================================================
    STAR SCORING  &  WORLD-UNLOCK BY STARS
-   - THREE_STAR_ACCURACY: 90% accuracy (or more) always gives 3 stars.
-   - UNLOCK_STAR_THRESHOLD: a world unlocks the next once the student has
-     earned at least 70% of that world's total possible stars.
+   - THREE_STAR_ACCURACY: 85% accuracy (or more) always gives 3 stars.
    - "Best stars per level": stars are derived from each level's BEST stored
      accuracy (markLevelComplete already keeps the best), so repeated attempts
-     never stack — only the best result per level counts.
+     never stack — only the best result per level counts. Re-passing a 2★ level
+     as 3★ therefore adds exactly 1 to the account total, never another 3.
+   - CUMULATIVE ACCOUNT TOTAL (`getTotalStars`): the sum of best stars over every
+     level in every world. This is the single number shown in the StarCounter.
+   - WORLD UNLOCK (handled in `data/worlds.ts`): a world unlocks once the account
+     total reaches the sum of the MAX stars of all worlds before it (world 2 needs
+     world 1's max, world 3 needs world 1 + world 2's max, …). Entering a world
+     never spends stars — it is a pure threshold check against the running total.
+   - UNLOCK_STAR_THRESHOLD / WorldStarProgress.requiredStars are legacy per-world
+     figures kept only for the informational "x/y stars" chips, NOT the gate.
 =================================================================== */
 export const MAX_STARS_PER_LEVEL = 3;
 export const THREE_STAR_ACCURACY = 85; // percent
@@ -130,6 +143,25 @@ export function getBestStarsForLevel(
   const level = progress[worldId]?.[levelNumber];
   if (!level?.completed) return 0;
   return getStarsFromAccuracy(level.bestAccuracy);
+}
+
+/** Max stars obtainable in a world = number of levels × 3. */
+export function getWorldMaxStars(worldId: WorldKey): number {
+  return (activitiesByWorld[worldId]?.length ?? 0) * MAX_STARS_PER_LEVEL;
+}
+
+/** Account-wide cumulative star counter: the sum of the BEST stars earned in
+ *  every level of every world. This is the running total shown in the
+ *  StarCounter and used as the world-unlock gate. Because it is re-derived from
+ *  best accuracy each time, a level only ever contributes its best result. */
+export function getTotalStars(progress: CurriculumProgress = loadProgress()): number {
+  let total = 0;
+  for (const worldId of Object.keys(activitiesByWorld) as WorldKey[]) {
+    for (const activity of activitiesByWorld[worldId]) {
+      total += getBestStarsForLevel(progress, worldId, activity.levelNumber);
+    }
+  }
+  return total;
 }
 
 export interface WorldStarProgress {

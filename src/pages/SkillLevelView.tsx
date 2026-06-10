@@ -5,6 +5,7 @@ import type { Activity } from "../data/activities";
 import { assets } from "../utils/assets";
 import { getGameplayBackground } from "../data/worlds";
 import { getStarsFromAccuracy, markLevelComplete } from "../utils/progress";
+import { StarCounter } from "../components/common/StarCounter";
 
 interface SkillLevelViewProps {
   activity: Activity;
@@ -130,15 +131,18 @@ function Island5Shell({
           <strong className="font-display font-extrabold text-lg text-text">{title}</strong>
           <em className="text-[10px] text-muted italic font-normal tracking-wider uppercase">{subtitle}</em>
         </div>
-        <button
-          type="button"
-          className="glass rounded-full w-10 h-10 grid place-items-center border-0 cursor-pointer text-text hover:bg-white/80 transition"
-          onClick={() => navigate(`/worlds/${activity.worldId}`)}
-          aria-label="Salir"
-        >
-          <X size={16} />
-          <span className="hidden sm:inline text-xs font-bold">Salir</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <StarCounter />
+          <button
+            type="button"
+            className="glass rounded-full w-10 h-10 grid place-items-center border-0 cursor-pointer text-text hover:bg-white/80 transition"
+            onClick={() => navigate(`/worlds/${activity.worldId}`)}
+            aria-label="Salir"
+          >
+            <X size={16} />
+            <span className="hidden sm:inline text-xs font-bold">Salir</span>
+          </button>
+        </div>
       </header>
 
       <div className="flex justify-center px-5 py-2">

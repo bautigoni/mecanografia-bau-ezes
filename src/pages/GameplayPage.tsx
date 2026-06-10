@@ -8,6 +8,7 @@ import { getStarsFromAccuracy, markLevelComplete } from "../utils/progress";
 import { achievementMeta } from "../data/achievements";
 import { SkillLevelView } from "./SkillLevelView";
 import { ShortcutLevelView } from "./ShortcutLevelView";
+import { StarCounter } from "../components/common/StarCounter";
 
 const MOTIVATION_PHRASES = [
   "¡Vamos que podés!",
@@ -793,6 +794,9 @@ export function GameplayPage() {
         }}
       />
       <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+        {/* Contador de estrellas de la cuenta — sube al completar un nivel
+            (escucha el evento edutic:progress). */}
+        <StarCounter />
         {/* Escuchar consigna — solo el ícono, a la izquierda de Reintentar.
             (Antes era un botón grande abajo que empujaba el teclado fuera de
             pantalla en alturas chicas.) */}

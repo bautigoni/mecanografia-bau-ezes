@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/common/Button";
+import { StarCounter } from "../components/common/StarCounter";
 import { assets } from "../utils/assets";
 import { useAuth } from "../hooks/useAuth";
 import { getUserContext } from "../utils/userContext";
@@ -156,6 +157,8 @@ export function MissionsPage() {
       className="relative min-h-dvh flex flex-col items-center gap-6 p-6 pb-12 animate-page-fade bg-cover bg-center bg-fixed"
       style={{ backgroundImage: `url("${assets.homeBg}")` }}
     >
+      {/* Contador de estrellas de la cuenta (siempre visible, arriba a la derecha). */}
+      <StarCounter className="fixed top-4 right-4 z-30" />
       {/* ── Page header ── */}
       <header className="w-full max-w-3xl flex flex-col items-start gap-3">
         <Button variant="secondary" onClick={() => navigate("/mundos")}>
