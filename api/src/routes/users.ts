@@ -185,18 +185,43 @@ export async function userRoutes(app: FastifyInstance) {
     if (target.role === "superadmin" && actor.role !== "superadmin") {
       return reply.code(403).send({ error: "Solo el superadmin puede modificar al superadmin." });
     }
-    const [row] = await db
-      .update(schema.users)
-      .set({
-        fullName: parsed.data.fullName ?? target.fullName,
-        email: parsed.data.email ?? target.email,
-        sedeId: parsed.data.sedeId !== undefined ? parsed.data.sedeId : target.sedeId,
-        classId: parsed.data.classId !== undefined ? parsed.data.classId : target.classId,
-        grade: parsed.data.grade ?? target.grade,
-        active: parsed.data.active !== undefined ? parsed.data.active : target.active,
-      })
-      .where(eq(schema.users.id, id))
-      .returning();
+    // El curso destino también tiene que ser de una sede sobre la que el
+    // actor puede actuar.
+    if (parsed.data.classId) {
+      const [cls] = await db.select().from(schema.classes).where(eq(schema.classes.id, parsed.data.classId)).limit(1);
+      if (!cls) return reply.code(400).send({ error: "El curso no existe." });
+      if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, cls.sedeId)) {
+        return reply.code(403).send({ error: "El curso es de otra sede." });
+      }
+    }
+    let row;
+    try {
+      [row] = await db
+        .update(schema.users)
+        .set({
+          fullName: parsed.data.fullName ?? target.fullName,
+          email: parsed.data.email ?? target.email,
+          username: parsed.data.username ?? target.username,
+          sedeId: parsed.data.sedeId !== undefined ? parsed.data.sedeId : target.sedeId,
+          classId: parsed.data.classId !== undefined ? parsed.data.classId : target.classId,
+          grade: parsed.data.grade ?? target.grade,
+          active: parsed.data.active !== undefined ? parsed.data.active : target.active,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, id))
+        .returning();
+    } catch (e: any) {
+      if (e?.code === "23505") return reply.code(409).send({ error: "Ya existe un usuario con ese email o usuario." });
+      throw e;
+    }
+    // Mantener el roster (class_students) en sincronía cuando se cambia el
+    // curso de un alumno desde la edición — igual que POST /classes/:id/students.
+    if (target.role === "alumno" && parsed.data.classId !== undefined && parsed.data.classId !== target.classId) {
+      await db.delete(schema.classStudents).where(eq(schema.classStudents.userId, id));
+      if (parsed.data.classId) {
+        await db.insert(schema.classStudents).values({ classId: parsed.data.classId, userId: id }).onConflictDoNothing();
+      }
+    }
     return reply.send(row);
   });
 

@@ -644,7 +644,7 @@ export function IslandDetailPage() {
               style={{ left: `${currentPosition.x}%`, top: `${currentPosition.y - 3}%`, transform: "translate(-50%,-100%)" }}
             >
               <img
-                className="block w-[clamp(3.6rem,16vmin,20rem)] animate-ship-hover"
+                className="block w-[clamp(3.4rem,12vmin,11rem)] animate-ship-hover"
                 src={shipAsset}
                 alt="Nave de los estudiantes en el nivel actual"
                 decoding="async"
@@ -693,7 +693,7 @@ export function IslandDetailPage() {
                  image) + effective scale/perspective. No dynamic rotate deltas. */
               const numTransform = `perspective(${effPersp}px) rotateX(${PERSPECTIVE_BASE.rotateX}deg) rotateY(${PERSPECTIVE_BASE.rotateY}deg) rotateZ(${PERSPECTIVE_BASE.rotateZ}deg) scale(${effScale})`;
 
-              const numSize = `${3 * numScale}vmin`;
+              const numSize = `${2.3 * numScale}vmin`;
 
               /* State-driven visual classes for the node button. */
               const stateClass =
@@ -710,7 +710,7 @@ export function IslandDetailPage() {
                   data-level-node=""
                   className={[
                     "absolute -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto",
-                    "w-[clamp(3rem,12vmin,16rem)] h-[clamp(3rem,12vmin,16rem)]",
+                    "w-[clamp(3rem,9.5vmin,9rem)] h-[clamp(3rem,9.5vmin,9rem)]",
                     "rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-sky",
                     "transition-opacity duration-150",
                     isSelected ? "animate-platform-pulse" : "",
@@ -850,8 +850,8 @@ export function IslandDetailPage() {
         className="fixed top-4 left-4 z-30 glass-surface rounded-xl px-3 py-2 flex items-center gap-2 text-text font-bold shadow-card hover:brightness-105 transition cursor-pointer animate-hud-in"
         onClick={() => navigate("/mundos")}
       >
-        <ArrowLeft size={23} />
-        <span className="text-[clamp(1.3rem,2.3vmin,2rem)]">Volver a mundos</span>
+        <ArrowLeft size={20} />
+        <span className="text-[clamp(1rem,1.8vmin,1.35rem)]">Volver a mundos</span>
       </button>
 
       {editorAvailable() && (
@@ -869,13 +869,13 @@ export function IslandDetailPage() {
       {/* Compact floating island header — sits in the top-safe area and never
           covers the level nodes. Replaces the old large title/progress panel. */}
       <header className="fixed top-0 left-1/2 -translate-x-1/2 z-20 glass-strong rounded-b-2xl px-5 py-3 flex items-center gap-4 shadow-card animate-hud-in max-w-[92vw]">
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/20 text-violet-700 font-bold text-[clamp(1.25rem,2.3vmin,2rem)] whitespace-nowrap">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/20 text-violet-700 font-bold text-[clamp(0.95rem,1.7vmin,1.3rem)] whitespace-nowrap">
           <Star size={15} fill="currentColor" />
           Mundo {worldNumber}
         </span>
         <div className="flex flex-col min-w-0">
-          <h1 className="font-display font-black text-text text-[clamp(1.6rem,3vmin,2.8rem)] truncate">{world.title}</h1>
-          <div className="flex items-center gap-3 text-[clamp(1.25rem,2.3vmin,2rem)]">
+          <h1 className="font-display font-black text-text text-[clamp(1.2rem,2.3vmin,1.8rem)] truncate">{world.title}</h1>
+          <div className="flex items-center gap-3 text-[clamp(0.95rem,1.7vmin,1.3rem)]">
             <span className="inline-flex items-center gap-1 text-yellow-500 font-bold">
               <Star size={14} fill="currentColor" />
               {starProgress.earnedStars}/{starProgress.totalStars}

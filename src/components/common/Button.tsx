@@ -5,8 +5,10 @@ type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
     "bg-accent text-white shadow-btn hover:shadow-btn-hover",
+  /* Quieter than primary on purpose: secondary actions must never compete
+     visually with the main CTA (jerarquía visual). */
   secondary:
-    "bg-white/75 text-text shadow hover:bg-white/90",
+    "bg-white/55 text-text/90 hover:bg-white/85 hover:text-text",
   ghost:
     "bg-transparent text-text hover:bg-white/40",
   danger:

@@ -25,7 +25,7 @@ export function StudentsListPage() {
   const [courseFilter, setCourseFilter] = useState("");
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState({ name: "", classId: "" });
-  const [edit, setEdit] = useState<{ id: string; name: string } | null>(null);
+  const [edit, setEdit] = useState<{ id: string; name: string; username: string; classId: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [pass, setPass] = useState<{ id: string; password: string } | null>(null);
@@ -44,7 +44,8 @@ export function StudentsListPage() {
   // F6: filter by selected year (through the student's class).
   const yearClassIds = useMemo(() => {
     if (!selectedYear) return new Set<string>();
-    return new Set(classes.filter((c) => c.academicYearId === selectedYear.id).map((c) => c.id));
+    // Los cursos sin año asignado cuentan como del año vigente.
+    return new Set(classes.filter((c) => c.academicYearId === selectedYear.id || !c.academicYearId).map((c) => c.id));
   }, [classes, selectedYear]);
 
   const filtered = useMemo(() => {
@@ -52,10 +53,9 @@ export function StudentsListPage() {
     return students.filter((s) => {
       if (q && !(s.fullName.toLowerCase().includes(q) || (s.username ?? "").toLowerCase().includes(q))) return false;
       if (courseFilter && s.classId !== courseFilter) return false;
-      if (selectedYear) {
-        if (!s.classId) return false;            // unassigned → not in any year
-        if (!yearClassIds.has(s.classId)) return false;
-      }
+      // Los alumnos SIN curso se muestran siempre ("Sin curso") — antes el
+      // filtro por año los escondía y un alumno recién creado "desaparecía".
+      if (selectedYear && s.classId && !yearClassIds.has(s.classId)) return false;
       return true;
     });
   }, [students, search, courseFilter, selectedYear, yearClassIds]);
@@ -76,8 +76,15 @@ export function StudentsListPage() {
     e.preventDefault();
     if (!edit) return;
     setBusy(true);
-    try { await api.updateUser(edit.id, { fullName: edit.name.trim() }); setEdit(null); await load(); }
-    catch { setMsg("No se pudo guardar."); } finally { setBusy(false); }
+    try {
+      await api.updateUser(edit.id, {
+        fullName: edit.name.trim(),
+        username: edit.username.trim() || undefined,
+        classId: edit.classId || null,
+      });
+      setEdit(null);
+      await load();
+    } catch (err) { setMsg(err instanceof Error ? err.message : "No se pudo guardar."); } finally { setBusy(false); }
   }
   async function resetPass(id: string) {
     setBusy(true);
@@ -132,7 +139,7 @@ export function StudentsListPage() {
         ]}
         actions={(s) => (
           <div className="flex items-center gap-1.5 justify-end">
-            <button type="button" onClick={() => setEdit({ id: s.id, name: s.fullName })} disabled={busy} className="w-8 h-8 grid place-items-center rounded-lg hover:bg-white/60 text-text cursor-pointer" aria-label="Editar"><Pencil size={15} /></button>
+            <button type="button" onClick={() => setEdit({ id: s.id, name: s.fullName, username: s.username ?? "", classId: s.classId ?? "" })} disabled={busy} className="w-8 h-8 grid place-items-center rounded-lg hover:bg-white/60 text-text cursor-pointer" aria-label="Editar"><Pencil size={15} /></button>
             <button type="button" onClick={() => resetPass(s.id)} disabled={busy} className="glass-surface rounded-lg px-2.5 py-1.5 text-xs font-bold text-text hover:brightness-105 cursor-pointer flex items-center gap-1"><KeyRound size={13} /> Clave</button>
             <button type="button" onClick={() => remove(s.id)} disabled={busy} className="w-8 h-8 grid place-items-center rounded-lg hover:bg-rose/20 text-rose cursor-pointer" aria-label="Eliminar"><Trash2 size={15} /></button>
           </div>
@@ -166,9 +173,20 @@ export function StudentsListPage() {
       {edit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 animate-overlay-fade" role="dialog" aria-modal="true">
           <div className="absolute inset-0" onClick={() => setEdit(null)} />
-          <form onSubmit={saveEdit} className="glass-card-smooth relative z-10 p-6 w-[min(24rem,92vw)] flex flex-col gap-4 animate-card-pop">
+          <form onSubmit={saveEdit} className="glass-card-smooth relative z-10 p-6 w-[min(24rem,92vw)] max-h-[88vh] overflow-y-auto flex flex-col gap-4 animate-card-pop">
             <h2 className="font-display font-bold text-xl text-text">Editar alumno</h2>
-            <input autoFocus value={edit.name} onChange={(e) => setEdit((x) => x && { ...x, name: e.target.value })} className="h-11 px-4 rounded-xl bg-white/70 border border-white/60 outline-none font-semibold" />
+            <label className="flex flex-col gap-1 text-sm font-bold text-text">Nombre
+              <input autoFocus value={edit.name} onChange={(e) => setEdit((x) => x && { ...x, name: e.target.value })} className="h-11 px-4 rounded-xl bg-white/70 border border-white/60 outline-none font-semibold" />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-bold text-text">Usuario
+              <input value={edit.username} onChange={(e) => setEdit((x) => x && { ...x, username: e.target.value })} placeholder="usuario de ingreso" className="h-11 px-4 rounded-xl bg-white/70 border border-white/60 outline-none font-semibold" />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-bold text-text">Curso
+              <select value={edit.classId} onChange={(e) => setEdit((x) => x && { ...x, classId: e.target.value })} className="h-11 px-4 rounded-xl bg-white/70 border border-white/60 outline-none font-semibold cursor-pointer">
+                <option value="">Sin curso</option>
+                {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
             <div className="flex gap-2">
               <button type="button" onClick={() => setEdit(null)} className="flex-1 h-11 rounded-xl font-bold text-text bg-white/50 cursor-pointer">Cancelar</button>
               <button type="submit" disabled={busy} className="flex-1 h-11 rounded-xl font-bold text-white bg-gradient-to-r from-accent to-accent-strong shadow-btn disabled:opacity-50 cursor-pointer">Guardar</button>

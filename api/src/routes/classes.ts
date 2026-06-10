@@ -52,9 +52,9 @@ export async function classRoutes(app: FastifyInstance) {
       conditions.push(eq(schema.classes.sedeId, actor.sede));
     } else if (actor.role === "profesor") {
       // Teachers only see the classes they are explicitly assigned to via
-      // class_teachers. (Was: every class in their sede. That gave the
-      // teacher zero visibility control over their own course list.)
-      if (!actor.sede || !actor.sub) return reply.send([]);
+      // class_teachers — independent of sede, so a profesor that works in
+      // varias sedes (or has no sede binding) still sees all their courses.
+      if (!actor.sub) return reply.send([]);
       const assigned = await db
         .select({ classId: schema.classTeachers.classId })
         .from(schema.classTeachers)
@@ -111,9 +111,17 @@ export async function classRoutes(app: FastifyInstance) {
     if (!canActOnSede({ role: actor.role, sedeId: actor.sede }, sedeId)) {
       return reply.code(403).send({ error: "No podés crear cursos en otra sede." });
     }
+    // Un curso nuevo nace en el año lectivo ACTIVO de la sede. Si quedara en
+    // NULL desaparecería de los listados filtrados por año hasta el próximo
+    // reinicio del API (el backfill de ensureSchema corre solo en el boot).
+    const [activeYear] = await db
+      .select({ id: schema.academicYears.id })
+      .from(schema.academicYears)
+      .where(and(eq(schema.academicYears.sedeId, sedeId), eq(schema.academicYears.isActive, true)))
+      .limit(1);
     const [row] = await db
       .insert(schema.classes)
-      .values({ name: parsed.data.name, sedeId, grade: parsed.data.grade ?? "libre" })
+      .values({ name: parsed.data.name, sedeId, grade: parsed.data.grade ?? "libre", academicYearId: activeYear?.id ?? null })
       .returning();
     return reply.send({ id: row!.id, name: row!.name, grade: row!.grade, sedeId: row!.sedeId, studentCount: 0, teacherCount: 0 });
   });

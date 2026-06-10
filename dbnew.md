@@ -225,4 +225,38 @@ order.
 - Server-side monthly partition rotation cron (the SQL exists; needs
   a cron container or a host cron line to call it).
 
+## Phase G — Audit fixes + admin inspector + UX/permissions pass (2026-06-09/10)
+
+- `api/src/routes/users.ts` — GET /api/users bloqueado para alumno/profesor
+  (leak de emails); PATCH valida sede destino y curso destino, soporta
+  `username`, sincroniza `class_students` al cambiar de curso y maneja 23505;
+  change-password mínimo 6. Probado: tsc + smoke en prod.
+- `api/src/routes/academicYears.ts` — requireStaff bloquea alumno/profesor.
+- `api/src/routes/invitations.ts` — aceptar una invitación no puede degradar
+  una cuenta superadmin/admin-general existente (409).
+- `api/src/routes/classes.ts` — POST asigna el año lectivo ACTIVO de la sede
+  al crear el curso (antes quedaba NULL y el filtro por año lo escondía:
+  "no puedo entrar a cursos nuevos"); el listado de cursos del profesor ya no
+  exige sede (profes multi-sede o sin sede ven sus cursos igual).
+- `api/src/server.ts` — setErrorHandler movido ANTES de las rutas (Fastify no
+  lo hereda hacia atrás: los 401/403 salían con el shape default en inglés);
+  alias público `/api/health`; hook onRoute para el inspector.
+- `api/src/routes/inspector.ts` (nuevo) — GET /api/admin/inspector
+  (superadmin/admin-general/admin-sede): estado API+DB, env enmascaradas,
+  rutas vivas con ejemplos, ring-buffer de errores, auditoría reciente.
+- `src/pages/admin/ApiInspectorPage.tsx` (nuevo) + ruta `/admin/api` protegida.
+- `src/hooks/useAuth.tsx` — completePasswordChange llama de verdad a
+  `/api/users/:id/change-password` (antes hacía `api.logout()` placeholder).
+- `CoursesListPage` / `StudentsListPage` — los filtros de año tratan los
+  cursos sin año como vigentes y muestran a los alumnos sin curso; edición de
+  alumno ampliada (nombre + usuario + curso, con sincronización de roster).
+- `AdminGeneralPage` — el formulario de sede pasa de incrustado a modal; la
+  edición de admin de sede gana el campo usuario.
+- Login/Worlds/Island — revertida la tipografía fluida vmin del login (volvió
+  la versión anterior), robots más grandes y más arriba, zoom general
+  reducido (islas, nave, nodos, HUD), fondo levemente más brillante (base
+  `#f1effb` + velo blanco en `.login-aura`), botón secundario más discreto.
+- Borrados: `src/pages/SiteAdminPage.tsx`, `src/utils/emailService.ts`,
+  `docs/ADMIN_SEDE_ARCHITECTURE.md` (spec vieja, ya implementada).
+
 

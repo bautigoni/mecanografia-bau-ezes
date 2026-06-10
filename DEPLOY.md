@@ -1,5 +1,15 @@
 # Deploying TYPELY on Oracle VPS
 
+> **Estado real del VPS actual (`bauhub`, 168.75.68.75):** el repo vive en
+> **`/opt/apps/typely`** (no `/typely`) y existe un
+> **`docker-compose.override.yml` local (NO commiteado)** que (1) publica el
+> API en **`127.0.0.1:3007`** porque el 3006 lo ocupa otra app del host
+> (guessify) y (2) mantiene vivo el contenedor `typely-invite-mailer`
+> (`Dockerfile.mailer`, puerto 8787) para `/api/invitations/send`. El
+> Caddyfile rutea `/api/invitations/send`→8787, `/api/*`→3007 y el resto→3005.
+> No borrar ese override ni los backups `.env.bak-*` del VPS. Para smoke
+> tests locales en ese host usá `curl http://127.0.0.1:3007/health`.
+
 The app ships as **three containers** behind Caddy:
 
 1. `db` — Postgres 16 (loopback only, port 5432). Schema is applied from

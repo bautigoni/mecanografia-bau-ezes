@@ -124,24 +124,16 @@ Key responsive rules in that section:
 - **Island detail:** back/profile become icon-only, compact HUD, no collision.
 - **Logros:** the 4-column reward grid collapses to 2×2.
 
-### Login mascots — proportional flanking system
-The two login robots (`.login-mascot--left/right`, `mascot-women-wave` and
-`mascot-wave`) are sized **purely by height** (no `max-width` that would clip one
-more than the other), so they always scale together and stay proportional. The
-height tracks the space beside the centred card:
-
-```
-height: min(60vh, calc((50vw - 18rem) / 0.69));
-```
-
-- `50vw - 18rem` = horizontal room from the viewport edge to the card (card is
-  `32rem` ⇒ half `16rem`, +2rem gap). `÷ 0.69` converts that target *width* to a
-  *height* (the trimmed woman PNG is ~0.69 aspect). This keeps a near-constant
-  gap from the card at every width; capped at `60vh` on tall screens.
-- On phones (`≤720px`) the mascots switch to small bottom-corner decorations
-  (`max-width` re-capped) so the square-ish art can't cover the card.
-- Per-side `bottom`/`left`/`right` offsets place each robot standing on a painted
-  island. Tune those clamps, not the formula, for placement.
+### Login mascots — flanking robots
+The two login robots are positioned inline in `LoginPage.tsx` with Tailwind
+viewport units (no dedicated CSS class anymore): female left
+(`bottom-[17.5vh] left-[5.5vw] max-h-[62vh]`), male right
+(`bottom-[7.5vh] right-[8vw] max-h-[72vh]`). They're sized purely by height
+so both scale together; the `bottom` offsets stand each robot on a painted
+island. Tune those four values for placement/size. The login card is fixed
+at `w-[min(32rem,92vw)]` with the original (non-fluid) typography — do NOT
+reintroduce vmin-clamped fonts on the login card (it ballooned the UI and
+pushed buttons off-screen on short displays).
 
 ## 7. Gameplay Curriculum
 

@@ -292,7 +292,7 @@ export const api = {
       "/users",
       { method: "POST", json: payload },
     ),
-  updateUser: (id: string, payload: Partial<{ fullName: string; email: string; sedeId: string | null; classId: string | null; active: boolean }>) =>
+  updateUser: (id: string, payload: Partial<{ fullName: string; email: string; username: string; sedeId: string | null; classId: string | null; active: boolean }>) =>
     call<ApiUser>(`/users/${id}`, { method: "PATCH", json: payload }),
   deleteUser: (id: string) => call<{ ok: true }>(`/users/${id}`, { method: "DELETE" }),
   restoreUser: (id: string) => call<{ ok: true }>(`/users/${id}/restore`, { method: "POST" }),

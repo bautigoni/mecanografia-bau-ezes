@@ -47,6 +47,9 @@ export function CoursesListPage() {
       if (q && !c.name.toLowerCase().includes(q)) return false;
       if (!selectedYear) return true;
       if (c.academicYearId === selectedYear.id) return true;
+      // Un curso sin año asignado se considera del año vigente — antes el
+      // filtro lo escondía y un curso recién creado "desaparecía".
+      if (!c.academicYearId && c.status !== "archived") return true;
       // Always show archived courses (they belong to a closed year).
       if (c.status === "archived") return true;
       return false;

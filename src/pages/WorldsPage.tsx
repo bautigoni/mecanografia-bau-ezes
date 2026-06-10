@@ -597,7 +597,7 @@ export function WorldsPage() {
                        HEIGHT below the 36%-of-viewport gap between the two island
                        rows — so they never overlap vertically on wide-but-short
                        screens (where a flat `20vw` would collide). */
-                    "relative w-[min(20vw,34vh)] aspect-square rounded-full border-0 p-0",
+                    "relative w-[min(18.5vw,31vh)] max-w-[17rem] aspect-square rounded-full border-0 p-0",
                     "cursor-pointer transition-all duration-300 ease-out",
                     "hover:scale-105 hover:-translate-y-1",
                     "active:scale-95",
@@ -740,7 +740,7 @@ export function WorldsPage() {
           re-blur the alpha channel of a 14–24rem tall PNG on every frame. */}
       <span className="absolute bottom-0 left-0 animate-mascot-float pointer-events-none select-none z-10">
         <img
-          className="w-auto max-h-[38vh] drop-shadow-lg"
+          className="w-auto max-h-[33vh] drop-shadow-lg"
           src={assets.mascotFemaleLaptop}
           alt=""
           decoding="async"
@@ -749,13 +749,13 @@ export function WorldsPage() {
       </span>
       <div className="absolute bottom-0 right-0 flex flex-col items-end pointer-events-none select-none z-10">
         <span
-          className="glass-strong px-4 py-2 rounded-2xl rounded-br-sm text-text font-display font-bold text-[clamp(1.4rem,2.6vmin,2.3rem)] mb-2 animate-bubble-pop shadow-md"
+          className="glass-strong px-4 py-2 rounded-2xl rounded-br-sm text-text font-display font-bold text-[clamp(1.05rem,1.9vmin,1.5rem)] mb-2 animate-bubble-pop shadow-md"
         >
           ¡Vamos!
         </span>
         <span className="animate-mascot-float">
           <img
-            className="w-auto max-h-[38vh] drop-shadow-lg"
+            className="w-auto max-h-[33vh] drop-shadow-lg"
             src={assets.mascotMaleProud}
             alt=""
             decoding="async"

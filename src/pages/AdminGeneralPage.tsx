@@ -242,6 +242,7 @@ export function AdminGeneralPage() {
         await api.updateUser(editingAdminId, {
           fullName: adminDraft.name,
           email: adminDraft.email,
+          username: adminDraft.username.trim() || undefined,
           sedeId: adminDraft.siteId,
           active: adminDraft.active,
         });
@@ -653,7 +654,22 @@ export function AdminGeneralPage() {
               <Plus size={18} /> Crear sede
             </Button>
           </div>
-          {showSiteForm && (
+          <SedeCards sites={filteredSites} />
+        </section>
+      )}
+
+      {/* Crear/editar sede — modal dedicado (nunca un formulario incrustado
+          en la misma lista, para no romper la jerarquía visual). */}
+      {showSiteForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="site-modal-title">
+          <div className="absolute inset-0 bg-black/30 animate-overlay-fade" onClick={() => setShowSiteForm(false)} />
+          <div className="glass-card-smooth relative max-h-[88vh] overflow-y-auto p-8 w-[min(34rem,92vw)] flex flex-col gap-5 animate-menu-reveal">
+            <span className="grid place-items-center w-12 h-12 rounded-full bg-mint/20 text-mint" aria-hidden="true">
+              <School size={24} />
+            </span>
+            <h2 id="site-modal-title" className="font-display text-xl font-bold text-text">
+              {editingSiteId ? "Editar sede" : "Nueva sede"}
+            </h2>
             <form className="flex flex-col gap-4" onSubmit={submitSite}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="flex flex-col gap-1.5">
@@ -719,9 +735,16 @@ export function AdminGeneralPage() {
                 </Button>
               </div>
             </form>
-          )}
-          <SedeCards sites={filteredSites} />
-        </section>
+            <button
+              type="button"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/30 border-0 cursor-pointer flex items-center justify-center text-text/60 hover:text-text hover:bg-white/50 transition-colors"
+              aria-label="Cerrar"
+              onClick={() => setShowSiteForm(false)}
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
       )}
 
       {section === "admins" && (
@@ -921,6 +944,15 @@ export function AdminGeneralPage() {
 
               {editingAdminId && (
                 <>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-sm font-bold text-text">Usuario</span>
+                    <input
+                      className={INPUT_CLS}
+                      placeholder="usuario de ingreso"
+                      value={adminDraft.username}
+                      onChange={(e) => setAdminDraft({ ...adminDraft, username: e.target.value })}
+                    />
+                  </label>
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
