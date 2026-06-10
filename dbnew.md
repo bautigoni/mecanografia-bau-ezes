@@ -284,4 +284,24 @@ order.
   Hero de los dashboards con hairline de gradiente superior.
 - LoginPage: `fetchpriority` → `fetchPriority` (warning de React 19).
 
+## Phase I — Gameplay sin recortes, blur Apple, ruta animada (2026-06-10)
+
+- WorldsPage: el gradiente de la ruta cicla los colores de marca vía SMIL
+  (como el texto de bienvenida); islas más grandes (`min(21vw,34vh)`,
+  tope 19.5rem).
+- GameplayPage: "Escuchar consigna" pasa a ícono arriba a la derecha (junto
+  a Reintentar) — el botón grande de abajo empujaba el teclado fuera de
+  pantalla sin F11. TTS explícito: "Palabra a escribir: ventana", "Letra
+  que toca: G", "Frase a escribir: …". Robots anclados al suelo (bottom)
+  con flotación reducida a ±4px (ya no parecen volar — aplica también a
+  login y mundos). Vista de "lo que estás escribiendo" con min-height y
+  más contraste. Verificado por geometría en preview a 1366×620: teclado
+  completo y tipeo visibles, sin recortes.
+- COMPACT-HEIGHT PASS al final de global.css: las teclas (.gp-key) se
+  achican a max-height 720/640/560 para que el teclado entre siempre.
+- Modales estilo Apple: .modal-overlay difumina fuerte (blur 22px) y casi
+  no oscurece; .modal-card ya NO sube la opacidad (solo blur del vidrio) —
+  liquid glass legible sin opacar. Aplicado también al modal de nivel
+  completado (Gameplay) y al modal del modo demo (Login).
+
 

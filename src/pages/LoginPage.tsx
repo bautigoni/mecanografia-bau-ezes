@@ -261,13 +261,13 @@ export function LoginPage() {
 
       {showDemoModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 animate-overlay-fade"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-overlay-fade"
           role="dialog"
           aria-modal="true"
           aria-labelledby="demo-modal-title"
         >
-          <div className="absolute inset-0" onClick={() => setShowDemoModal(false)} />
-          <div className="glass-card-smooth relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col items-center gap-5 animate-menu-reveal">
+          <div className="modal-overlay" onClick={() => setShowDemoModal(false)} />
+          <div className="glass-card-smooth modal-card relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col items-center gap-5 animate-menu-reveal">
             <span className="text-4xl" aria-hidden="true"><Rocket size={26} /></span>
             <h2 id="demo-modal-title" className="font-display text-xl font-bold text-text">Modo demo</h2>
             <p className="text-muted text-sm text-center">¿Querés continuar con el progreso anterior o empezar desde cero?</p>

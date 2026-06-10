@@ -486,10 +486,33 @@ export function WorldsPage() {
             style={{ width: `${trackWidthVw}vw` }}
           >
             <defs>
+              {/* El gradiente de la ruta CICLA los colores de marca (igual que
+                  el texto de bienvenida del login) vía SMIL — ver §5 paleta. */}
               <linearGradient id="world-route-gradient" x1="0%" y1="35%" x2="100%" y2="40%">
-                <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.25" />
-                <stop offset="50%"  stopColor="#bfeaff" stopOpacity="0.85" />
-                <stop offset="100%" stopColor="#ffffff" stopOpacity="0.25" />
+                <stop offset="0%" stopOpacity="0.55">
+                  <animate
+                    attributeName="stop-color"
+                    values="#54e8c6;#25c8df;#536bff;#9b7cff;#ff9fca;#54e8c6"
+                    dur="8s"
+                    repeatCount="indefinite"
+                  />
+                </stop>
+                <stop offset="50%" stopOpacity="0.95">
+                  <animate
+                    attributeName="stop-color"
+                    values="#536bff;#9b7cff;#ff9fca;#54e8c6;#25c8df;#536bff"
+                    dur="8s"
+                    repeatCount="indefinite"
+                  />
+                </stop>
+                <stop offset="100%" stopOpacity="0.55">
+                  <animate
+                    attributeName="stop-color"
+                    values="#ff9fca;#54e8c6;#25c8df;#536bff;#9b7cff;#ff9fca"
+                    dur="8s"
+                    repeatCount="indefinite"
+                  />
+                </stop>
               </linearGradient>
               <filter id="world-route-glow" x="-18%" y="-32%" width="136%" height="164%">
                 {/* stdDeviation 1.25 → 0.8: a tighter blur is dramatically
@@ -597,7 +620,7 @@ export function WorldsPage() {
                        HEIGHT below the 36%-of-viewport gap between the two island
                        rows — so they never overlap vertically on wide-but-short
                        screens (where a flat `20vw` would collide). */
-                    "relative w-[min(18.5vw,31vh)] max-w-[17rem] aspect-square rounded-full border-0 p-0",
+                    "relative w-[min(21vw,34vh)] max-w-[19.5rem] aspect-square rounded-full border-0 p-0",
                     "cursor-pointer transition-all duration-300 ease-out",
                     "hover:scale-105 hover:-translate-y-1",
                     "active:scale-95",

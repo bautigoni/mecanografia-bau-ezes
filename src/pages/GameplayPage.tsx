@@ -742,10 +742,16 @@ export function GameplayPage() {
   }
 
   function listen() {
-    // Speak the consigna AND the concrete target (e.g. "Tocá la letra A"),
-    // not just the generic instruction.
-    const prompt = objectivePrompt(activity, target);
-    const phrase = [activity.listenText, prompt].filter(Boolean).join(" ");
+    // El dictado dice QUÉ tipo de objetivo es y cuál es el objetivo concreto
+    // ("Palabra a escribir: ventana", "Letra que toca: G"), no solo la
+    // consigna genérica.
+    const targetPhrase =
+      activity.inputType === "letter" ? `Letra que toca: ${target}.` :
+      activity.inputType === "symbol" ? `Símbolo que toca: ${target}.` :
+      activity.inputType === "correction" ? `Corregí el texto para que quede: ${target}.` :
+      /\s/.test(target) ? `Frase a escribir: ${target}.` :
+      `Palabra a escribir: ${target}.`;
+    const phrase = [activity.listenText ?? activity.instruction, targetPhrase].filter(Boolean).join(" ");
     if ("speechSynthesis" in window) {
       const utterance = new SpeechSynthesisUtterance(phrase);
       utterance.lang = "es-AR";
@@ -787,6 +793,18 @@ export function GameplayPage() {
         }}
       />
       <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+        {/* Escuchar consigna — solo el ícono, a la izquierda de Reintentar.
+            (Antes era un botón grande abajo que empujaba el teclado fuera de
+            pantalla en alturas chicas.) */}
+        <button
+          type="button"
+          onClick={listen}
+          className="rounded-full w-12 h-12 flex items-center justify-center text-white bg-gradient-to-br from-accent to-accent-strong shadow-btn hover:scale-105 transition-transform"
+          aria-label="Escuchar consigna"
+          title="Escuchar consigna"
+        >
+          <Volume2 size={22} />
+        </button>
         <button
           type="button"
           onClick={retry}
@@ -924,7 +942,7 @@ export function GameplayPage() {
               {/* Typed preview — light floating glass (word/phrase levels). */}
               {showTypedPreview && (
                 <div
-                  className="inline-flex flex-col items-center gap-1 rounded-2xl px-6 py-2.5 bg-white/15 backdrop-blur-xl border border-white/25 shadow-md"
+                  className="inline-flex flex-col items-center gap-1 shrink-0 min-h-[4.5rem] rounded-2xl px-6 py-2.5 bg-white/25 backdrop-blur-2xl border border-white/40 shadow-md"
                   aria-live="polite"
                 >
                   <span className="text-[11px] font-bold text-text/55 uppercase tracking-wider">
@@ -981,8 +999,9 @@ export function GameplayPage() {
         const rightPhrase = phrasePool[(targetIndex + Math.max(1, Math.floor(phrasePool.length / 2))) % phrasePool.length];
         return (
           <>
-            {/* Robots flank the sides, vertically centred (middle of Y, edges of X). */}
-            <figure className="absolute top-1/2 -translate-y-1/2 left-0 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
+            {/* Robots APOYADOS sobre el suelo pintado del arte (anclados al
+                borde inferior, no flotando a mitad de pantalla). */}
+            <figure className="absolute bottom-2 left-1 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
               <div
                 className={`glass-surface rounded-2xl rounded-br-sm px-2.5 py-1.5 text-xs font-semibold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
               >
@@ -995,7 +1014,7 @@ export function GameplayPage() {
                 className="w-28 sm:w-40 h-auto object-contain animate-mascot-float"
               />
             </figure>
-            <figure className="absolute top-1/2 -translate-y-1/2 right-0 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
+            <figure className="absolute bottom-2 right-1 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
               <div
                 className={`glass-surface rounded-2xl rounded-bl-sm px-2.5 py-1.5 text-xs font-semibold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
               >
@@ -1044,7 +1063,7 @@ export function GameplayPage() {
                   const isWide = key === "Backspace" || key === "Shift" || key === "Enter";
 
                   const keyClasses = [
-                    "relative rounded-lg font-black shadow-sm transition-all duration-100 border-2",
+                    "gp-key relative rounded-lg font-black shadow-sm transition-all duration-100 border-2",
                     "flex items-center justify-center select-none",
                     isSpace ? "w-48 sm:w-72 h-8 sm:h-9 text-sm" : isWide ? "w-16 sm:w-24 h-8 sm:h-9 text-xs" : "w-10 h-8 sm:w-12 sm:h-9 text-sm",
                     // Target/combo override the row colour with the accent blue.
@@ -1071,26 +1090,18 @@ export function GameplayPage() {
         </div>
       </section>
 
-      {/* Bottom-centre: a single action — "Escuchar consigna". */}
-      <section className="flex justify-center pb-4 pt-1 shrink-0 z-20" aria-live="polite">
-        <button
-          type="button"
-          onClick={listen}
-          className="flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-accent to-accent-strong shadow-btn hover:scale-105 transition-transform"
-        >
-          <Volume2 size={22} />
-          Escuchar consigna
-        </button>
-      </section>
+      {/* Aire inferior mínimo — el botón de consigna vive arriba a la derecha. */}
+      <div className="pb-3 shrink-0" aria-hidden="true" />
 
       {isCompleted && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 animate-overlay-fade"
+          className="fixed inset-0 z-50 flex items-center justify-center animate-overlay-fade"
           role="dialog"
           aria-modal="true"
           aria-labelledby="level-complete-title"
         >
-          <div className="glass-card-smooth px-8 py-10 flex flex-col items-center gap-4 max-w-md w-full mx-4 relative animate-card-pop">
+          <div className="modal-overlay" aria-hidden="true" />
+          <div className="glass-card-smooth modal-card px-8 py-10 flex flex-col items-center gap-4 max-w-md w-full mx-4 relative animate-card-pop">
             <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-3xl" aria-hidden="true">
               <span className="absolute top-4 left-8 text-3xl text-amber-400 animate-sparkle-burst" style={{ animationDelay: "0s" }}>★</span>
               <span className="absolute top-12 right-12 text-2xl text-pink-400 animate-sparkle-burst" style={{ animationDelay: "0.1s" }}>✦</span>
