@@ -18,6 +18,14 @@ const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
 let accessToken: string | null = null;
 const refreshListeners: Array<(token: string | null) => void> = [];
 
+/* Modo lectura (sesión de soporte / impersonación): mientras está activo NO
+   hacemos el refresh silencioso, porque la cookie de refresh sigue siendo la
+   del administrador real y restauraría su sesión (rompiendo el read-only). */
+let readOnlyMode = false;
+export function setReadOnlyMode(on: boolean) {
+  readOnlyMode = on;
+}
+
 export function setAccessToken(token: string | null) {
   accessToken = token;
   for (const l of refreshListeners) l(token);
@@ -51,8 +59,8 @@ async function call<T = unknown>(path: string, opts: FetchOpts = {}): Promise<T>
     credentials: "include", // send refresh cookie
   });
 
-  if (res.status === 401 && retry && path !== "/auth/refresh" && path !== "/auth/login" && path !== "/auth/google") {
-    // Try a silent refresh once.
+  if (res.status === 401 && retry && !readOnlyMode && path !== "/auth/refresh" && path !== "/auth/login" && path !== "/auth/google") {
+    // Try a silent refresh once (nunca durante una sesión de solo lectura).
     const refreshed = await refresh();
     if (refreshed) return call<T>(path, { ...opts, retry: false });
   }
@@ -346,6 +354,13 @@ export const api = {
 
   /* Inspector de API (F7) — superadmin / admin-general / admin-sede. */
   inspector: () => call<ApiInspectorReport>("/admin/inspector"),
+
+  /* Soporte (F8) — acceso en modo lectura con triple verificación. */
+  impersonate: (payload: { userId: string; password: string; confirmPhrase: string; legalAck: true }) =>
+    call<{ access: string; expiresInSeconds: number; actor: { name: string }; user: ApiActiveUser }>(
+      "/admin/impersonate",
+      { method: "POST", json: payload, retry: false },
+    ),
 
   /* Audit log (F6). */
   listAudit: (params: { sedeId?: string; limit?: number } = {}) => {

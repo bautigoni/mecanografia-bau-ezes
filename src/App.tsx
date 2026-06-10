@@ -15,6 +15,7 @@ import { InicioPage } from "./pages/admin/InicioPage";
 import { ApiInspectorPage } from "./pages/admin/ApiInspectorPage";
 import { SedeAcademicYearLayout } from "./components/admin/SedeShell";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
+import { ImpersonationBanner } from "./components/admin/ImpersonationBanner";
 import { StudentDetailPage } from "./pages/admin/StudentDetailPage";
 import { TeacherDetailPage } from "./pages/admin/TeacherDetailPage";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
@@ -64,6 +65,7 @@ function PageFallback() {
 export function App() {
   return (
     <ErrorBoundary>
+    <ImpersonationBanner />
     <Routes>
       <Route path="/" element={<LoginPage />} />
       <Route path="/login" element={<LoginPage />} />

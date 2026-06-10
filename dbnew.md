@@ -304,4 +304,36 @@ order.
   liquid glass legible sin opacar. Aplicado también al modal de nivel
   completado (Gameplay) y al modal del modo demo (Login).
 
+## Phase J — blur de modales (causa raíz), impersonación read-only (2026-06-10)
+
+- **CAUSA RAÍZ del "difuminado no funciona" en popups**: `.animate-page-fade`
+  animaba `translateY` con `fill-mode: both`, dejando un `transform` PERMANENTE
+  en el contenedor raíz del dashboard. Un ancestro con `transform` DESACTIVA el
+  `backdrop-filter` de los descendientes en Chrome → los overlays oscurecían
+  pero no difuminaban. Fix: `@keyframes pageFade` ahora anima SOLO opacity.
+  Diagnosticado midiendo `getComputedStyle` en el preview (el ancestro tenía
+  `matrix(1,0,0,1,0,0)`); confirmado visualmente que al quitar el transform el
+  blur aparece.
+- Blur de modales ajustable en vivo desde /editor-glass: variables
+  `--modal-blur` / `--modal-tint`, dos sliders nuevos + un "popup de ejemplo".
+  `applyStoredGlass()` ahora se llama en main.tsx (antes no corría en boot).
+- WorldsPage: islas más grandes (`min(24vw,38vh)`, tope 22rem) y las
+  bloqueadas más apagadas (`grayscale saturate-0 opacity-50 brightness-90`).
+- **Impersonación en MODO LECTURA (F8)** — soporte avalado legalmente, 30 min:
+  - `api/src/routes/support.ts`: `POST /api/admin/impersonate` con TRIPLE
+    verificación (contraseña del admin + frase exacta "ACCEDER EN MODO LECTURA"
+    + aceptación legal). Emite un access token con claim `readOnly` y SIN
+    refresh cookie (muere solo a los 30 min). Valida alcance (RBAC por sede,
+    nunca a un superadmin). Auditado (`impersonate_start`).
+  - `server.ts`: preHandler global que rechaza TODA mutación (no-GET, salvo
+    auth logout/refresh) cuando el token es `readOnly`.
+  - `auth.ts`: claims `readOnly` + `act` (actor real); `signAccessToken` con
+    TTL configurable.
+  - Frontend: `ImpersonateModal` (triple auth) en AdminGeneral (admins),
+    StudentsListPage y TeachersListPage; `ImpersonationBanner` fijo global con
+    cuenta regresiva que al expirar restaura al admin; `useAuth` gana
+    `impersonation` + `startImpersonation`/`stopImpersonation`; el cliente API
+    desactiva el refresh silencioso en modo lectura para no restaurar al admin.
+- `.env.local` (gitignored) creado con SUPERADMIN admin/admin para desarrollo.
+
 

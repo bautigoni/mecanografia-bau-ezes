@@ -43,6 +43,10 @@ html, body { background-color: #f1effb; }
   --glass-white: 0.5;        /* translucency of the white film (lower = more see-through) */
   --glass-border: 0.7;
   --glass-sheen: 0.55;
+  /* Difuminado del FONDO detrás de cualquier popup/modal (estilo Apple).
+     Ajustable en vivo desde /editor-glass. */
+  --modal-blur: 22px;
+  --modal-tint: 0.16;        /* qué tan oscuro se pone el fondo (0 = nada) */
 }
 
 /* Opt-in heavier liquid glass for immersive GAME surfaces only (login,
@@ -111,10 +115,11 @@ a { color: inherit; text-decoration: none; }
   position: absolute;
   inset: 0;
   /* Estilo Apple: lo de atrás se DIFUMINA con fuerza y apenas se oscurece —
-     nunca se tapa con una película opaca. */
-  background: rgba(23, 53, 95, 0.16);
-  backdrop-filter: blur(22px) saturate(1.25);
-  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+     nunca se tapa con una película opaca. Ambos valores son ajustables en
+     vivo desde /editor-glass (--modal-blur / --modal-tint). */
+  background: rgba(23, 53, 95, var(--modal-tint));
+  backdrop-filter: blur(var(--modal-blur)) saturate(1.25);
+  -webkit-backdrop-filter: blur(var(--modal-blur)) saturate(1.25);
 }
 
 .modal-card {
@@ -135,7 +140,12 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ── Animations ── */
-@keyframes pageFade { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+/* IMPORTANTE: el page-fade anima SOLO opacity, nunca transform. Con
+   `fill-mode: both` un translateY dejaba un `transform` permanente en el
+   contenedor raíz, y un ancestro con transform DESACTIVA el backdrop-filter
+   de los modales descendientes en Chrome (por eso los popups no difuminaban
+   el fondo). Sin transform acá, el blur de los modales funciona en toda la app. */
+@keyframes pageFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes cardIn { from { opacity: 0; transform: translateY(28px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes menuReveal { from { opacity: 0; transform: translateY(-8px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
 /* Flotación sutil (respiración): amplitud corta para que los personajes se

@@ -30,13 +30,18 @@ export interface AccessClaims {
   sede: string | null;
   email: string;
   name: string;
+  /** Sesión de soporte en modo lectura (impersonación). Cuando es true,
+   *  el servidor rechaza toda mutación. */
+  readOnly?: boolean;
+  /** Actor real que inició la sesión de soporte (auditoría / banner). */
+  act?: { sub: string; name: string; role: Role } | null;
 }
 
-export async function signAccessToken(claims: AccessClaims): Promise<string> {
+export async function signAccessToken(claims: AccessClaims, ttlSeconds = ACCESS_TTL_SECONDS): Promise<string> {
   return await new SignJWT({ ...claims })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${ACCESS_TTL_SECONDS}s`)
+    .setExpirationTime(`${ttlSeconds}s`)
     .sign(secret);
 }
 
@@ -48,6 +53,8 @@ export async function verifyAccessToken(token: string): Promise<AccessClaims> {
     sede: (payload.sede as string | null) ?? null,
     email: String(payload.email),
     name: String(payload.name),
+    readOnly: payload.readOnly === true,
+    act: (payload.act as AccessClaims["act"]) ?? null,
   };
 }
 

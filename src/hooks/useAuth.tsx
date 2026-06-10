@@ -15,7 +15,15 @@ import {
   type ViewAs,
 } from "../utils/storage";
 import { isEmailDomainAllowed, parseJwtCredential } from "../utils/googleAuth";
-import { api, ApiError, type ApiActiveUser } from "../utils/api";
+import { api, ApiError, setAccessToken, setReadOnlyMode, type ApiActiveUser } from "../utils/api";
+
+/** Sesión de soporte en modo lectura: a quién estoy viendo, quién la inició
+ *  y cuándo expira (epoch ms). `null` = sesión normal. */
+export interface Impersonation {
+  targetName: string;
+  actorName: string;
+  expiresAt: number;
+}
 
 /** Result of a Google sign-in attempt. Always returns a structured value
  *  so the UI can render a friendly Spanish message — `null` would lose
@@ -64,6 +72,13 @@ interface AuthContextValue {
    *  from the "¿Cómo querés entrar?" chooser. `null` = act as superadmin. */
   viewAs: ViewAs | null;
   setViewAs: (view: ViewAs | null) => void;
+  /** Sesión de soporte en modo lectura (impersonación), o null. */
+  impersonation: Impersonation | null;
+  /** Inicia el modo lectura sobre `target` (el access token ya fue emitido
+   *  por la API). Reemplaza la sesión actual en memoria. */
+  startImpersonation: (access: string, target: ApiActiveUser, actorName: string, expiresInSeconds: number) => ActiveUser;
+  /** Termina el modo lectura y restaura la sesión del administrador real. */
+  stopImpersonation: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -75,6 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [bootstrapping, setBootstrapping] = useState(true);
   const [usingApi, setUsingApi] = useState(false);
   const [viewAs, setViewAsState] = useState<ViewAs | null>(() => getViewAs());
+  const [impersonation, setImpersonation] = useState<Impersonation | null>(null);
 
   const setViewAs = useCallback((view: ViewAs | null) => {
     setViewAsStored(view);
@@ -233,7 +249,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return au;
   }, []);
 
+  const startImpersonation = useCallback(
+    (access: string, target: ApiActiveUser, actorName: string, expiresInSeconds: number): ActiveUser => {
+      setReadOnlyMode(true);
+      setAccessToken(access);
+      const au = toActiveUser({ ...target, mustChangePassword: false });
+      setActiveUser(au);
+      setUser(au);
+      setUsingApi(true);
+      setImpersonation({ targetName: au.name, actorName, expiresAt: Date.now() + expiresInSeconds * 1000 });
+      return au;
+    },
+    [],
+  );
+
+  const stopImpersonation = useCallback(async () => {
+    setReadOnlyMode(false);
+    setImpersonation(null);
+    setAccessToken(null);
+    // La cookie de refresh del administrador real sigue viva → recuperamos
+    // su sesión. Si falla (expiró), caemos al login.
+    const apiUser = await api.bootstrap();
+    if (apiUser) {
+      const au = toActiveUser(apiUser);
+      setActiveUser(au);
+      setUser(au);
+      setUsingApi(true);
+    } else {
+      setActiveUser(null);
+      setUser(null);
+    }
+  }, []);
+
   const logout = useCallback(async () => {
+    setReadOnlyMode(false);
+    setImpersonation(null);
     setDemoMode(false);
     setViewAsStored(null);
     setViewAsState(null);
@@ -245,8 +295,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [usingApi]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, viewAs, setViewAs, logout }),
-    [user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, viewAs, setViewAs, logout],
+    () => ({ user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, viewAs, setViewAs, impersonation, startImpersonation, stopImpersonation, logout }),
+    [user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, viewAs, setViewAs, impersonation, startImpersonation, stopImpersonation, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

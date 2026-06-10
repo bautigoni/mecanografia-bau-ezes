@@ -19,9 +19,11 @@ interface GlassVars {
   white: number;      // 0..1
   border: number;     // 0..1
   sheen: number;      // 0..1
+  modalBlur: number;  // px — difuminado del fondo detrás de popups
+  modalTint: number;  // 0..1 — oscurecido del fondo detrás de popups
 }
 
-const DEFAULTS: GlassVars = { blur: 26, saturate: 1.6, white: 0.55, border: 0.65, sheen: 0.6 };
+const DEFAULTS: GlassVars = { blur: 26, saturate: 1.6, white: 0.55, border: 0.65, sheen: 0.6, modalBlur: 22, modalTint: 0.16 };
 const STORAGE_KEY = "typely.glassEditor.v1";
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -33,6 +35,8 @@ export function applyGlassVars(v: GlassVars) {
   r.setProperty("--glass-white", String(v.white));
   r.setProperty("--glass-border", String(v.border));
   r.setProperty("--glass-sheen", String(v.sheen));
+  r.setProperty("--modal-blur", `${v.modalBlur}px`);
+  r.setProperty("--modal-tint", String(v.modalTint));
 }
 
 /** Read saved glass vars (if any) and apply them — call once at app start. */
@@ -49,6 +53,7 @@ export function GlassEditorPage() {
   const navigate = useNavigate();
   const [v, setV] = useState<GlassVars>(DEFAULTS);
   const [copied, setCopied] = useState(false);
+  const [showModalPreview, setShowModalPreview] = useState(false);
 
   useEffect(() => {
     try {
@@ -69,6 +74,8 @@ export function GlassEditorPage() {
     `  --glass-white: ${round2(v.white)};\n` +
     `  --glass-border: ${round2(v.border)};\n` +
     `  --glass-sheen: ${round2(v.sheen)};\n` +
+    `  --modal-blur: ${round2(v.modalBlur)}px;\n` +
+    `  --modal-tint: ${round2(v.modalTint)};\n` +
     `}`;
 
   function copy() {
@@ -121,7 +128,20 @@ export function GlassEditorPage() {
         <Slider label="Borde" value={v.border} min={0} max={1} step={0.01} onChange={(border) => setV((s) => ({ ...s, border }))} />
         <Slider label="Brillo (sheen)" value={v.sheen} min={0} max={1} step={0.01} onChange={(sheen) => setV((s) => ({ ...s, sheen }))} />
 
+        <div className="h-px bg-white/40 my-1" />
+        <p className="text-[11px] font-bold text-accent-strong -mb-1">Popups / modales (fondo)</p>
+        <Slider label="Difuminado fondo" value={v.modalBlur} min={0} max={60} step={1} onChange={(modalBlur) => setV((s) => ({ ...s, modalBlur }))} />
+        <Slider label="Oscurecido fondo" value={v.modalTint} min={0} max={0.6} step={0.01} onChange={(modalTint) => setV((s) => ({ ...s, modalTint }))} />
+
         <pre className="text-[11px] leading-snug text-accent-strong bg-white/50 rounded-lg p-2 overflow-x-auto no-scrollbar">{cssBlock}</pre>
+
+        <button
+          type="button"
+          onClick={() => setShowModalPreview(true)}
+          className="py-2.5 rounded-xl font-bold text-text bg-white/55 hover:bg-white/80 cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]"
+        >
+          Ver popup de ejemplo
+        </button>
 
         <div className="flex gap-2">
           <button
@@ -142,6 +162,28 @@ export function GlassEditorPage() {
           </button>
         </div>
       </aside>
+
+      {/* Popup de ejemplo — usa exactamente las mismas clases que los modales
+          reales (.modal-overlay + .modal-card) para juzgar el difuminado. */}
+      {showModalPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-overlay-fade" role="dialog" aria-modal="true">
+          <div className="modal-overlay" onClick={() => setShowModalPreview(false)} />
+          <div className="glass-card-smooth modal-card relative p-8 w-[min(26rem,92vw)] flex flex-col gap-4 animate-card-pop">
+            <h2 className="font-display text-xl font-bold text-text">Popup de ejemplo</h2>
+            <p className="text-muted font-semibold text-sm">
+              Así se ve el difuminado del fondo detrás de los modales. Movés
+              «Difuminado fondo» y «Oscurecido fondo» y se actualiza en vivo.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowModalPreview(false)}
+              className="self-start px-5 py-2.5 rounded-xl font-extrabold text-white bg-gradient-to-br from-accent-sky to-accent-strong cursor-pointer"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

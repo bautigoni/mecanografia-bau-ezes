@@ -4,6 +4,7 @@ import {
   Building2,
   Copy,
   Crown,
+  Eye,
   GraduationCap,
   Home,
   ImagePlus,
@@ -28,6 +29,7 @@ import type { EduTicUser, Site } from "../types";
 import { api, ApiError } from "../utils/api";
 import { fileToResizedDataUrl } from "../utils/image";
 import { assets } from "../utils/assets";
+import { ImpersonateModal } from "../components/admin/ImpersonateModal";
 
 const NAV: DashNavItem[] = [
   { id: "inicio", label: "Inicio", icon: Home },
@@ -90,6 +92,7 @@ export function AdminGeneralPage() {
   /* F6: toggle that re-fetches users with includeDeleted=1 so the
      superadmin can see + restore soft-deleted accounts. */
   const [showDeleted, setShowDeleted] = useState(false);
+  const [impTarget, setImpTarget] = useState<{ id: string; name: string } | null>(null);
 
   /* Dedicated "invite admin de sede by email" flow (mirrors the teacher one). */
   const [invitations, setInvitations] = useState<
@@ -513,6 +516,17 @@ export function AdminGeneralPage() {
               >
                 {isDeleted ? "Borrado" : admin.active === false ? "Inactivo" : "Activo"}
               </span>
+              {!isDeleted && (
+                <button
+                  type="button"
+                  className="grid place-items-center w-8 h-8 rounded-full bg-amber-100/70 text-amber-700 hover:bg-amber-200 cursor-pointer border-0 transition-colors shrink-0"
+                  aria-label={`Ver ${admin.name} en modo lectura`}
+                  title="Ver en modo lectura"
+                  onClick={() => setImpTarget({ id: admin.id, name: admin.name })}
+                >
+                  <Eye size={16} />
+                </button>
+              )}
               <button
                 type="button"
                 className="grid place-items-center w-8 h-8 rounded-full bg-white/40 text-text/60 hover:text-text hover:bg-white/70 cursor-pointer border-0 transition-colors shrink-0"
@@ -1133,6 +1147,8 @@ export function AdminGeneralPage() {
           </div>
         </div>
       )}
+
+      {impTarget && <ImpersonateModal target={impTarget} onClose={() => setImpTarget(null)} />}
 
       <Toast message={message} />
     </DashboardShell>

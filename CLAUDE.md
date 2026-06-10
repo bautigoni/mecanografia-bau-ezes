@@ -73,6 +73,15 @@ lands on its own surface via `routeForRole` (`/admin-general`, `/admin-sede`,
 - **RBAC** (`api/src/rbac.ts`): `canGrantRole(actor,target)` — an `admin_sede`
   can never grant `admin_sede` or higher; `canActOnSede` blocks cross-sede
   mutations. Every user-mutating endpoint calls these.
+- **Read-only impersonation (support)** — `POST /api/admin/impersonate`
+  (`api/src/routes/support.ts`) lets superadmin/admin-general/admin-sede VIEW
+  another in-scope account for 30 min after a **triple check** (own password +
+  exact phrase `ACCEDER EN MODO LECTURA` + legal acknowledgment). It mints an
+  access token with a `readOnly` claim and NO refresh cookie (dies in 30 min);
+  a global preHandler in `server.ts` rejects every mutation made with a
+  `readOnly` token. Never targets a superadmin. Front: `ImpersonateModal` +
+  global `ImpersonationBanner` (countdown), wired through `useAuth`
+  (`startImpersonation`/`stopImpersonation`). Audited as `impersonate_start`.
 
 ## 5. Visual Design System
 

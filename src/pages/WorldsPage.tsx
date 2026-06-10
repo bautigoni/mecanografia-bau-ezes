@@ -620,14 +620,15 @@ export function WorldsPage() {
                        HEIGHT below the 36%-of-viewport gap between the two island
                        rows — so they never overlap vertically on wide-but-short
                        screens (where a flat `20vw` would collide). */
-                    "relative w-[min(21vw,34vh)] max-w-[19.5rem] aspect-square rounded-full border-0 p-0",
+                    "relative w-[min(24vw,38vh)] max-w-[22rem] aspect-square rounded-full border-0 p-0",
                     "cursor-pointer transition-all duration-300 ease-out",
                     "hover:scale-105 hover:-translate-y-1",
                     "active:scale-95",
                     "overflow-visible",
-                    /* State: locked */
+                    /* State: locked — bien apagada para que se lea "bloqueada"
+                       de un vistazo (más gris + más tenue que antes). */
                     isLocked
-                      ? "grayscale-[0.6] opacity-70 cursor-not-allowed hover:scale-100 hover:translate-y-0"
+                      ? "grayscale saturate-0 opacity-50 brightness-90 cursor-not-allowed hover:scale-100 hover:translate-y-0"
                       : "",
                     /* State: just unlocked → reveal animation */
                     justUnlocked.has(world.slug) ? "animate-unlock-reveal" : "",

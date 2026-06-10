@@ -161,6 +161,8 @@ import { classRoutes } from "./routes/classes.js";
 import { adminRoutes } from "./routes/admin.js";
 import { academicYearRoutes } from "./routes/academicYears.js";
 import { inspectorRoutes, registerRoute, recordError } from "./routes/inspector.js";
+import { supportRoutes } from "./routes/support.js";
+import { verifyAccessToken } from "./auth.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const ORIGIN = process.env.CORS_ORIGIN ?? "https://typely.bauhub.online";
@@ -211,6 +213,26 @@ async function main() {
     });
   });
 
+  /* Cumplimiento del MODO LECTURA (impersonación de soporte). Si el token
+     trae el claim readOnly, se rechaza cualquier método que mute datos.
+     Se hace acá, ANTES de las rutas, para que ninguna mutación se escape.
+     Las únicas excepciones POST son auth (cerrar/renovar sesión). */
+  const READONLY_POST_ALLOW = new Set(["/api/auth/logout", "/api/auth/refresh"]);
+  app.addHook("preHandler", async (req, reply) => {
+    if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return;
+    const auth = req.headers.authorization;
+    if (!auth?.startsWith("Bearer ")) return; // que la ruta resuelva su propio 401
+    let claims;
+    try {
+      claims = await verifyAccessToken(auth.slice("Bearer ".length));
+    } catch {
+      return; // token inválido → la ruta responde 401
+    }
+    if (claims.readOnly && !READONLY_POST_ALLOW.has(req.url.split("?")[0]!)) {
+      return reply.code(403).send({ error: "Estás en modo lectura (sesión de soporte). No se pueden hacer cambios." });
+    }
+  });
+
   /* Health check — used by the Caddy reverse-proxy to know we're up.
      Also exposed as /api/health so the PUBLIC https://…/api/health probe
      works through Caddy (which proxies /api/* preserving the path). */
@@ -229,6 +251,7 @@ async function main() {
   await app.register(adminRoutes);
   await app.register(academicYearRoutes);
   await app.register(inspectorRoutes);
+  await app.register(supportRoutes);
 
   /* Graceful shutdown. */
   const shutdown = async (signal: string) => {
