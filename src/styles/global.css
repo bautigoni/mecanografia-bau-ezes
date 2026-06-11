@@ -43,11 +43,11 @@ html, body { background-color: #f1effb; }
   --glass-white: 0.5;        /* translucency of the white film (lower = more see-through) */
   --glass-border: 0.7;
   --glass-sheen: 0.55;
-  /* Difuminado del FONDO detrás de cualquier popup/modal (estilo Apple).
-     Ajustable en vivo desde /editor-glass. Con 40-48px el fondo se ve
-     completamente borroso detrás del modal y la tarjeta translúcida puede
-     ser liquid glass "real" sin que se cuele nada nítido. */
-  --modal-blur: 42px;
+  /* Difuminado del FONDO detrás de cualquier popup/modal. Con el estilo
+     "tint glass" queremos un blur SUAVE (10-14px) que difumine el texto
+     del fondo sin matar el color pastel que se filtra a través del card
+     translúcido. Ajustable en vivo desde /editor-glass. */
+  --modal-blur: 12px;
   --modal-tint: 0.10;        /* qué tan oscuro se pone el fondo (0 = nada) */
 }
 
@@ -125,39 +125,36 @@ a { color: inherit; text-decoration: none; }
   position: absolute;
   inset: 0;
   background: rgba(23, 53, 95, var(--modal-tint));
-  /* El overlay es la capa que DIFUMINA el fondo detrás de TODA la ventana
-     del modal (estilo Apple: blur FUERTE en la profundidad de campo, tinte
-     sutil para que el fondo borroso no compita con la tarjeta). Con un blur
-     más alto (40-48px) el fondo se ve completamente borroso aunque la
-     tarjeta sea translúcida. */
-  @apply backdrop-blur-[var(--modal-blur)] backdrop-saturate-125;
-  /* Sin mask — cubrimos toda la pantalla uniformemente. La profundidad
-     (blur cerca del modal, menos en los bordes) la da la propia intensidad
-     del backdrop-filter, no la mask. */
+  /* Overlay "tint glass" con un blur SUAVE (10-14px): difumina lo justo
+     para que ningún texto/elemento nítido del fondo se cuele, pero deja
+     pasar el color pastel del fondo para que el card se vea con su tinte.
+     El look final es el de la captura de referencia (degradado del fondo
+     filtrándose) pero sin texto nítido asomando por debajo. */
+  @apply backdrop-blur-[var(--modal-blur)];
+  /* Saturamos un toque el fondo borroso para que el color pastel se note
+     más a través del card translúcido. */
+  -webkit-backdrop-filter: blur(var(--modal-blur)) saturate(1.4);
+  backdrop-filter: blur(var(--modal-blur)) saturate(1.4);
 }
 
 .modal-card {
-  /* Liquid glass estilo Apple: la tarjeta es TRANSLÚCIDA (se ve el fondo
-     borroso a través del cristal). El secreto es:
-       1) El .modal-overlay que está DEBAJO difumina FUERTE el fondo (40-48px)
-          → no hay nada nítido que pueda colarse.
-       2) La propia tarjeta sube --glass-blur a 56px → el degradado translúcido
-          del .glass-card-smooth sigue difuminando lo poco que pasa.
-       3) --glass-saturate moderado (1.4) → los colores del fondo borroso se
-          ven apagados, no amplificados.
-     El background-color de respaldo (~0.5) actúa solo si el backdrop-filter
-     no estuviera disponible (Safari viejo / GPU bloqueada) — entonces la
-     tarjeta sigue siendo legible. */
-  --glass-blur: 56px;
-  --glass-saturate: 1.4;
-  --glass-white: 0.42;
-  --glass-border: 0.85;
-  --glass-sheen: 0.75;
-  box-shadow: 0 32px 90px rgba(23, 53, 95, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.85);
-  /* Respaldo: si el backdrop-filter falla (Safari/GPU bloqueada), la tarjeta
-     sigue siendo ~50% opaca (texto legible). Si funciona, la tarjeta se ve
-     translúcida y deja pasar el fondo borroso del overlay. */
-  background-color: rgba(255, 255, 255, 0.50);
+  /* Liquid glass estilo "tint glass" (igual que el card de /entrar — el
+     superadmin chooser): la tarjeta es translúcida y deja pasar el COLOR
+     del fondo con su saturación. El overlay que está debajo NO difumina
+     (sólo oscurece muy suavemente), así que el card muestra el fondo con
+     su tinte pastel real (rosa / azul / violeta). Es el look de la captura
+     de referencia: degradado del fondo filtrándose a través del cristal.
+     Como no hay blur de fondo, los elementos del fondo SÍ se verían
+     nítidos si fueran rectos/duros — por eso este estilo se usa solo en
+     páginas con fondo artístico (pintura, gradiente animado) y no en
+     formularios con texto. */
+  --glass-blur: 24px;
+  --glass-saturate: 1.9;
+  --glass-white: 0.32;
+  --glass-border: 0.7;
+  --glass-sheen: 0.55;
+  box-shadow: 0 32px 90px rgba(23, 53, 95, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  background-color: rgba(255, 255, 255, 0.32);
   position: relative;
   z-index: 1;
 }
