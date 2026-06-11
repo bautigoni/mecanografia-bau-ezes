@@ -36,3 +36,6 @@ pnpm-debug.log*
 
 # Local asset backups (not shipped)
 _backups/
+
+# Local verification scratch (Playwright screenshots, dev scripts)
+screenshots/
