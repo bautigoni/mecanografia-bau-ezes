@@ -43,12 +43,12 @@ html, body { background-color: #f1effb; }
   --glass-white: 0.5;        /* translucency of the white film (lower = more see-through) */
   --glass-border: 0.7;
   --glass-sheen: 0.55;
-  /* Difuminado del FONDO detrás de cualquier popup/modal. Con el estilo
-     "tint glass" queremos un blur SUAVE (10-14px) que difumine el texto
-     del fondo sin matar el color pastel que se filtra a través del card
-     translúcido. Ajustable en vivo desde /editor-glass. */
-  --modal-blur: 12px;
-  --modal-tint: 0.10;        /* qué tan oscuro se pone el fondo (0 = nada) */
+  /* Difuminado del FONDO detrás de cualquier popup/modal. Necesita ser
+     FUERTE (28-40px) para que cualquier texto o card de atrás se vuelva
+     ilegible y el modal sea lo único que se lee claro. Ajustable en
+     vivo desde /editor-glass. */
+  --modal-blur: 32px;
+  --modal-tint: 0.12;        /* qué tan oscuro se pone el fondo (0 = nada) */
 }
 
 /* Opt-in heavier liquid glass for immersive GAME surfaces only (login,
@@ -138,23 +138,21 @@ a { color: inherit; text-decoration: none; }
 }
 
 .modal-card {
-  /* Liquid glass estilo "tint glass" (igual que el card de /entrar — el
-     superadmin chooser): la tarjeta es translúcida y deja pasar el COLOR
-     del fondo con su saturación. El overlay que está debajo NO difumina
-     (sólo oscurece muy suavemente), así que el card muestra el fondo con
-     su tinte pastel real (rosa / azul / violeta). Es el look de la captura
-     de referencia: degradado del fondo filtrándose a través del cristal.
-     Como no hay blur de fondo, los elementos del fondo SÍ se verían
-     nítidos si fueran rectos/duros — por eso este estilo se usa solo en
-     páginas con fondo artístico (pintura, gradiente animado) y no en
-     formularios con texto. */
-  --glass-blur: 24px;
-  --glass-saturate: 1.9;
-  --glass-white: 0.32;
-  --glass-border: 0.7;
-  --glass-sheen: 0.55;
-  box-shadow: 0 32px 90px rgba(23, 53, 95, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.75);
-  background-color: rgba(255, 255, 255, 0.32);
+  /* Liquid glass "real": el overlay DEBAJO difumina el fondo con FUERZA
+     (--modal-blur 32px) → cualquier card o texto detrás queda borroso e
+     ilegible. La propia tarjeta sube su opacidad para que, aunque sea
+     translúcida, no deje pasar elementos nítidos (por si el card de
+     atrás quedara con poco blur por composición). */
+  --glass-blur: 28px;
+  --glass-saturate: 1.5;
+  --glass-white: 0.55;
+  --glass-border: 0.8;
+  --glass-sheen: 0.65;
+  box-shadow: 0 32px 90px rgba(23, 53, 95, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.80);
+  /* Capa de respaldo opaca: si el backdrop-filter falla, la tarjeta
+     sigue siendo 75% opaca → legible. Con backdrop-filter activo, la
+     tarjeta se ve translúcida con tinte del fondo borroso. */
+  background-color: rgba(255, 255, 255, 0.75);
   position: relative;
   z-index: 1;
 }
