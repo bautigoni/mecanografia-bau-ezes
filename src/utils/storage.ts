@@ -225,6 +225,45 @@ export function isDemoMode(): boolean {
   return localStorage.getItem(DEMO_MODE_KEY) === "true";
 }
 
+/* ------------------------------------------------------------------ */
+/* Superadmin "view as" (god mode)                                     */
+/* ------------------------------------------------------------------ */
+/** When a superadmin chooses to enter as another role / sede from the
+ *  "¿Cómo querés entrar?" chooser, we persist that choice so the scoped
+ *  dashboards (and the dev level editor) know which surface to render.
+ *  This is purely a client-side convenience — the superadmin token still
+ *  has full server-side authority, so RBAC is unaffected. */
+const VIEW_AS_KEY = "typely_view_as";
+const DEV_EDITOR_KEY = "typely_dev_editor";
+
+export interface ViewAs {
+  role: Role;
+  sedeId?: string;
+  /** True when entering the developer level-position editor mode. */
+  dev?: boolean;
+}
+
+export function getViewAs(): ViewAs | null {
+  const raw = localStorage.getItem(VIEW_AS_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as ViewAs;
+  } catch {
+    return null;
+  }
+}
+
+export function setViewAsStored(view: ViewAs | null) {
+  if (!view) {
+    localStorage.removeItem(VIEW_AS_KEY);
+    localStorage.removeItem(DEV_EDITOR_KEY);
+    return;
+  }
+  localStorage.setItem(VIEW_AS_KEY, JSON.stringify(view));
+  if (view.dev) localStorage.setItem(DEV_EDITOR_KEY, "1");
+  else localStorage.removeItem(DEV_EDITOR_KEY);
+}
+
 export function routeForRole(role: Role) {
   const routes: Record<Role, string> = {
     // Superadmin lands on the GLOBAL administration dashboard — never the

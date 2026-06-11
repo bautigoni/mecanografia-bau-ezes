@@ -33,7 +33,7 @@ Core visual direction:
 
 TYPELY started frontend-only (localStorage) and now has a real backend. It runs
 as **three Docker containers behind a Caddy reverse proxy** at
-`mecanografia.bauhub.online`:
+`typely.bauhub.online`:
 
 | Layer | Stack | Where | Exposed |
 | --- | --- | --- | --- |
@@ -73,6 +73,15 @@ lands on its own surface via `routeForRole` (`/admin-general`, `/admin-sede`,
 - **RBAC** (`api/src/rbac.ts`): `canGrantRole(actor,target)` — an `admin_sede`
   can never grant `admin_sede` or higher; `canActOnSede` blocks cross-sede
   mutations. Every user-mutating endpoint calls these.
+- **Read-only impersonation (support)** — `POST /api/admin/impersonate`
+  (`api/src/routes/support.ts`) lets superadmin/admin-general/admin-sede VIEW
+  another in-scope account for 30 min after a **triple check** (own password +
+  exact phrase `ACCEDER EN MODO LECTURA` + legal acknowledgment). It mints an
+  access token with a `readOnly` claim and NO refresh cookie (dies in 30 min);
+  a global preHandler in `server.ts` rejects every mutation made with a
+  `readOnly` token. Never targets a superadmin. Front: `ImpersonateModal` +
+  global `ImpersonationBanner` (countdown), wired through `useAuth`
+  (`startImpersonation`/`stopImpersonation`). Audited as `impersonate_start`.
 
 ## 5. Visual Design System
 
@@ -124,24 +133,16 @@ Key responsive rules in that section:
 - **Island detail:** back/profile become icon-only, compact HUD, no collision.
 - **Logros:** the 4-column reward grid collapses to 2×2.
 
-### Login mascots — proportional flanking system
-The two login robots (`.login-mascot--left/right`, `mascot-women-wave` and
-`mascot-wave`) are sized **purely by height** (no `max-width` that would clip one
-more than the other), so they always scale together and stay proportional. The
-height tracks the space beside the centred card:
-
-```
-height: min(60vh, calc((50vw - 18rem) / 0.69));
-```
-
-- `50vw - 18rem` = horizontal room from the viewport edge to the card (card is
-  `32rem` ⇒ half `16rem`, +2rem gap). `÷ 0.69` converts that target *width* to a
-  *height* (the trimmed woman PNG is ~0.69 aspect). This keeps a near-constant
-  gap from the card at every width; capped at `60vh` on tall screens.
-- On phones (`≤720px`) the mascots switch to small bottom-corner decorations
-  (`max-width` re-capped) so the square-ish art can't cover the card.
-- Per-side `bottom`/`left`/`right` offsets place each robot standing on a painted
-  island. Tune those clamps, not the formula, for placement.
+### Login mascots — flanking robots
+The two login robots are positioned inline in `LoginPage.tsx` with Tailwind
+viewport units (no dedicated CSS class anymore): female left
+(`bottom-[17.5vh] left-[5.5vw] max-h-[62vh]`), male right
+(`bottom-[7.5vh] right-[8vw] max-h-[72vh]`). They're sized purely by height
+so both scale together; the `bottom` offsets stand each robot on a painted
+island. Tune those four values for placement/size. The login card is fixed
+at `w-[min(32rem,92vw)]` with the original (non-fluid) typography — do NOT
+reintroduce vmin-clamped fonts on the login card (it ballooned the UI and
+pushed buttons off-screen on short displays).
 
 ## 7. Gameplay Curriculum
 
@@ -185,8 +186,11 @@ touchpad, windows, tabs, shortcuts, text editing, UI literacy). `SkillLevelView`
 - `src/App.tsx` — routes + protected-route composition (lazy-loads heavy pages).
 - `src/pages/` — `LoginPage`, `WorldsPage`, `IslandDetailPage`, `GameplayPage`,
   `RewardsPage`, `AccountPage`, `MissionsPage`, `SkillLevelView`,
-  `ShortcutLevelView`, `ChangePasswordPage`, `AdminGeneralPage`, `SiteAdminPage`,
-  `TeacherPage`, `TeacherClassPage`, `TeacherStudentPage`.
+  `ShortcutLevelView`, `ChangePasswordPage`, `AdminGeneralPage`,
+  `TeacherPage`, `TeacherClassPage`, `TeacherStudentPage`, plus the routed
+  admin-sede screens in `src/pages/admin/` (incl. `ApiInspectorPage` at
+  `/admin/api` — superadmin/admin-general/admin-sede only, backed by
+  `GET /api/admin/inspector`).
 - `src/components/` — `auth/`, `common/` (`Brand`, `Button`, `Toast`),
   `dashboard/DashboardShell`, `dev/LevelPositionEditor`, `digitalSkills/`,
   `layout/TopNav`.
@@ -194,7 +198,7 @@ touchpad, windows, tabs, shortcuts, text editing, UI literacy). `SkillLevelView`
   `digitalSkills.ts`, `seed.ts`.
 - `src/hooks/useAuth.tsx` — API-aware auth provider (async, localStorage fallback).
 - `src/utils/` — `api.ts` (typed API client), `assets.ts` (public-URL map),
-  `progress.ts`, `storage.ts`, `image.ts`, `googleAuth.ts`, `emailService.ts`,
+  `progress.ts`, `storage.ts`, `image.ts`, `googleAuth.ts`,
   `studentStatus.ts`, `userContext.ts`.
 - `src/styles/global.css` — entire visual system + page CSS + the responsive pass.
 - `api/src/` — `server.ts`, `auth.ts`, `rbac.ts`, `seed.ts`, `db/{index,schema}.ts`,

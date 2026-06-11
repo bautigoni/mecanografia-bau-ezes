@@ -1,113 +1,50 @@
-import { ArrowLeft, ArrowRight, Lock, MapPin, RotateCcw, Star, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Lock, MapPin, RotateCcw, Star } from "lucide-react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
+import { StarCounter } from "../components/common/StarCounter";
 import { getWorldBySlug, getWorlds, worldStarProgress, WORLD_PEDAGOGY_ORDER, type Level, type LevelPosition } from "../data/worlds";
 import { LevelPositionEditor } from "../components/dev/LevelPositionEditor";
 import { assets } from "../utils/assets";
 
-/* Dev-only level-position editor is available solely in dev builds; in a
-   production/student build this is false and the entire editor is tree-shaken
-   out, so students never see any debug UI, grid or coordinates. */
-const EDITOR_AVAILABLE = import.meta.env.DEV;
-
+/* The dev level-position editor is available in local dev builds, OR when a
+   superadmin entered "modo desarrollador" from the god-mode chooser (which
+   sets the `typely_dev_editor` flag). Never available to normal users. */
+/* The editor is ONLY available in superadmin "Modo desarrollador" (which sets
+   the typely_dev_editor flag via setViewAsStored). It is NOT shown in local dev
+   for the demo student, nor to any normal user. Checked dynamically because the
+   flag is set after this module first loads. */
+function editorAvailable(): boolean {
+  return typeof window !== "undefined" && localStorage.getItem("typely_dev_editor") === "1";
+}
 const clampPct = (v: number) => Math.min(100, Math.max(0, v));
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
-/* Base 3D perspective the level.png / pressed_level.png images were rendered at.
-   CSS transforms apply the DELTA between a level's desired perspective and this
-   base, so the pre-rendered artwork stays sharp while the overlaid number text
-   sits in the same 3D plane. */
 const PERSPECTIVE_BASE = { scale: 1.4, rotateX: 54.5, rotateY: -1.5, rotateZ: 2, perspective: 110 } as const;
 
-/* ---- Image-relative coordinate helpers ----
-   The island background uses object-fit: cover. At non-16:9 viewports the
-   image gets cropped. Level positions are stored as percentages of the IMAGE
-   itself (0 = left/top edge of artwork, 100 = right/bottom edge). At render
-   time we translate those to container-relative percentages for CSS. */
-
-function getImageContentRect(
-  containerW: number, containerH: number,
-  imgW: number, imgH: number,
-): { left: number; top: number; width: number; height: number } {
-  const cAR = containerW / containerH;
-  const iAR = imgW / imgH;
-  if (cAR > iAR) {
-    const w = containerH * iAR;
-    return { left: (containerW - w) / 2, top: 0, width: w, height: containerH };
-  }
-  const h = containerW / iAR;
-  return { left: 0, top: (containerH - h) / 2, width: containerW, height: h };
-}
-
-function imageToContainer(imageX: number, imageY: number, cr: ReturnType<typeof getImageContentRect>, cW: number, cH: number) {
-  return {
-    x: ((cr.left + (imageX / 100) * cr.width) / cW) * 100,
-    y: ((cr.top + (imageY / 100) * cr.height) / cH) * 100,
-  };
-}
-
-function containerToImage(containerX: number, containerY: number, cr: ReturnType<typeof getImageContentRect>, cW: number, cH: number) {
-  return {
-    x: clampPct(((containerX / 100) * cW - cr.left) / cr.width * 100),
-    y: clampPct(((containerY / 100) * cH - cr.top) / cr.height * 100),
-  };
-}
-
-/* ---- Level marker icon assets (served from /public) ----
-   Each state has its own high-quality WebP badge. The number in the file
-   name matches the level number shown in the icon. Completed badges bake in
-   the 1/2/3 star result (okay = 1★, good = 2★, perfect = 3★). */
-const LEVEL_ICON_DIR = {
-  available: "/typely_level_icons_webp",
-  okay: "/okay_webp_icons",
-  good: "/good_webp_icons",
-  perfect: "/perfect_webp_icons",
-} as const;
-const BLOCKED_ICON = "/typely_level_icons_webp/blocked-levels.webp";
-
-/** Resolves the badge image for a level given its state + best stars. */
-function levelIconSrc(level: Pick<Level, "levelNumber" | "state" | "stars">): string {
-  const n = Math.min(Math.max(level.levelNumber, 1), 8);
-  if (level.state === "Bloqueado") return BLOCKED_ICON;
-  if (level.state === "Completado") {
-    if (level.stars >= 3) return `${LEVEL_ICON_DIR.perfect}/${n}-perfect.webp`;
-    if (level.stars === 2) return `${LEVEL_ICON_DIR.good}/${n}-good.webp`;
-    return `${LEVEL_ICON_DIR.okay}/${n}-okay.webp`;
-  }
-  // "Actual" / available but not completed → blue numbered badge.
-  return `${LEVEL_ICON_DIR.available}/${n}.webp`;
-}
+/* ---- Island image containers (per world) — separate from the full background.
+   The island PNG is centered in the viewport with object-fit: contain. Level
+   nodes live inside a %-grid that matches this island container, so their
+   positions stay locked to the art on every screen size. ---- */
+const ISLAND_IMG: Partial<Record<string, string>> = {
+  island1: "/assets/edutic-art/islands/1/island.png",
+};
+const ISLAND_BG: Partial<Record<string, string>> = {
+  // Soft pastel sky (same backdrop as the /mundos map) — clean, no busy
+  // castle islands. The island art is a separate PNG layered on top. The old
+  // islands/1/background.png was a flat blue sky and looked wrong.
+  island1: assets.homeBg,
+};
 
 
-function getShipAsset(from: LevelPosition, to?: LevelPosition) {
-  if (!to) {
-    return assets.shipFront;
-  }
-
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-
-  if (Math.abs(dx) < 4 && dy < 0) {
-    return assets.shipBack;
-  }
-
-  if (Math.abs(dx) < 4 && dy >= 0) {
-    return assets.shipFront;
-  }
-
-  if (dx > 0 && Math.abs(dy) < 7) {
-    return assets.shipRight;
-  }
-
-  if (dx < 0 && Math.abs(dy) < 7) {
-    return assets.shipLeft;
-  }
-
-  return dx >= 0 ? assets.shipDiagonalRight : assets.shipDiagonalLeft;
-}
+/* ---- Status-pill colour map (state → Tailwind classes) ---- */
+const STATUS_PILL_CLASSES: Record<string, string> = {
+  actual: "bg-accent-sky text-white",
+  completado: "bg-mint text-white",
+  bloqueado: "bg-rose/80 text-white",
+};
 
 export function IslandDetailPage() {
   const { islandId } = useParams();
@@ -139,7 +76,7 @@ export function IslandDetailPage() {
   /* ---- Dev-only level position editor state ---- */
   const mapRef = useRef<HTMLElement>(null);
   const [editorOn, setEditorOn] = useState(
-    () => EDITOR_AVAILABLE && new URLSearchParams(window.location.search).has("editor"),
+    () => editorAvailable() && new URLSearchParams(window.location.search).has("editor"),
   );
   const [gridOn, setGridOn] = useState(true);
   const [editorPositions, setEditorPositions] = useState<LevelPosition[]>([]);
@@ -155,14 +92,7 @@ export function IslandDetailPage() {
   const [hoveredIndex, setHoveredIndex] = useState(-1);
   /* Perspective adjustment mode: null = position, otherwise the active 3D property. */
   const [perspMode, setPerspMode] = useState<"scale" | "rotateX" | "rotateY" | "rotateZ" | "persp" | null>(null);
-  /* Global number font-size multiplier. */
   const [numScale, setNumScale] = useState(1);
-  /* Natural dimensions of the island background image, used to convert between
-     image-relative and container-relative coordinates. */
-  const bgImgRef = useRef<HTMLImageElement>(null);
-  const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
-  /* Recompute the image content rect whenever the container resizes. */
-  const [containerSize, setContainerSize] = useState<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
     setSelectedIndex(initialIndex);
@@ -171,35 +101,14 @@ export function IslandDetailPage() {
   useEffect(() => {
     if (!maybeWorld) return;
     setBgReady(false);
-    setImgNatural(null);
+    const bgSrc = ISLAND_BG[maybeWorld.slug] ?? maybeWorld.background;
     const img = new Image();
     img.decoding = "async";
-    img.onload = () => {
-      setBgReady(true);
-      if (img.naturalWidth > 0) setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });
-    };
+    img.onload = () => setBgReady(true);
     img.onerror = () => setBgReady(true);
-    img.src = maybeWorld.background;
-    if (img.complete && img.naturalWidth > 0) {
-      setBgReady(true);
-      setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });
-    }
+    img.src = bgSrc;
+    if (img.complete && img.naturalWidth > 0) setBgReady(true);
   }, [maybeWorld]);
-
-  // Track container dimensions for image-relative coordinate computation.
-  useEffect(() => {
-    const el = mapRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      const r = entry.contentRect;
-      if (r.width > 0 && r.height > 0) setContainerSize({ w: r.width, h: r.height });
-    });
-    ro.observe(el);
-    // Initial size
-    const r = el.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0) setContainerSize({ w: r.width, h: r.height });
-    return () => ro.disconnect();
-  }, [maybeWorld?.slug, editorOn]); // re-attach if the DOM changes (e.g. editor toggle)
 
   // Seed the editor draft from the saved config whenever the island changes.
   useEffect(() => {
@@ -207,23 +116,12 @@ export function IslandDetailPage() {
     setEditorPositions(maybeWorld.levelPositions.map((p) => ({ ...p })));
   }, [maybeWorld?.slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Preload the level badge images for this island so they never flicker in.
-  useEffect(() => {
-    if (!maybeWorld) return;
-    for (const level of maybeWorld.levels) {
-      const img = new Image();
-      img.decoding = "async";
-      img.src = levelIconSrc(level);
-    }
-  }, [maybeWorld]);
-
-  // Close the level popover when tapping anywhere that isn't a level node or
-  // the popover itself.
+  // Close the level popover when tapping anywhere that isn't a level node.
   useEffect(() => {
     if (!popoverOpen) return;
     function onDocPointerDown(event: PointerEvent) {
       const el = event.target as HTMLElement | null;
-      if (el && (el.closest(".level-node") || el.closest(".level-popover"))) return;
+      if (el && (el.closest("[data-level-node]") || el.closest("[data-level-popover]"))) return;
       setPopoverOpen(false);
     }
     document.addEventListener("pointerdown", onDocPointerDown);
@@ -235,6 +133,39 @@ export function IslandDetailPage() {
   }
 
   const world = maybeWorld;
+
+  /* ---- Island container: island.png centered via object-fit: contain.
+     Pixel dimensions so the level map matches the image exactly. ---- */
+  const islandImgPath = ISLAND_IMG[world.slug];
+  const islandBgPath = ISLAND_BG[world.slug] ?? world.background;
+  const [islandImgSize, setIslandImgSize] = useState<{ w: number; h: number } | null>(null);
+  const [islandContainer, setIslandContainer] = useState<{ left: number; top: number; w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    if (!islandImgPath) { setIslandImgSize(null); return; }
+    const img = new Image();
+    img.onload = () => { if (img.naturalWidth > 0) setIslandImgSize({ w: img.naturalWidth, h: img.naturalHeight }); };
+    img.onerror = () => setIslandImgSize(null);
+    img.src = islandImgPath;
+  }, [islandImgPath]);
+
+  const computeIslandContainer = useCallback(() => {
+    if (!islandImgSize) { setIslandContainer(null); return; }
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const iAR = islandImgSize.w / islandImgSize.h;
+    const vAR = vw / vh;
+    let cw: number, ch: number;
+    if (vAR > iAR) { ch = vh; cw = ch * iAR; }
+    else            { cw = vw; ch = cw / iAR; }
+    setIslandContainer({ left: (vw - cw) / 2, top: (vh - ch) / 2, w: cw, h: ch });
+  }, [islandImgSize]);
+
+  useEffect(() => {
+    computeIslandContainer();
+    window.addEventListener("resize", computeIslandContainer);
+    return () => window.removeEventListener("resize", computeIslandContainer);
+  }, [computeIslandContainer]);
+
   const actualIndex = world.levels.findIndex((level) => level.state === "Actual");
   const currentIndex = actualIndex >= 0 ? actualIndex : initialIndex;
   const worldNumber = world.displayNumber;
@@ -247,41 +178,10 @@ export function IslandDetailPage() {
     editorOn && editorPositions.length === world.levelPositions.length
       ? editorPositions
       : world.levelPositions;
-
-  /* Compute the image content rect (accounting for object-fit: cover cropping)
-     and a helper that converts image-relative stored positions to container-
-     relative positions for CSS. */
-  const imgContentRect = useMemo(() => {
-    if (!containerSize || !imgNatural) return null;
-    return getImageContentRect(containerSize.w, containerSize.h, imgNatural.w, imgNatural.h);
-  }, [containerSize, imgNatural]);
-
-  /** Convert a stored image-relative position to container-relative for CSS. */
-  const posForCss = useCallback(
-    (p: LevelPosition): { left: string; top: string } => {
-      if (!imgContentRect || !containerSize) return { left: `${p.x}%`, top: `${p.y}%` };
-      const c = imageToContainer(p.x, p.y, imgContentRect, containerSize.w, containerSize.h);
-      return { left: `${c.x}%`, top: `${c.y}%` };
-    },
-    [imgContentRect, containerSize],
-  );
-
-  /** Convert a container-relative coordinate (from mouse event) to image-relative. */
-  const clientToImage = useCallback(
-    (clientX: number, clientY: number): LevelPosition | null => {
-      const el = mapRef.current;
-      if (!el || !imgContentRect || !containerSize) return null;
-      const r = el.getBoundingClientRect();
-      if (r.width === 0 || r.height === 0) return null;
-      const cx = clampPct(((clientX - r.left) / r.width) * 100);
-      const cy = clampPct(((clientY - r.top) / r.height) * 100);
-      return containerToImage(cx, cy, imgContentRect, containerSize.w, containerSize.h);
-    },
-    [imgContentRect, containerSize],
-  );
   const currentPosition = activePositions[currentIndex] ?? activePositions[0];
-  const nextPosition = activePositions[currentIndex + 1];
-  const shipAsset = getShipAsset(currentPosition, nextPosition);
+  /* The ship is ALWAYS the same front-facing sprite (ship-front) in every
+     world — it's the game's main character, not a directional indicator. */
+  const shipAsset = assets.shipFront;
   /* Star progress toward unlocking the next world (70% gate). */
   const starProgress = worldStarProgress(world.slug);
   const isLastWorld = worldNumber >= WORLD_PEDAGOGY_ORDER.length;
@@ -394,7 +294,7 @@ export function IslandDetailPage() {
     setCursor(pctFromClient(clientX, clientY));
   }
   async function handleEditorCopyAt(clientX: number, clientY: number) {
-    const p = clientToImage(clientX, clientY);
+    const p = pctFromClient(clientX, clientY);
     if (!p) return;
     setLastClick(p);
     logConfig("Click en mapa");
@@ -418,10 +318,9 @@ export function IslandDetailPage() {
   }
   function onNodePointerMove(event: ReactPointerEvent<HTMLButtonElement>, index: number) {
     if (!editorOn || dragIndexRef.current !== index) return;
-    const p = clientToImage(event.clientX, event.clientY);
+    const p = pctFromClient(event.clientX, event.clientY);
     if (!p) return;
-    // Use container-relative for the crosshair cursor display
-    setCursor(pctFromClient(event.clientX, event.clientY));
+    setCursor(p);
     setEditorPositions((prev) => prev.map((pos, i) => (i === index ? { ...pos, x: p.x, y: p.y } : pos)));
   }
   function onNodePointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -616,25 +515,78 @@ export function IslandDetailPage() {
 
   return (
     <main
-      className={`island-detail scene-contain page-fade ${bgReady ? "is-bg-ready" : "is-bg-loading"} ${editorOn ? "is-editing-levels" : ""}`}
-      style={{ "--scene-bg": `url("${world.background}")` } as CSSProperties}
+      className={`relative min-h-dvh overflow-hidden bg-cover bg-center animate-page-fade ${editorOn ? "cursor-crosshair" : ""}`}
+      /* Soft pastel fallback colour behind everything: covers the pre-load
+         frame and any sub-pixel gap so a white edge can never flash. */
+      style={{ "--scene-bg": `url("${islandBgPath}")`, backgroundColor: "#ebe3f7" } as CSSProperties}
     >
-      {/* Aspect-ratio-locked stage: the image and every level node share the
-          same 16:9 coordinate system, so % positions land on the real
-          painted platforms on every screen size. */}
-      <div className="island-stage" aria-hidden="false">
-        <div className="island-stage__frame">
-          <img
-            className="island-stage__bg scene-full-image"
-            src={world.background}
-            alt={world.title}
-            decoding="async"
-            // @ts-expect-error — fetchPriority is supported by all modern browsers
-            fetchpriority="high"
-          />
+      {/* Full-viewport background — lives OUTSIDE the aspect-locked stage so it
+          always covers the whole screen (object-cover, never letterboxed).
+          This is what kills the white borders during the entrance zoom and
+          when navigating back to the worlds map. */}
+      <img
+        /* Reveal only when BOTH the background AND the island art are ready, so
+           the island never pops in a frame after the bg/platforms. */
+        className={`absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-300 ${bgReady && (!islandImgPath || islandImgSize) ? "animate-island-zoom" : "opacity-0"}`}
+        src={islandBgPath}
+        alt={world.title}
+        decoding="async"
+        // @ts-expect-error — fetchPriority is supported by all modern browsers
+        fetchpriority="high"
+      />
 
-          <section className="level-map" aria-label="Niveles del mundo" ref={mapRef}>
-            {EDITOR_AVAILABLE && editorOn && (
+      {/* Aspect-ratio-locked stage: the island PNG and every level node share
+          the same 16:9 coordinate system, so % positions land on the real
+          painted platforms on every screen size. */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="false">
+        <div className="relative w-full h-full">
+          {/* Island PNG — only shown when separate island art is available */}
+          {islandContainer && (
+            <div
+              style={{
+                position: "absolute",
+                left: `${islandContainer.left}px`,
+                top: `${islandContainer.top}px`,
+                width: `${islandContainer.w}px`,
+                height: `${islandContainer.h}px`,
+                zIndex: 5,
+                pointerEvents: "none",
+              }}
+            >
+              <img
+                src={islandImgPath}
+                alt=""
+                decoding="async"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  userSelect: "none",
+                }}
+              />
+            </div>
+          )}
+
+          {/* Level map — always renders. Matches island container bounds when
+              available, otherwise fills the viewport (old background approach). */}
+          <section
+            className="absolute inset-0 pointer-events-none z-10"
+            aria-label="Niveles del mundo"
+            ref={mapRef}
+            style={
+              islandContainer
+                ? {
+                    position: "absolute",
+                    left: `${islandContainer.left}px`,
+                    top: `${islandContainer.top}px`,
+                    width: `${islandContainer.w}px`,
+                    height: `${islandContainer.h}px`,
+                  }
+                : undefined
+            }
+          >
+            {editorAvailable() && editorOn && (
               <LevelPositionEditor
                 worldSlug={world.slug}
                 positions={activePositions}
@@ -657,20 +609,29 @@ export function IslandDetailPage() {
               />
             )}
 
-            <img
-              className="level-ship"
-              src={shipAsset}
-              alt="Nave de los estudiantes en el nivel actual"
-              decoding="async"
-              loading="lazy"
-              style={posForCss({ ...currentPosition, y: currentPosition.y - 13 } as LevelPosition)}
-            />
+            {/* Ship/avatar. Anchored by its BOTTOM-CENTRE just above the current
+                level node (translate -50%,-100%), so making it bigger grows it
+                UPWARD and it never covers the node it sits on. The bob animation
+                lives on the inner <img> so it doesn't fight the positioning
+                transform on the wrapper. */}
+            <span
+              className="absolute z-20 pointer-events-none"
+              style={{ left: `${currentPosition.x}%`, top: `${currentPosition.y - 3}%`, transform: "translate(-50%,-100%)" }}
+            >
+              <img
+                className="block w-[clamp(5rem,18vmin,16rem)] animate-ship-hover"
+                src={shipAsset}
+                alt="Nave de los estudiantes en el nivel actual"
+                decoding="async"
+                loading="lazy"
+              />
+            </span>
 
             {/* Track hover for pressed button state (disabled during editor). */}
             {world.levels.map((level, index) => {
               const isSelected = index === selectedIndex;
               const position = activePositions[index];
-              const cssPos = posForCss(position);
+              const cssPos = { left: `${position.x}%`, top: `${position.y}%` };
               const isCompleted = level.state === "Completado";
               const isBlocked = level.state === "Bloqueado";
 
@@ -703,17 +664,36 @@ export function IslandDetailPage() {
 
               /* Image transform: delta from base (0 = as rendered). */
               const imgTransform = hasDelta ? transform3d(deltaRx, deltaRy, deltaRz, deltaScale, effPersp) : undefined;
-              /* Number transform: effective absolute (base + delta) so the flat text
-                 matches the pre-rendered 3D look of the artwork. */
-              const numTransform = transform3d(effRx, effRy, effRz, effScale, effPersp);
+              /* Number transform: fixed base perspective (matches the pre-rendered
+                 image) + effective scale/perspective. No dynamic rotate deltas. */
+              const numTransform = `perspective(${effPersp}px) rotateX(${PERSPECTIVE_BASE.rotateX}deg) rotateY(${PERSPECTIVE_BASE.rotateY}deg) rotateZ(${PERSPECTIVE_BASE.rotateZ}deg) scale(${effScale})`;
 
-              const numSize = `${1.2 * numScale}rem`;
+              const numSize = `${2.3 * numScale}vmin`;
+
+              /* State-driven visual classes for the node button. */
+              const stateClass =
+                level.state === "Completado"
+                  ? "drop-shadow-[0_0_8px_rgba(89,205,183,0.55)]"
+                  : level.state === "Bloqueado"
+                    ? "opacity-60 saturate-50"
+                    : "";
 
               return (
                 <button
                   key={level.title}
                   type="button"
-                  className={`level-node level-node--${level.state.toLowerCase()} ${isSelected ? "is-selected" : ""} ${editorOn ? "is-editable" : ""} ${dragIndex === index ? "is-dragging" : ""} ${editorOn && editorSelectedIndex === index ? "is-editor-selected" : ""}`}
+                  data-level-node=""
+                  className={[
+                    "absolute -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto",
+                    "w-[clamp(3rem,9.5vmin,9rem)] h-[clamp(3rem,9.5vmin,9rem)]",
+                    "rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-sky",
+                    "transition-opacity duration-150",
+                    isSelected ? "animate-platform-pulse" : "",
+                    editorOn ? "cursor-move" : "cursor-pointer",
+                    dragIndex === index ? "opacity-70 cursor-grabbing" : "",
+                    editorOn && editorSelectedIndex === index ? "ring-2 ring-accent ring-offset-2 ring-offset-transparent" : "",
+                    stateClass,
+                  ].filter(Boolean).join(" ")}
                   style={cssPos}
                   onClick={() => handleNodeClick(index)}
                   onDoubleClick={() => handleNodeDoubleClick(index)}
@@ -726,18 +706,18 @@ export function IslandDetailPage() {
                 >
                   {/* Image layer: only the delta from base. */}
                   <span
-                    className={`level-node__layer ${hasDelta ? "level-node__layer--custom" : ""}`}
+                    className="absolute inset-0"
                     style={hasDelta ? { transform: imgTransform } : undefined}
                   >
                     <img
-                      className={`level-node__img ${!editorOn && hoveredIndex === index ? "level-node__img--hidden" : ""}`}
+                      className={`w-full h-full object-contain ${!editorOn && hoveredIndex === index ? "hidden" : ""}`}
                       src={assets.levelButton}
                       alt=""
                       decoding="async"
                       draggable={false}
                     />
                     <img
-                      className={`level-node__img level-node__img--pressed ${!editorOn && hoveredIndex === index ? "" : "level-node__img--hidden"}`}
+                      className={`w-full h-full object-contain ${!editorOn && hoveredIndex === index ? "" : "hidden"}`}
                       src={assets.levelButtonPressed}
                       alt=""
                       decoding="async"
@@ -745,37 +725,42 @@ export function IslandDetailPage() {
                     />
                   </span>
 
-                  {/* Number layer: base + delta composed. Uses the same delta as the
-                      image layer but adds the fixed base so the number matches the
-                      pre-rendered perspective. z-index keeps it always on top. */}
-                  <span className="level-node__layer level-node__layer--custom level-node__layer--top" style={{ transform: numTransform }}>
+                  {/* Number layer: fixed base perspective + scale. */}
+                  <span className="absolute inset-0 flex items-center justify-center" style={{ transform: numTransform }}>
                     <span
-                      className={`level-node__number ${isCompleted ? "level-node__number--completed" : ""} ${isBlocked ? "level-node__number--blocked" : ""}`}
+                      className={[
+                        "font-display font-black select-none",
+                        isCompleted ? "text-mint" : "",
+                        isBlocked ? "text-muted" : "",
+                        !isCompleted && !isBlocked ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" : "",
+                      ].filter(Boolean).join(" ")}
                       style={{ fontSize: numSize }}
                     >
                       {level.levelNumber}
                     </span>
-                    {isCompleted && (
-                      <span className="level-node__check" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      </span>
-                    )}
-                    {isBlocked && (
-                      <span className="level-node__lock" aria-hidden="true">
-                        <Lock size={14} />
-                      </span>
-                    )}
-                    {isCompleted && (
-                      <span className="level-node__rating">
-                        {Array.from({ length: 3 }).map((_, i) => (
-                          <Star key={i} size={14} fill={i < level.stars ? "currentColor" : "none"} />
-                        ))}
-                      </span>
-                    )}
                   </span>
 
+                  {/* Status indicators — no perspective, positioned flat on the button. */}
+                  {isCompleted && (
+                    <span className="absolute -top-1 -right-1 text-mint drop-shadow-sm" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </span>
+                  )}
+                  {isBlocked && (
+                    <span className="absolute -top-1 -right-1 text-rose bg-white/70 rounded-full p-0.5" aria-hidden="true">
+                      <Lock size={14} />
+                    </span>
+                  )}
+                  {isCompleted && (
+                    <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-0.5 text-yellow-400 drop-shadow-sm">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <Star key={i} size={14} fill={i < level.stars ? "currentColor" : "none"} />
+                      ))}
+                    </span>
+                  )}
+
                   {editorOn && (
-                    <span className="level-node__coord" aria-hidden="true">
+                    <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[9px] text-white bg-black/60 px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none" aria-hidden="true">
                       {position.x} · {position.y}
                       {hasDelta ? `  s${storedScale.toFixed(1)}  rx${storedRx} ry${storedRy} rz${storedRz}` : ""}
                     </span>
@@ -788,27 +773,37 @@ export function IslandDetailPage() {
                 Opens on tap, closes on tap-outside. Hidden while editing. */}
             {!editorOn && popoverOpen && (
               <div
-                className="level-popover"
-                data-place={popoverRight ? "right" : "left"}
-                data-v={popoverVBand}
+                data-level-popover=""
+                className="absolute z-30 pointer-events-auto animate-popover-in"
                 style={{
-                  ...posForCss(selectedPos),
+                  left: `${selectedPos.x}%`,
+                  top: `${selectedPos.y}%`,
                   transform: `translate(${popoverTx}, ${popoverTy})`,
                 }}
               >
-                <div className="level-popover__card">
-                  <span className="level-popover__tail" aria-hidden="true" />
-                  <div className="level-popover__top">
-                    <strong className="level-popover__num">{selectedLevel.title}</strong>
-                    <span className={`status-pill status-pill--${popoverState}`}>{selectedLevel.state}</span>
+                <div className="glass-card p-4 rounded-2xl min-w-[14rem] relative">
+                  {/* Tail — rotated square pointing toward the node */}
+                  <span
+                    className={[
+                      "absolute w-3 h-3 glass-card rotate-45",
+                      popoverRight ? "-left-1.5" : "-right-1.5",
+                      popoverVBand === "top" ? "top-3" : popoverVBand === "bottom" ? "bottom-3" : "top-1/2 -translate-y-1/2",
+                    ].filter(Boolean).join(" ")}
+                    aria-hidden="true"
+                  />
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <strong className="font-display font-bold text-text text-base">{selectedLevel.title}</strong>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${STATUS_PILL_CLASSES[popoverState] ?? "bg-accent text-white"}`}>
+                      {selectedLevel.state}
+                    </span>
                   </div>
-                  <h3 className="level-popover__name">{selectedLevel.name}</h3>
-                  <span className="level-popover__stars" aria-hidden="true">
+                  <h3 className="text-sm text-muted mb-2">{selectedLevel.name}</h3>
+                  <span className="flex gap-0.5 text-yellow-400 mb-3" aria-hidden="true">
                     {Array.from({ length: 3 }).map((_, i) => (
                       <Star key={i} size={15} fill={i < selectedLevel.stars ? "currentColor" : "none"} />
                     ))}
                   </span>
-                  <Button className="level-popover__cta" onClick={openLevel}>
+                  <Button className="w-full" onClick={openLevel}>
                     {selectedLevel.state === "Bloqueado" ? (
                       <><Lock size={17} /> <span>Bloqueado</span></>
                     ) : selectedLevel.state === "Completado" ? (
@@ -824,15 +819,23 @@ export function IslandDetailPage() {
         </div>
       </div>
 
-      <button type="button" className="world-back-button" onClick={() => navigate("/mundos")}>
-        <ArrowLeft size={23} />
-        <span>Volver a mundos</span>
+      {/* Back to worlds map */}
+      <button
+        type="button"
+        className="fixed top-4 left-4 z-30 glass-surface rounded-xl px-3 py-2 flex items-center gap-2 text-text font-bold shadow-card hover:brightness-105 transition cursor-pointer animate-hud-in"
+        onClick={() => navigate("/mundos")}
+      >
+        <ArrowLeft size={20} />
+        <span className="text-[clamp(1rem,1.8vmin,1.35rem)]">Volver a mundos</span>
       </button>
 
-      {EDITOR_AVAILABLE && (
+      {/* Contador de estrellas de la cuenta (siempre visible, arriba a la derecha). */}
+      <StarCounter className="fixed top-4 right-4 z-30" />
+
+      {editorAvailable() && (
         <button
           type="button"
-          className={`level-editor-toggle ${editorOn ? "is-on" : ""}`}
+          className={`fixed bottom-4 left-4 z-30 glass-surface rounded-xl px-3 py-2 flex items-center gap-2 text-text font-bold shadow-card hover:brightness-105 transition cursor-pointer ${editorOn ? "bg-accent/20 ring-2 ring-accent" : ""}`}
           onClick={() => setEditorOn((v) => !v)}
           title="Editor de posiciones de niveles (solo dev)"
         >
@@ -843,19 +846,19 @@ export function IslandDetailPage() {
 
       {/* Compact floating island header — sits in the top-safe area and never
           covers the level nodes. Replaces the old large title/progress panel. */}
-      <header className="island-hud">
-        <span className="island-hud__badge">
+      <header className="fixed top-0 left-1/2 -translate-x-1/2 z-20 glass-strong rounded-b-2xl px-5 py-3 flex items-center gap-4 shadow-card animate-hud-in max-w-[92vw]">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/20 text-violet-700 font-bold text-[clamp(0.95rem,1.7vmin,1.3rem)] whitespace-nowrap">
           <Star size={15} fill="currentColor" />
           Mundo {worldNumber}
         </span>
-        <div className="island-hud__body">
-          <h1>{world.title}</h1>
-          <div className="island-hud__meta">
-            <span className="island-hud__stars">
+        <div className="flex flex-col min-w-0">
+          <h1 className="font-display font-black text-text text-[clamp(1.2rem,2.3vmin,1.8rem)] truncate">{world.title}</h1>
+          <div className="flex items-center gap-3 text-[clamp(0.95rem,1.7vmin,1.3rem)]">
+            <span className="inline-flex items-center gap-1 text-yellow-500 font-bold">
               <Star size={14} fill="currentColor" />
               {starProgress.earnedStars}/{starProgress.totalStars}
             </span>
-            <span className="island-hud__hint">
+            <span className="text-muted">
               {!isLastWorld && !starProgress.isUnlockedNext
                 ? `Faltan ${Math.max(0, starProgress.requiredStars - starProgress.earnedStars)}★ para el próximo mundo`
                 : "Tocá un nivel para jugar"}
@@ -865,7 +868,7 @@ export function IslandDetailPage() {
         {canGoToNextWorld && nextWorld && (
           <button
             type="button"
-            className="island-hud__next"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-white font-bold shadow-btn animate-next-pulse hover:brightness-105 transition cursor-pointer whitespace-nowrap"
             onClick={() => navigate(nextWorld.route)}
             aria-label={`Ir al siguiente mundo: ${nextWorld.title}`}
             title={`Ir a ${nextWorld.title}`}
@@ -875,11 +878,6 @@ export function IslandDetailPage() {
           </button>
         )}
       </header>
-
-      <button type="button" className="profile-bubble" aria-label="Mi cuenta" onClick={() => navigate("/mi-cuenta")}>
-        <UserRound size={25} />
-        <span>Perfil</span>
-      </button>
 
       <Toast message={message} />
     </main>

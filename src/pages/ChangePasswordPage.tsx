@@ -46,43 +46,61 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <main className="login-page page-fade" style={{ backgroundImage: `url("${assets.loginBg}")` }}>
-      <section className="login-card change-pass-card" aria-label="Cambiar contraseña">
-        <span className="login-card__halo" aria-hidden="true" />
-        <div className="login-card__copy">
-          <span className="change-pass-card__badge"><KeyRound size={20} /></span>
-          <h1>Creá tu contraseña</h1>
-          <p>Ingresaste con una clave temporal. Elegí una contraseña nueva para continuar.</p>
+    <main
+      className="relative min-h-dvh overflow-hidden bg-cover bg-center flex items-center justify-center animate-page-fade"
+      style={{ backgroundImage: `url("${assets.loginBg}")` }}
+    >
+      <section
+        className="glass-card-smooth relative w-[min(28rem,92vw)] mx-auto my-[7vh] p-8 pt-12 text-center flex flex-col items-center gap-6 animate-card-in z-20"
+        aria-label="Cambiar contraseña"
+      >
+        <span
+          className="absolute -inset-8 -z-10 rounded-[2rem] bg-[radial-gradient(circle_at_50%_40%,rgba(51,199,240,0.22),transparent_60%)] blur-3xl animate-halo-drift pointer-events-none"
+          aria-hidden="true"
+        />
+        <div className="text-center flex flex-col items-center gap-2">
+          <span className="grid place-items-center w-14 h-14 rounded-full bg-gradient-to-br from-accent-sky to-accent-strong text-white shadow-btn mb-1">
+            <KeyRound size={20} />
+          </span>
+          <h1 className="font-display text-2xl font-bold text-text">Creá tu contraseña</h1>
+          <p className="text-muted text-sm">
+            Ingresaste con una clave temporal. Elegí una contraseña nueva para continuar.
+          </p>
         </div>
 
-        <form onSubmit={submit} className="login-form">
-          <label className="field">
-            <span>Nueva contraseña</span>
+        <form onSubmit={submit} className="flex flex-col gap-4 w-full">
+          <label className="flex flex-col gap-1.5 text-left">
+            <span className="text-sm font-bold text-text">Nueva contraseña</span>
             <input
               type="password"
               autoComplete="new-password"
               placeholder="Mínimo 6 caracteres"
               value={next}
               onChange={(e) => setNext(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-white/70 border border-white/60 text-text font-semibold placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent-sky/40 focus:bg-white/90 transition-all"
             />
           </label>
-          <label className="field">
-            <span>Repetir contraseña</span>
+          <label className="flex flex-col gap-1.5 text-left">
+            <span className="text-sm font-bold text-text">Repetir contraseña</span>
             <input
               type="password"
               autoComplete="new-password"
               placeholder="Repetí la contraseña"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-white/70 border border-white/60 text-text font-semibold placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent-sky/40 focus:bg-white/90 transition-all"
             />
           </label>
 
-          <button type="submit" className="button button--sm change-pass-card__submit">
+          <button
+            type="submit"
+            className="inline-flex items-center justify-center gap-1.5 py-3 px-5 rounded-xl font-extrabold text-white cursor-pointer bg-gradient-to-br from-accent-sky to-accent-strong shadow-btn transition-transform hover:scale-[1.02] active:scale-[0.98]"
+          >
             <Sparkles size={18} /> Guardar y continuar
           </button>
           <button
             type="button"
-            className="change-pass-card__cancel"
+            className="inline-flex items-center justify-center py-3 px-5 rounded-xl font-bold cursor-pointer bg-white/75 text-text shadow hover:bg-white/90 transition-transform hover:scale-[1.01] active:scale-[0.98]"
             onClick={() => {
               void logout();
               navigate("/login", { replace: true });
@@ -91,7 +109,7 @@ export function ChangePasswordPage() {
             Cancelar y cerrar sesión
           </button>
 
-          <p className="login-card__safety">
+          <p className="flex items-center justify-center gap-1.5 text-xs text-muted/70 font-semibold mt-1">
             <ShieldCheck size={15} aria-hidden="true" />
             Tu contraseña no se comparte con nadie
           </p>

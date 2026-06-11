@@ -225,4 +225,161 @@ order.
 - Server-side monthly partition rotation cron (the SQL exists; needs
   a cron container or a host cron line to call it).
 
+## Phase G — Audit fixes + admin inspector + UX/permissions pass (2026-06-09/10)
+
+- `api/src/routes/users.ts` — GET /api/users bloqueado para alumno/profesor
+  (leak de emails); PATCH valida sede destino y curso destino, soporta
+  `username`, sincroniza `class_students` al cambiar de curso y maneja 23505;
+  change-password mínimo 6. Probado: tsc + smoke en prod.
+- `api/src/routes/academicYears.ts` — requireStaff bloquea alumno/profesor.
+- `api/src/routes/invitations.ts` — aceptar una invitación no puede degradar
+  una cuenta superadmin/admin-general existente (409).
+- `api/src/routes/classes.ts` — POST asigna el año lectivo ACTIVO de la sede
+  al crear el curso (antes quedaba NULL y el filtro por año lo escondía:
+  "no puedo entrar a cursos nuevos"); el listado de cursos del profesor ya no
+  exige sede (profes multi-sede o sin sede ven sus cursos igual).
+- `api/src/server.ts` — setErrorHandler movido ANTES de las rutas (Fastify no
+  lo hereda hacia atrás: los 401/403 salían con el shape default en inglés);
+  alias público `/api/health`; hook onRoute para el inspector.
+- `api/src/routes/inspector.ts` (nuevo) — GET /api/admin/inspector
+  (superadmin/admin-general/admin-sede): estado API+DB, env enmascaradas,
+  rutas vivas con ejemplos, ring-buffer de errores, auditoría reciente.
+- `src/pages/admin/ApiInspectorPage.tsx` (nuevo) + ruta `/admin/api` protegida.
+- `src/hooks/useAuth.tsx` — completePasswordChange llama de verdad a
+  `/api/users/:id/change-password` (antes hacía `api.logout()` placeholder).
+- `CoursesListPage` / `StudentsListPage` — los filtros de año tratan los
+  cursos sin año como vigentes y muestran a los alumnos sin curso; edición de
+  alumno ampliada (nombre + usuario + curso, con sincronización de roster).
+- `AdminGeneralPage` — el formulario de sede pasa de incrustado a modal; la
+  edición de admin de sede gana el campo usuario.
+- Login/Worlds/Island — revertida la tipografía fluida vmin del login (volvió
+  la versión anterior), robots más grandes y más arriba, zoom general
+  reducido (islas, nave, nodos, HUD), fondo levemente más brillante (base
+  `#f1effb` + velo blanco en `.login-aura`), botón secundario más discreto.
+- Borrados: `src/pages/SiteAdminPage.tsx`, `src/utils/emailService.ts`,
+  `docs/ADMIN_SEDE_ARCHITECTURE.md` (spec vieja, ya implementada).
+
+## Phase H — Crash de /admin-sede, modales con blur real, marca (2026-06-10)
+
+- **Crash crítico**: `/admin-sede/cursos` y `/admin-sede/alumnos` montaban en
+  gris SIEMPRE — las páginas llaman `useAcademicYear()` en su propio cuerpo,
+  fuera del `AcademicYearProvider` que vivía dentro de `SedeShell`, y el hook
+  tira si no hay provider. Fix: provider movido a un layout de ruta
+  (`SedeAcademicYearLayout` en `SedeShell.tsx`, montado en App.tsx sobre TODO
+  el grupo admin-sede) y quitado de SedeShell. Verificado en preview.
+- `ErrorBoundary` global (App) — un crash de render ya nunca deja la pantalla
+  gris muda: tarjeta amigable con Recargar / Ir al inicio.
+- **Modales**: nuevo sistema `.modal-overlay` (oscurece + `backdrop-filter:
+  blur(16px)` sobre TODO el fondo) + `.modal-card` (glass más opaco) aplicado
+  a todos los modales de admin (AdminGeneral ×5, Cursos, Alumnos ×2, Docentes,
+  CourseDetail, CloseYearWizard). Lo de atrás ya no compite con el modal.
+- **Docentes**: asignar a un curso un profesor SIN sede ahora adopta la sede
+  del curso (invitaciones aceptadas sin sede quedaban inasignables con 403
+  "de otra sede"). POST /api/sedes crea el año lectivo activo del año
+  calendario (las sedes nuevas no tenían año → cursos sin año).
+- **Marca**: el "T" + wordmark en tipografía body se reemplaza por el robot
+  (favicon-256) + "TYPELY" en font-display con gradiente de marca, en
+  `DashboardShell` y `Brand`.
+- DataTable: header con tinte de gradiente, zebra suave y hover celeste.
+  Hero de los dashboards con hairline de gradiente superior.
+- LoginPage: `fetchpriority` → `fetchPriority` (warning de React 19).
+
+## Phase I — Gameplay sin recortes, blur Apple, ruta animada (2026-06-10)
+
+- WorldsPage: el gradiente de la ruta cicla los colores de marca vía SMIL
+  (como el texto de bienvenida); islas más grandes (`min(21vw,34vh)`,
+  tope 19.5rem).
+- GameplayPage: "Escuchar consigna" pasa a ícono arriba a la derecha (junto
+  a Reintentar) — el botón grande de abajo empujaba el teclado fuera de
+  pantalla sin F11. TTS explícito: "Palabra a escribir: ventana", "Letra
+  que toca: G", "Frase a escribir: …". Robots anclados al suelo (bottom)
+  con flotación reducida a ±4px (ya no parecen volar — aplica también a
+  login y mundos). Vista de "lo que estás escribiendo" con min-height y
+  más contraste. Verificado por geometría en preview a 1366×620: teclado
+  completo y tipeo visibles, sin recortes.
+- COMPACT-HEIGHT PASS al final de global.css: las teclas (.gp-key) se
+  achican a max-height 720/640/560 para que el teclado entre siempre.
+- Modales estilo Apple: .modal-overlay difumina fuerte (blur 22px) y casi
+  no oscurece; .modal-card ya NO sube la opacidad (solo blur del vidrio) —
+  liquid glass legible sin opacar. Aplicado también al modal de nivel
+  completado (Gameplay) y al modal del modo demo (Login).
+
+## Phase J — blur de modales (causa raíz), impersonación read-only (2026-06-10)
+
+- **CAUSA RAÍZ del "difuminado no funciona" en popups**: `.animate-page-fade`
+  animaba `translateY` con `fill-mode: both`, dejando un `transform` PERMANENTE
+  en el contenedor raíz del dashboard. Un ancestro con `transform` DESACTIVA el
+  `backdrop-filter` de los descendientes en Chrome → los overlays oscurecían
+  pero no difuminaban. Fix: `@keyframes pageFade` ahora anima SOLO opacity.
+  Diagnosticado midiendo `getComputedStyle` en el preview (el ancestro tenía
+  `matrix(1,0,0,1,0,0)`); confirmado visualmente que al quitar el transform el
+  blur aparece.
+- Blur de modales ajustable en vivo desde /editor-glass: variables
+  `--modal-blur` / `--modal-tint`, dos sliders nuevos + un "popup de ejemplo".
+  `applyStoredGlass()` ahora se llama en main.tsx (antes no corría en boot).
+- WorldsPage: islas más grandes (`min(24vw,38vh)`, tope 22rem) y las
+  bloqueadas más apagadas (`grayscale saturate-0 opacity-50 brightness-90`).
+- **Impersonación en MODO LECTURA (F8)** — soporte avalado legalmente, 30 min:
+  - `api/src/routes/support.ts`: `POST /api/admin/impersonate` con TRIPLE
+    verificación (contraseña del admin + frase exacta "ACCEDER EN MODO LECTURA"
+    + aceptación legal). Emite un access token con claim `readOnly` y SIN
+    refresh cookie (muere solo a los 30 min). Valida alcance (RBAC por sede,
+    nunca a un superadmin). Auditado (`impersonate_start`).
+  - `server.ts`: preHandler global que rechaza TODA mutación (no-GET, salvo
+    auth logout/refresh) cuando el token es `readOnly`.
+  - `auth.ts`: claims `readOnly` + `act` (actor real); `signAccessToken` con
+    TTL configurable.
+  - Frontend: `ImpersonateModal` (triple auth) en AdminGeneral (admins),
+    StudentsListPage y TeachersListPage; `ImpersonationBanner` fijo global con
+    cuenta regresiva que al expirar restaura al admin; `useAuth` gana
+    `impersonation` + `startImpersonation`/`stopImpersonation`; el cliente API
+    desactiva el refresh silencioso en modo lectura para no restaurar al admin.
+- `.env.local` (gitignored) creado con SUPERADMIN admin/admin para desarrollo.
+
+## Phase K — el blur SÍ rompía en prod: Lightning CSS (2026-06-10)
+
+- **2º causa raíz del blur** (la de Phase J era real pero parcial): escribir
+  `backdrop-filter: blur(var(--x))` a mano hace que el Lightning CSS de
+  Tailwind v4 ELIMINE la propiedad estándar en el build de prod y deje solo
+  `-webkit-backdrop-filter` (que el Chrome del usuario no aplica). Por eso en
+  el preview dev (CSS sin minificar) difuminaba y en producción no — en NINGÚN
+  modal ni superficie glass. Diagnosticado curleando el CSS desplegado y
+  grepeando: solo había `-webkit-`.
+- Fix: TODAS las utilidades glass (`glass`, `glass-strong`, `glass-card`,
+  `glass-card-smooth`, `glass-surface`) y `.modal-overlay` ahora hacen el blur
+  con `@apply backdrop-blur-[var(--glass-blur)] backdrop-saturate-[...]`
+  (utilidad nativa de Tailwind), que emite el `backdrop-filter` estándar
+  (`var(--tw-backdrop-blur,) …`). Verificado en el bundle: 13 ocurrencias del
+  estándar; computed `blur(22px)`/`blur(48px)` en overlay/card. Ver memoria
+  [[backdrop-filter-transform-gotcha]].
+- `browserslist` moderno agregado en package.json.
+
+## Phase L — admins simples, blur focalizado, teclado 3D, SEO (2026-06-10)
+
+- **Admins de sede, flujo simple**: "Invitar admin de sede" = un solo modal con
+  email (+nombre opcional) + sede → la invitación se envía sola. Eliminado el
+  bloque usuario/contraseña manual y el formulario inline duplicado. La lista
+  de invitaciones muestra solo las EN CURSO (pendiente/enviada) — las
+  aceptadas ya aparecen arriba como cuentas reales.
+- **Consistencia de invitaciones (API)**: POST /api/invitations rechaza con
+  409 si el email ya pertenece a una cuenta superadmin/admin-general o a una
+  cuenta con el mismo rol (la causa del "accepted" fantasma: se había invitado
+  al email del propio superadmin).
+- **Blur focalizado**: .modal-overlay ahora lleva una mask-image radial — el
+  difuminado se concentra detrás del componente y se desvanece hacia los
+  bordes (profundidad de campo) en vez de empañar TODA la pantalla; tinte
+  bajado a 0.10 (menos velo gris). Defaults del editor actualizados.
+- **Teclado del juego**: keycaps con profundidad 3D (borde inferior grueso en
+  el tono de la fila, brillo superior inset, sombra en capas), hover lift,
+  efecto de presión al click, filas con más aire y teclado levantado del borde
+  (pb-6). La tecla objetivo brilla con sombra azul propia.
+- **SEO/Lighthouse**: public/robots.txt (antes el fallback SPA devolvía HTML)
+  + sitemap.xml; title descriptivo, meta description, Open Graph completo y
+  Twitter card en index.html; source maps en el build (vite sourcemap);
+  headers de seguridad en nginx.conf: HSTS, X-Frame-Options, COOP
+  (same-origin-allow-popups por Google Sign-In), nosniff, Referrer-Policy,
+  Permissions-Policy y CSP completa (self + accounts.google.com + Google
+  Fonts + data:/blob: para fotos de sede). Trusted Types NO se activó:
+  rompería React (require-trusted-types-for bloquea innerHTML del runtime).
+
 

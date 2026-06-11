@@ -1,6 +1,7 @@
 import { ArrowLeft, LogOut, Medal, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/common/Button";
+import { StarCounter } from "../components/common/StarCounter";
 import { useAuth } from "../hooks/useAuth";
 import { assets } from "../utils/assets";
 import { getUserContext } from "../utils/userContext";
@@ -37,6 +38,8 @@ export function AccountPage() {
 
   return (
     <main className="student-soft-page page-fade" style={{ backgroundImage: `url("${assets.homeBg}")` }}>
+      {/* Contador de estrellas de la cuenta (siempre visible, arriba a la derecha). */}
+      <StarCounter className="fixed top-4 right-4 z-30" />
       <header className="student-page-header">
         <Button variant="secondary" onClick={() => navigate("/mundos")}>
           <ArrowLeft size={20} />

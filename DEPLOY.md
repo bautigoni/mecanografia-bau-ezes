@@ -1,4 +1,14 @@
-# Deploying TYPELY (Mecanografia) on Oracle VPS
+# Deploying TYPELY on Oracle VPS
+
+> **Estado real del VPS actual (`bauhub`, 168.75.68.75):** el repo vive en
+> **`/opt/apps/typely`** (no `/typely`) y existe un
+> **`docker-compose.override.yml` local (NO commiteado)** que (1) publica el
+> API en **`127.0.0.1:3007`** porque el 3006 lo ocupa otra app del host
+> (guessify) y (2) mantiene vivo el contenedor `typely-invite-mailer`
+> (`Dockerfile.mailer`, puerto 8787) para `/api/invitations/send`. El
+> Caddyfile rutea `/api/invitations/send`→8787, `/api/*`→3007 y el resto→3005.
+> No borrar ese override ni los backups `.env.bak-*` del VPS. Para smoke
+> tests locales en ese host usá `curl http://127.0.0.1:3007/health`.
 
 The app ships as **three containers** behind Caddy:
 
@@ -21,15 +31,15 @@ The VPS must already have:
 - Docker Engine + the `docker compose` plugin
 - Caddy (or any reverse proxy) running on the host
 - Outbound network access to `registry-1.docker.io` and `npmjs.org`
-- A DNS A/AAAA record for `mecanografia.bauhub.online` pointing to the VPS
+- A DNS A/AAAA record for `typely.bauhub.online` pointing to the VPS
 
 ## 1. Clone the repository
 
 ```bash
-sudo mkdir -p /opt/apps
-sudo chown "$USER":"$USER" /opt/apps
-git clone <your-git-url> /opt/apps/mecanografia
-cd /opt/apps/mecanografia
+sudo mkdir -p /typely
+sudo chown "$USER":"$USER" /typely
+git clone <your-git-url> /typely
+cd /typely
 ```
 
 ## 2. Provision the secrets
@@ -98,7 +108,7 @@ You should see `HTTP/1.1 200 OK` from both. A follow-up
 Open the host Caddyfile (typically `/etc/caddy/Caddyfile`) and append:
 
 ```caddy
-mecanografia.bauhub.online {
+typely.bauhub.online {
     # Static SPA
     reverse_proxy 127.0.0.1:3005
 
@@ -128,8 +138,8 @@ Caddy will request a Let's Encrypt certificate on first hit. Verify from
 outside the VPS:
 
 ```bash
-curl -I https://mecanografia.bauhub.online
-curl -I https://mecanografia.bauhub.online/api/health
+curl -I https://typely.bauhub.online
+curl -I https://typely.bauhub.online/api/health
 ```
 
 `HTTP/2 200` for both confirms TLS + proxy are both working.
@@ -137,7 +147,7 @@ curl -I https://mecanografia.bauhub.online/api/health
 ## 7. Updating the app
 
 ```bash
-cd /opt/apps/mecanografia
+cd /typely
 git pull
 docker compose up -d --build
 ```
@@ -167,7 +177,7 @@ If a release misbehaves, roll back by checking out the previous commit
 and rebuilding:
 
 ```bash
-cd /opt/apps/mecanografia
+cd /typely
 git log --oneline -n 5            # find the last good commit
 git checkout <commit-sha>
 docker compose up -d --build
@@ -189,7 +199,7 @@ docker compose exec -T db pg_dump -U typely -d typely \
 Wire that into a cron at 03:00 UTC (low traffic):
 
 ```cron
-0 3 * * * cd /opt/apps/mecanografia && \
+0 3 * * * cd /typely && \
   /usr/bin/docker compose exec -T db pg_dump -U typely -d typely \
   | gzip > /opt/backups/typely-$(date +\%Y\%m\%d).sql.gz
 ```

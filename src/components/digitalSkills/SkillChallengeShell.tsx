@@ -52,42 +52,76 @@ export function SkillChallengeShell({
       : challenge.instruction);
 
   return (
-    <main className="skill-shell page-fade" data-category={challenge.category} data-difficulty={challenge.difficulty}>
-      <header className="skill-shell__header">
-        <div className="skill-shell__crumbs">
-          <span className="skill-shell__kicker">Nivel {challenge.level}</span>
-          <strong>{challenge.goal}</strong>
+    <main
+      className="grid grid-rows-[auto_auto_1fr_auto] h-dvh animate-page-fade"
+      data-category={challenge.category}
+      data-difficulty={challenge.difficulty}
+    >
+      {/* ── Header ── */}
+      <header className="flex items-center justify-between gap-4 p-4 glass-strong border-b border-white/40">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-accent-strong">
+            Nivel {challenge.level}
+          </span>
+          <strong className="text-text text-lg font-display font-extrabold">
+            {challenge.goal}
+          </strong>
         </div>
         {onExit && (
-          <button type="button" className="skill-shell__exit" onClick={onExit} aria-label="Salir">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-muted hover:bg-rose/10 hover:text-rose transition cursor-pointer"
+            onClick={onExit}
+            aria-label="Salir"
+          >
             ✕ Salir
           </button>
         )}
       </header>
 
-      <p className="skill-shell__instruction">{challenge.instruction}</p>
+      {/* ── Instruction ── */}
+      <p className="px-4 pt-3 pb-1 text-sm text-muted font-bold animate-soft-hint-in">
+        {challenge.instruction}
+      </p>
 
-      <section className="skill-shell__stage" aria-label="Escena de la actividad">
+      {/* ── Stage (scene slot) ── */}
+      <section className="flex-1 p-4" aria-label="Escena de la actividad">
         {children}
       </section>
 
-      <footer className="skill-shell__footer" aria-live="polite">
+      {/* ── Footer: feedback + metrics + actions ── */}
+      <footer className="flex flex-col gap-3 p-4 glass-strong border-t border-white/40" aria-live="polite">
+        {/* Feedback banner */}
         <div
-          className={`skill-shell__feedback skill-shell__feedback--${status}`}
+          className={`rounded-xl px-4 py-3 text-sm font-bold text-center transition-all duration-200 ${
+            status === "success"
+              ? "text-emerald-900"
+              : status === "error"
+              ? "text-orange-900"
+              : "text-text"
+          }`}
           style={{ background: STATUS_TONES[status] }}
         >
           {message}
         </div>
 
-        {metrics && (
-          <ul className="skill-shell__metrics" aria-label="Métricas">
-            <li>Intentos: <strong>{metrics.attempts}</strong></li>
-            <li>Errores: <strong>{metrics.errors}</strong></li>
-            <li>Tiempo: <strong>{Math.round(metrics.timeMs / 100) / 10}s</strong></li>
-          </ul>
-        )}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          {metrics && (
+            <ul className="flex items-center gap-4 text-sm text-muted font-bold" aria-label="Métricas">
+              <li>
+                Intentos: <strong className="text-text">{metrics.attempts}</strong>
+              </li>
+              <li>
+                Errores: <strong className="text-text">{metrics.errors}</strong>
+              </li>
+              <li>
+                Tiempo: <strong className="text-text">{Math.round(metrics.timeMs / 100) / 10}s</strong>
+              </li>
+            </ul>
+          )}
 
-        {actions && <div className="skill-shell__actions">{actions}</div>}
+          {actions && <div className="flex items-center gap-2 ml-auto">{actions}</div>}
+        </div>
       </footer>
     </main>
   );

@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin-sede
+Disallow: /admin-general
+Disallow: /profesor
+Disallow: /mundos
+Disallow: /gameplay
+Disallow: /invite
+Disallow: /cambiar-contrasena
+
+Sitemap: https://typely.bauhub.online/sitemap.xml

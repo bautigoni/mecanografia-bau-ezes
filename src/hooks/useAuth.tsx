@@ -10,9 +10,20 @@ import {
   setActiveUser,
   setDemoMode,
   setUserPassword,
+  getViewAs,
+  setViewAsStored,
+  type ViewAs,
 } from "../utils/storage";
 import { isEmailDomainAllowed, parseJwtCredential } from "../utils/googleAuth";
-import { api, ApiError, type ApiActiveUser } from "../utils/api";
+import { api, ApiError, setAccessToken, setReadOnlyMode, type ApiActiveUser } from "../utils/api";
+
+/** Sesión de soporte en modo lectura: a quién estoy viendo, quién la inició
+ *  y cuándo expira (epoch ms). `null` = sesión normal. */
+export interface Impersonation {
+  targetName: string;
+  actorName: string;
+  expiresAt: number;
+}
 
 /** Result of a Google sign-in attempt. Always returns a structured value
  *  so the UI can render a friendly Spanish message — `null` would lose
@@ -53,6 +64,21 @@ interface AuthContextValue {
   loginDemo: () => ActiveUser;
   completePasswordChange: (newPassword: string) => Promise<ActiveUser | null>;
   loginGoogle: (credential: string) => Promise<GoogleLoginResult>;
+  /** Adopt a session created out-of-band (e.g. accepting an invitation,
+   *  which logs the user in server-side). The access token + refresh cookie
+   *  are already set by the api client; this syncs the React/local state. */
+  adoptSession: (apiUser: ApiActiveUser) => ActiveUser;
+  /** Superadmin "god mode": the role/sede/dev surface they chose to enter
+   *  from the "¿Cómo querés entrar?" chooser. `null` = act as superadmin. */
+  viewAs: ViewAs | null;
+  setViewAs: (view: ViewAs | null) => void;
+  /** Sesión de soporte en modo lectura (impersonación), o null. */
+  impersonation: Impersonation | null;
+  /** Inicia el modo lectura sobre `target` (el access token ya fue emitido
+   *  por la API). Reemplaza la sesión actual en memoria. */
+  startImpersonation: (access: string, target: ApiActiveUser, actorName: string, expiresInSeconds: number) => ActiveUser;
+  /** Termina el modo lectura y restaura la sesión del administrador real. */
+  stopImpersonation: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -63,6 +89,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<ActiveUser | null>(() => getActiveUser());
   const [bootstrapping, setBootstrapping] = useState(true);
   const [usingApi, setUsingApi] = useState(false);
+  const [viewAs, setViewAsState] = useState<ViewAs | null>(() => getViewAs());
+  const [impersonation, setImpersonation] = useState<Impersonation | null>(null);
+
+  const setViewAs = useCallback((view: ViewAs | null) => {
+    setViewAsStored(view);
+    setViewAsState(view);
+  }, []);
 
   /* Try to recover a session from the HTTP-only refresh cookie. If it
      works we replace the localStorage user with the API user (more
@@ -155,14 +188,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const completePasswordChange = useCallback(async (newPassword: string): Promise<ActiveUser | null> => {
     if (!user) return null;
     if (usingApi) {
+      // API-backed session: the server is the source of truth. If this call
+      // fails the flag stays set and the guard keeps the user on the page.
       try {
-        await api.logout(); // placeholder — real endpoint is /api/users/:id/change-password, called from the page
-        // The page should call api.post("/users/:id/change-password", ...) directly. We don't expose that
-        // here so the typed contract stays small. For the localStorage path the old behaviour applies.
-      } catch { /* ignore */ }
+        await api.changeOwnPassword(user.id, newPassword);
+      } catch {
+        return null;
+      }
+    } else {
+      const ok = setUserPassword(user.id, newPassword);
+      if (!ok) return null;
     }
-    const ok = setUserPassword(user.id, newPassword);
-    if (!ok) return null;
     const refreshed: ActiveUser = { ...user, mustChangePassword: false };
     setActiveUser(refreshed);
     setUser(refreshed);
@@ -204,8 +240,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const logout = useCallback(async () => {
+  const adoptSession = useCallback((apiUser: ApiActiveUser): ActiveUser => {
+    const au = toActiveUser(apiUser);
     setDemoMode(false);
+    setActiveUser(au);
+    setUser(au);
+    setUsingApi(true);
+    return au;
+  }, []);
+
+  const startImpersonation = useCallback(
+    (access: string, target: ApiActiveUser, actorName: string, expiresInSeconds: number): ActiveUser => {
+      setReadOnlyMode(true);
+      setAccessToken(access);
+      const au = toActiveUser({ ...target, mustChangePassword: false });
+      setActiveUser(au);
+      setUser(au);
+      setUsingApi(true);
+      setImpersonation({ targetName: au.name, actorName, expiresAt: Date.now() + expiresInSeconds * 1000 });
+      return au;
+    },
+    [],
+  );
+
+  const stopImpersonation = useCallback(async () => {
+    setReadOnlyMode(false);
+    setImpersonation(null);
+    setAccessToken(null);
+    // La cookie de refresh del administrador real sigue viva → recuperamos
+    // su sesión. Si falla (expiró), caemos al login.
+    const apiUser = await api.bootstrap();
+    if (apiUser) {
+      const au = toActiveUser(apiUser);
+      setActiveUser(au);
+      setUser(au);
+      setUsingApi(true);
+    } else {
+      setActiveUser(null);
+      setUser(null);
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    setReadOnlyMode(false);
+    setImpersonation(null);
+    setDemoMode(false);
+    setViewAsStored(null);
+    setViewAsState(null);
     if (usingApi) {
       try { await api.logout(); } catch { /* ignore */ }
     }
@@ -214,8 +295,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [usingApi]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, logout }),
-    [user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, logout],
+    () => ({ user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, viewAs, setViewAs, impersonation, startImpersonation, stopImpersonation, logout }),
+    [user, bootstrapping, usingApi, loginAny, login, loginDemo, completePasswordChange, loginGoogle, adoptSession, viewAs, setViewAs, impersonation, startImpersonation, stopImpersonation, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -88,13 +88,22 @@ export function Toast({ message }: { message: string }) {
   if (items.length === 0) return null;
 
   return (
-    <div className="toast-stack" role="status" aria-live="polite">
+    <div
+      className="fixed right-6 bottom-6 z-20 flex flex-col gap-2.5 max-w-[min(26rem,calc(100vw-3rem))] pointer-events-none"
+      role="status"
+      aria-live="polite"
+    >
       {items.map((item) => (
-        <div key={item.id} className="toast select-none">
-          <span className="toast__text">{item.text}</span>
+        <div
+          key={item.id}
+          className="glass-surface rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg animate-toast-in pointer-events-auto select-none"
+        >
+          <span className="text-text font-semibold text-sm flex-1">
+            {item.text}
+          </span>
           <button
             type="button"
-            className="toast__close"
+            className="grid place-items-center w-7 h-7 rounded-lg text-muted hover:bg-white/50 cursor-pointer transition-colors"
             aria-label="Cerrar notificación"
             onClick={() => dismiss(item.id)}
           >

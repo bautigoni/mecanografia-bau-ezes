@@ -3,6 +3,8 @@ import { islandLevelLayouts, type LevelPosition } from "./levelPositions";
 import { assets, expansionIslandThumbs, islandDetailBackgrounds, gameplayBackgrounds } from "../utils/assets";
 import {
   getBestStarsForLevel,
+  getTotalStars,
+  getWorldMaxStars,
   getWorldStarProgress,
   isLevelCompleted,
   levelState,
@@ -363,51 +365,67 @@ export function worldStarProgress(
   return getWorldStarProgress(progress, worldId);
 }
 
-/* Build lock states over an ORDERED list of worldIds using the 70%-stars
-   rule: the first world is unlocked; each next world unlocks only once the
-   previous one has earned ≥70% of its possible stars.
-     - "completed" → this world has already reached the 70% star gate.
-     - "current"   → unlocked and being worked on (first world below 70%).
-     - "locked"    → previous world has not reached 70% yet.
-   When `unlockAll` is true (free path: demo / superadmin / teacher) nothing
-   is ever locked. */
+/* Cumulative star requirement to UNLOCK each world: the sum of the MAX stars of
+   every world BEFORE it in the given order. So world 1 needs 0, world 2 needs
+   world 1's max (21★), world 3 needs world 1 + world 2's max (42★), and so on —
+   the bar keeps rising as the student advances. worldId → required running
+   total. Entering a world never spends stars; this is a pure threshold. */
+export function getWorldStarRequirements(
+  orderedIds: ReadonlyArray<Activity["worldId"]> = WORLD_ORDER,
+): Record<string, number> {
+  const reqs: Record<string, number> = {};
+  let required = 0;
+  for (const id of orderedIds) {
+    reqs[id] = required;
+    required += getWorldMaxStars(id);
+  }
+  return reqs;
+}
+
+/* Build lock states over an ORDERED list of worldIds using the CUMULATIVE
+   account-wide star total:
+     - a world is UNLOCKED once the running star total (sum of best stars over
+       every level of every world) reaches the sum of the max stars of all the
+       worlds before it (see getWorldStarRequirements).
+     - "completed" → unlocked AND every level of the world is finished.
+     - "current"   → unlocked but still has levels left to finish.
+     - "locked"    → the account total has not reached this world's threshold.
+   When `unlockAll` is true (free path: demo / superadmin / teacher) nothing is
+   ever locked. */
 function buildStarStates(
   orderedIds: ReadonlyArray<Activity["worldId"]>,
   progress: CurriculumProgress,
   unlockAll: boolean,
 ): Record<string, WorldLockState> {
   const states: Record<string, WorldLockState> = {};
-  let previousUnlocksNext = true; // the first world is always available
+  const total = getTotalStars(progress);
+  let required = 0; // cumulative max stars of all PRECEDING worlds
   for (const id of orderedIds) {
-    const reached = getWorldStarProgress(progress, id).isUnlockedNext;
-    if (unlockAll) {
-      states[id] = reached ? "completed" : "current";
-      continue;
-    }
-    if (!previousUnlocksNext) {
-      states[id] = "locked";
-      continue;
-    }
-    states[id] = reached ? "completed" : "current";
-    previousUnlocksNext = reached;
+    const unlocked = unlockAll || total >= required;
+    states[id] = !unlocked
+      ? "locked"
+      : isWorldComplete(id, progress)
+        ? "completed"
+        : "current";
+    required += getWorldMaxStars(id);
   }
   return states;
 }
 
 /* Sequential unlocking over the full WORLD_ORDER (no user context).
-   Uses the 70%-stars rule. */
+   Uses the cumulative account-wide star total (see buildStarStates). */
 export function getWorldStates(
   progress: CurriculumProgress = loadProgress(),
 ): Record<Activity["worldId"], WorldLockState> {
   return buildStarStates(WORLD_ORDER, progress, false) as Record<Activity["worldId"], WorldLockState>;
 }
 
-/* Context-aware lock states. The 70%-stars chain is applied to EVERY user
-   over their ordered worlds, so the unlock gate is real while playing — you
-   must earn 70% of a world's stars to open the next one. Demo / superadmin
-   still SEE every world (visibility is handled by getWorldsForUser); locked
-   ones simply appear greyed and can be opened with the hidden 5-click dev
-   bypass for testing. */
+/* Context-aware lock states. The cumulative-star gate is applied to EVERY user
+   over their ordered worlds, so the unlock gate is real while playing — your
+   running star total must reach the sum of the max stars of all earlier worlds
+   to open the next one. Demo / superadmin still SEE every world (visibility is
+   handled by getWorldsForUser); locked ones simply appear greyed and can be
+   opened with the hidden 5-click dev bypass for testing. */
 export function getWorldStatesForUser(
   context: UserContext,
   progress: CurriculumProgress = loadProgress(),

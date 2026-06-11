@@ -2,7 +2,6 @@ import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GlassInput } from "../components/auth/GlassInput";
 import { AnimatedButton } from "../components/auth/AnimatedButton";
-import { Toast } from "../components/common/Toast";
 import { useAuth } from "../hooks/useAuth";
 import { assets } from "../utils/assets";
 import { routeForRole } from "../utils/storage";
@@ -35,9 +34,18 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
+  // Bumped on every error so the top red popup re-animates even if the
+  // message text is identical to the previous attempt.
+  const [errKey, setErrKey] = useState(0);
   const [showDemoModal, setShowDemoModal] = useState(false);
   const { loginAny, loginDemo, loginGoogle } = useAuth();
   const navigate = useNavigate();
+
+  /** Show an error in the red popup above the card (re-animates each time). */
+  const showError = (msg: string) => {
+    setMessage(msg);
+    setErrKey((k) => k + 1);
+  };
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -45,13 +53,20 @@ export function LoginPage() {
     const nextUser = await loginAny(trimUser, password);
 
     if (!nextUser) {
-      setMessage("Revisá tu usuario y contraseña para ingresar.");
+      showError("Revisá tu usuario y contraseña para ingresar.");
       return;
     }
 
     // Temporary-password sign-ins must set a new password first.
     if (nextUser.mustChangePassword) {
       navigate("/cambiar-contrasena");
+      return;
+    }
+
+    // Superadmin picks how to enter (god-mode chooser) instead of landing
+    // straight on a single dashboard.
+    if (nextUser.role === "superadmin") {
+      navigate("/entrar");
       return;
     }
 
@@ -79,10 +94,10 @@ export function LoginPage() {
    *  then matches the returned email against Typely's user store. */
   async function googleLogin() {
     if (!getGoogleClientId()) {
-      setMessage("Google Login no está configurado. Pedile a tu administrador que cargue VITE_GOOGLE_CLIENT_ID en el servidor.");
+      showError("Google Login no está configurado. Pedile a tu administrador que cargue VITE_GOOGLE_CLIENT_ID en el servidor.");
       return;
     }
-    setMessage(""); // clear any prior error before opening the prompt
+    showError(""); // clear any prior error before opening the prompt
     await promptGoogleSignIn({
       onCredential: async (credential) => {
         const result = await loginGoogle(credential);
@@ -91,26 +106,30 @@ export function LoginPage() {
             navigate("/cambiar-contrasena");
             return;
           }
+          if (result.user.role === "superadmin") {
+            navigate("/entrar");
+            return;
+          }
           navigate(routeForRole(result.user.role));
           return;
         }
         if (result.reason === "DOMAIN_NOT_ALLOWED") {
-          setMessage("Tu dominio de correo no está habilitado para Typely.");
+          showError("Tu dominio de correo no está habilitado para Typely.");
         } else if (result.reason === "USER_NOT_FOUND") {
-          setMessage("No encontramos una cuenta asociada a este correo. Pedile acceso a tu administrador.");
+          showError("No encontramos una cuenta asociada a este correo. Pedile acceso a tu administrador.");
         } else if (result.reason === "NETWORK_ERROR") {
-          setMessage("No pudimos conectar con el servidor. Probá de nuevo.");
+          showError("No pudimos conectar con el servidor. Probá de nuevo.");
         } else {
-          setMessage("No pudimos validar tu cuenta de Google. Probá de nuevo.");
+          showError("No pudimos validar tu cuenta de Google. Probá de nuevo.");
         }
       },
       onError: (reason) => {
         if (reason === "MISSING_CLIENT_ID") {
-          setMessage("Google Login no está configurado.");
+          showError("Google Login no está configurado.");
         } else if (reason === "GIS_LOAD_FAILED") {
-          setMessage("No se pudo cargar Google. Revisá tu conexión.");
+          showError("No se pudo cargar Google. Revisá tu conexión.");
         } else {
-          setMessage("No se pudo abrir el inicio con Google. Probá de nuevo.");
+          showError("No se pudo abrir el inicio con Google. Probá de nuevo.");
         }
       },
     });
@@ -118,44 +137,64 @@ export function LoginPage() {
 
   return (
     <main
-      className="login-page page-fade"
+      className="relative min-h-dvh overflow-hidden bg-cover bg-center flex items-center justify-center animate-page-fade"
       style={{ backgroundImage: `url("${assets.loginBg}")` }}
     >
+      {/* Animated colourful aura over the background art (brand colours drifting). */}
+      <div className="login-aura absolute inset-0 pointer-events-none z-0" aria-hidden="true" />
+
+      {/* Mascots stand ON the green islands: lifted off the bottom edge and
+          nudged inward so they read as "standing on" the painted platforms. */}
       <img
-        className="login-mascot login-mascot--left"
+        className="absolute bottom-[17.5vh] left-[5.5vw] w-auto max-h-[62vh] animate-mascot-float pointer-events-none select-none z-10"
         src={assets.mascotFemaleWave}
         alt="Mascota saludando"
         decoding="async"
-        // @ts-expect-error — fetchPriority is supported by Chrome/Edge/Safari
-        fetchpriority="high"
+        fetchPriority="high"
       />
       <img
-        className="login-mascot login-mascot--right"
+        className="absolute bottom-[7.5vh] right-[8vw] w-auto max-h-[72vh] animate-mascot-float pointer-events-none select-none z-10"
         src={assets.mascotMaleWave}
         alt="Mascota saludando"
         decoding="async"
-        // @ts-expect-error — fetchPriority is supported by Chrome/Edge/Safari
-        fetchpriority="high"
+        fetchPriority="high"
       />
 
-      <section className="login-card" aria-label="Ingreso a TYPELY">
-        <span className="login-card__halo" aria-hidden="true" />
-        <span className="login-card__sparkle login-card__sparkle--left" aria-hidden="true">
+      <section
+        className="liquid-glass glass-card-smooth relative w-[min(32rem,92vw)] mx-auto my-[7vh] p-8 pt-12 text-center flex flex-col items-center gap-6 animate-card-in z-20"
+        aria-label="Ingreso a TYPELY"
+      >
+        <span
+          className="absolute -inset-8 -z-10 rounded-[2rem] bg-[radial-gradient(circle_at_50%_40%,rgba(51,199,240,0.22),transparent_60%)] blur-3xl animate-halo-drift pointer-events-none"
+          aria-hidden="true"
+        />
+        <span
+          className="absolute -left-4 top-1/3 text-2xl text-accent-pink/60 animate-sparkle-spin pointer-events-none select-none"
+          aria-hidden="true"
+        >
           ✦
         </span>
-        <span className="login-card__sparkle login-card__sparkle--right" aria-hidden="true">
+        <span
+          className="absolute -right-4 top-1/2 text-xl text-mint/70 animate-sparkle-spin pointer-events-none select-none"
+          aria-hidden="true"
+        >
           ✦
         </span>
-        <span className="login-card__sparkle login-card__sparkle--top" aria-hidden="true">
+        <span
+          className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl text-accent/60 animate-sparkle-spin pointer-events-none select-none"
+          aria-hidden="true"
+        >
           ✧
         </span>
 
-        <div className="login-card__copy">
-          <h1>Bienvenido a TYPELY</h1>
-          <p>Aprendé a escribir jugando entre las nubes ✨</p>
+        <div className="text-center">
+          <h1 className="font-display text-4xl font-black mb-2 text-gradient-loop">
+            ¡Bienvenido a TYPELY!
+          </h1>
+          <p className="text-muted font-semibold">Aprendé a escribir jugando entre las nubes ✨</p>
         </div>
 
-        <form onSubmit={submit} className="login-form">
+        <form onSubmit={submit} className="flex flex-col gap-4 w-full">
           <GlassInput
             icon={<User size={21} aria-hidden="true" />}
             label="Código o usuario"
@@ -174,7 +213,7 @@ export function LoginPage() {
             action={
               <button
                 type="button"
-                className="password-toggle"
+                className="grid w-9 h-9 place-items-center rounded-full bg-transparent border-0 cursor-pointer text-text/60 hover:text-text transition-colors"
                 aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 onClick={() => setShowPassword((v) => !v)}
               >
@@ -192,11 +231,15 @@ export function LoginPage() {
           </AnimatedButton>
 
           {/* Google sign-in — opens the FedCM "continuar como…" popup. */}
-          <button type="button" className="google-login-btn" onClick={googleLogin}>
-            <span className="google-login-btn__icon" aria-hidden="true">
+          <button
+            type="button"
+            className="bg-white flex items-center justify-center gap-2.5 py-3 px-5 rounded-full shadow-md cursor-pointer font-extrabold text-text transition-transform hover:scale-[1.02] active:scale-[0.98] w-full"
+            onClick={googleLogin}
+          >
+            <span className="inline-flex items-center" aria-hidden="true">
               <GoogleGlyph />
             </span>
-            Ingresar con Google
+            <span>Ingresar con Google</span>
           </button>
 
 
@@ -209,7 +252,7 @@ export function LoginPage() {
             Entrar en modo demo
           </AnimatedButton>
 
-          <p className="login-card__safety">
+          <p className="flex items-center justify-center gap-1.5 text-xs text-muted/70 font-semibold mt-1">
             <LockKeyhole size={15} aria-hidden="true" />
             Entorno seguro para aprender y enseñar
           </p>
@@ -217,28 +260,67 @@ export function LoginPage() {
       </section>
 
       {showDemoModal && (
-        <div className="demo-modal" role="dialog" aria-modal="true" aria-labelledby="demo-modal-title">
-          <div className="demo-modal__backdrop" onClick={() => setShowDemoModal(false)} />
-          <div className="demo-modal__card">
-            <span className="demo-modal__icon" aria-hidden="true"><Rocket size={26} /></span>
-            <h2 id="demo-modal-title">Modo demo</h2>
-            <p>¿Querés continuar con el progreso anterior o empezar desde cero?</p>
-            <div className="demo-modal__actions">
-              <button type="button" className="demo-modal__btn demo-modal__btn--primary" onClick={() => enterDemo(false)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-overlay-fade"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="demo-modal-title"
+        >
+          <div className="modal-overlay" onClick={() => setShowDemoModal(false)} />
+          <div className="glass-card-smooth modal-card relative max-h-[88vh] overflow-y-auto p-8 w-[min(24rem,90vw)] flex flex-col items-center gap-5 animate-menu-reveal">
+            <span className="text-4xl" aria-hidden="true"><Rocket size={26} /></span>
+            <h2 id="demo-modal-title" className="font-display text-xl font-bold text-text">Modo demo</h2>
+            <p className="text-muted text-sm text-center">¿Querés continuar con el progreso anterior o empezar desde cero?</p>
+            <div className="flex gap-3 w-full mt-2">
+              <button
+                type="button"
+                className="flex-1 py-3 rounded-xl font-extrabold text-white cursor-pointer bg-gradient-to-br from-accent-sky to-accent-strong transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                onClick={() => enterDemo(false)}
+              >
                 Continuar
               </button>
-              <button type="button" className="demo-modal__btn demo-modal__btn--ghost" onClick={() => enterDemo(true)}>
+              <button
+                type="button"
+                className="flex-1 py-3 rounded-xl font-extrabold cursor-pointer bg-white/50 text-text transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                onClick={() => enterDemo(true)}
+              >
                 Empezar de cero
               </button>
             </div>
-            <button type="button" className="demo-modal__close" aria-label="Cerrar" onClick={() => setShowDemoModal(false)}>
+            <button
+              type="button"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/30 border-0 cursor-pointer flex items-center justify-center text-text/60 hover:text-text hover:bg-white/50 transition-colors"
+              aria-label="Cerrar"
+              onClick={() => setShowDemoModal(false)}
+            >
               ✕
             </button>
           </div>
         </div>
       )}
 
-      <Toast message={message} />
+      {/* Error popup — red, floating ABOVE the card at the top-centre. The
+          outer flex centres it so the drop-in animation's transform can't
+          knock it off-centre. */}
+      {message && (
+        <div className="fixed top-6 inset-x-0 z-50 flex justify-center px-4 pointer-events-none" role="alert" aria-live="assertive">
+          <div
+            key={errKey}
+            className="flex items-start gap-3 rounded-2xl px-5 py-3.5 bg-gradient-to-r from-rose-500 to-red-500 text-white shadow-[0_18px_40px_rgba(225,29,72,0.4)] border border-white/30 w-[min(34rem,92vw)] pointer-events-auto animate-banner-drop"
+          >
+            <ShieldCheck size={20} className="shrink-0 mt-0.5" aria-hidden="true" />
+            <p className="font-bold text-sm leading-snug flex-1">{message}</p>
+            <button
+              type="button"
+              onClick={() => setMessage("")}
+              className="shrink-0 w-7 h-7 grid place-items-center rounded-full bg-white/20 hover:bg-white/35 transition cursor-pointer text-white font-black leading-none"
+              aria-label="Cerrar"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

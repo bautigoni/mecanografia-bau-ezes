@@ -5,8 +5,10 @@ import { getActivityById } from "../data/activities";
 import { assets } from "../utils/assets";
 import { getGameplayBackground } from "../data/worlds";
 import { getStarsFromAccuracy, markLevelComplete } from "../utils/progress";
+import { achievementMeta } from "../data/achievements";
 import { SkillLevelView } from "./SkillLevelView";
 import { ShortcutLevelView } from "./ShortcutLevelView";
+import { StarCounter } from "../components/common/StarCounter";
 
 const MOTIVATION_PHRASES = [
   "¡Vamos que podés!",
@@ -30,7 +32,7 @@ type KeyboardRow = { id: string; tone: "num" | "top" | "home" | "bot" | "mod"; k
 
 const keyboardRows: KeyboardRow[] = [
   { id: "num",  tone: "num",  keys: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "'", "¿"] },
-  { id: "top",  tone: "top",  keys: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"] },
+  { id: "top",  tone: "top",  keys: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "´"] },
   { id: "home", tone: "home", keys: ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ñ"] },
   { id: "bot",  tone: "bot",  keys: ["Z", "X", "C", "V", "B", "N", "M", ",", ".", "-", "Backspace"] },
   { id: "mod",  tone: "mod",  keys: ["Shift", "Space", "Enter"] },
@@ -266,6 +268,7 @@ export function GameplayPage() {
   const [isErrorActive, setIsErrorActive] = useState(false);
   const [isIdleHintActive, setIsIdleHintActive] = useState(false);
   const [inputSignal, setInputSignal] = useState(0);
+  const [unlockedAch, setUnlockedAch] = useState<string[]>([]);
   const completionSaved = useRef(false);
   const activityRef = useRef(activity);
   const advanceTimeoutRef = useRef<number | null>(null);
@@ -339,7 +342,9 @@ export function GameplayPage() {
     if (completionSaved.current) return;
     completionSaved.current = true;
     const currentActivity = activityRef.current;
-    markLevelComplete(currentActivity.worldId, currentActivity.levelNumber, finalAccuracy, finalAttempts);
+    void markLevelComplete(currentActivity.worldId, currentActivity.levelNumber, finalAccuracy, finalAttempts).then((unlocked) => {
+      if (unlocked.length) setUnlockedAch(unlocked);
+    });
   }
 
   function targetAt(index: number) {
@@ -738,24 +743,37 @@ export function GameplayPage() {
   }
 
   function listen() {
+    // El dictado dice QUÉ tipo de objetivo es y cuál es el objetivo concreto
+    // ("Palabra a escribir: ventana", "Letra que toca: G"), no solo la
+    // consigna genérica.
+    const targetPhrase =
+      activity.inputType === "letter" ? `Letra que toca: ${target}.` :
+      activity.inputType === "symbol" ? `Símbolo que toca: ${target}.` :
+      activity.inputType === "correction" ? `Corregí el texto para que quede: ${target}.` :
+      /\s/.test(target) ? `Frase a escribir: ${target}.` :
+      `Palabra a escribir: ${target}.`;
+    const phrase = [activity.listenText ?? activity.instruction, targetPhrase].filter(Boolean).join(" ");
     if ("speechSynthesis" in window) {
-      const utterance = new SpeechSynthesisUtterance(activity.listenText);
+      const utterance = new SpeechSynthesisUtterance(phrase);
       utterance.lang = "es-AR";
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
       setFeedback("Reproduciendo consigna.");
       return;
     }
-    setFeedback(activity.listenText);
+    setFeedback(phrase);
   }
 
   return (
-    <main className={`gameplay-page gameplay-shell page-fade ${isErrorActive ? "is-error" : ""} ${isIdleHintActive ? "is-idle-hint" : ""}`} style={{ backgroundImage: `url("${getGameplayBackground(activity.worldId)}")` }}>
+    <main
+      className="flex flex-col h-dvh overflow-hidden container-type-[inline-size] animate-page-fade relative bg-cover bg-center"
+      style={{ backgroundImage: `url("${getGameplayBackground(activity.worldId)}")` }}
+    >
       {/* Hidden capture field — drives beforeinput/composition so accented
           characters work on touch & Spanish-layout keyboards. */}
       <input
         ref={captureInputRef}
-        className="gameplay-capture"
+        className="sr-only"
         type="text"
         defaultValue=""
         autoCapitalize="off"
@@ -775,18 +793,52 @@ export function GameplayPage() {
           window.setTimeout(() => captureInputRef.current?.focus({ preventScroll: true }), 30);
         }}
       />
-      <button className="game-exit" type="button" onClick={() => navigate(`/worlds/${activity.worldId}`)}>
-        <X size={20} />
-        Salir
-      </button>
+      <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+        {/* Contador de estrellas de la cuenta — sube al completar un nivel
+            (escucha el evento edutic:progress). */}
+        <StarCounter />
+        {/* Escuchar consigna — solo el ícono, a la izquierda de Reintentar.
+            (Antes era un botón grande abajo que empujaba el teclado fuera de
+            pantalla en alturas chicas.) */}
+        <button
+          type="button"
+          onClick={listen}
+          className="rounded-full w-12 h-12 flex items-center justify-center text-white bg-gradient-to-br from-accent to-accent-strong shadow-btn hover:scale-105 transition-transform"
+          aria-label="Escuchar consigna"
+          title="Escuchar consigna"
+        >
+          <Volume2 size={22} />
+        </button>
+        <button
+          type="button"
+          onClick={retry}
+          className="glass rounded-full w-12 h-12 flex items-center justify-center text-text shadow-btn hover:scale-105 transition-transform"
+          aria-label="Reintentar"
+          title="Reintentar"
+        >
+          <RotateCcw size={20} />
+        </button>
+        <button
+          className="glass rounded-full w-12 h-12 flex items-center justify-center text-text shadow-btn hover:scale-105 transition-transform"
+          type="button"
+          onClick={() => navigate(`/worlds/${activity.worldId}`)}
+          aria-label="Salir"
+        >
+          <X size={20} />
+        </button>
+      </div>
 
-      <section className="game-stage" aria-label={activity.title}>
-        <div className="game-status">
-          <span>Nivel {activity.levelNumber}</span>
-          <strong>{activity.title}</strong>
-          <em>{activity.subtitle}</em>
+      {/* Header — compact floating glass capsule (Liquid Glass). */}
+      {!isCompleted && (
+        <div className="shrink-0 mt-4 mb-1 flex justify-center px-4 z-20" aria-live="polite">
+          <div className="inline-flex flex-col items-center gap-0.5 rounded-3xl px-7 py-2.5 bg-white/20 backdrop-blur-xl border border-white/35 shadow-[0_10px_34px_rgba(54,86,134,0.18)]">
+            <h1 className="font-display font-bold text-lg sm:text-xl text-text leading-tight">{activity.instruction}</h1>
+            <p className="text-sm text-text/70 font-semibold leading-tight">{feedback}</p>
+          </div>
         </div>
+      )}
 
+      <section className="flex flex-col items-center justify-center gap-3 flex-1 min-h-0 px-4 py-1 z-10 overflow-hidden" aria-label={activity.title}>
         {(() => {
           const isPhrase = /\s/.test(target);
           const variant =
@@ -804,81 +856,144 @@ export function GameplayPage() {
           const showTypedPreview =
             activity.inputType !== "letter" && activity.inputType !== "symbol";
           const isLongTarget = target.length > 14 || target.includes("@");
+
+          const targetCardSize =
+            variant === "letter" ? "text-[clamp(5rem,17vh,10rem)]" :
+            variant === "symbol" ? "text-[clamp(4rem,14vh,8rem)]" :
+            variant === "phrase" ? "text-3xl sm:text-4xl" :
+            "text-4xl sm:text-5xl";
+          /* Soft white halo so floating (container-less) text stays readable
+             over the bright background art. */
+          const floatShadow = { textShadow: "0 1px 12px rgba(255,255,255,0.9), 0 1px 2px rgba(255,255,255,0.9)" } as const;
+
           return (
             <>
-              <div className={`target-card target--${variant} ${isLongTarget ? "target--long" : ""} ${isErrorActive ? "is-error" : ""} ${isIdleHintActive ? "is-idle-hint" : ""}`}>
-                <span>Objetivo {visibleObjective} / {totalObjectives}</span>
-                <strong ref={targetScrollRef}>{target}</strong>
-                {locationHint && !isCompleted && (
-                  <small className="key-location-hint">{locationHint}</small>
-                )}
-                {commaHint && !isCompleted && (
-                  <small className="comma-hint">Después de una coma va un espacio antes de la siguiente palabra.</small>
-                )}
-                {combo && !isCompleted && (
-                  <div className="combo-hint" aria-label={`Combinación: ${combo.join(" + ")}`}>
-                    <span>Para escribir {expectedChar || "este símbolo"}</span>
-                    {combo.map((step, i) => (
-                      <span key={`${step}-${i}`} className="combo-hint__step">
-                        {i > 0 && <span className="combo-hint__plus">+</span>}
-                        <kbd>{step}</kbd>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {altCombos && !isCompleted && (
-                  <div className="combo-hint combo-hint--alt" aria-label="Otras formas">
-                    <span>o también</span>
-                    {altCombos.map((alt, idx) => (
-                      <span key={idx} className="combo-hint__alt">
-                        {alt.map((step, i) => (
-                          <span key={`${step}-${i}`} className="combo-hint__step">
-                            {i > 0 && <span className="combo-hint__plus">+</span>}
-                            <kbd>{step}</kbd>
-                          </span>
-                        ))}
-                        {idx < altCombos.length - 1 && <span className="combo-hint__sep">·</span>}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {(activity.requiresShift || activity.requiresAccent) && !isCompleted && (
-                  <small style={{ display: "block", marginTop: 6, opacity: 0.75 }}>
-                    {activity.requiresShift && "Usá Shift para mayúsculas y símbolos. "}
-                    {activity.requiresAccent && "Respetá tildes y la ñ."}
-                  </small>
-                )}
+              {/* Objective — floating text, no box. */}
+              <span
+                className="font-display font-extrabold text-text/80 text-sm uppercase tracking-[0.18em]"
+                style={floatShadow}
+              >
+                Objetivo {visibleObjective} / {totalObjectives}
+              </span>
+
+              {/* Target — the hero. A light floating glass card holds ONLY the
+                  letter/word so it reads as the focal point of the scene. */}
+              <div
+                className={`inline-flex items-center justify-center rounded-[2.25rem] px-10 py-3 sm:px-14 sm:py-5 bg-white/20 backdrop-blur-xl border border-white/35 shadow-[0_22px_60px_rgba(54,86,134,0.28)] ${isIdleHintActive ? "animate-target-pulse" : ""}`}
+              >
+                <strong
+                  ref={targetScrollRef}
+                  className={`font-display font-black text-text leading-none overflow-x-auto no-scrollbar whitespace-nowrap max-w-[82vw] [text-shadow:0_2px_8px_rgba(83,107,255,0.18)] ${isLongTarget ? "text-2xl sm:text-3xl" : targetCardSize}`}
+                >
+                  {target}
+                </strong>
               </div>
 
+              {/* Secondary instruction — floating text, no container. */}
+              {locationHint && !isCompleted && (
+                <span className="text-text/80 font-semibold text-base" style={floatShadow}>{locationHint}</span>
+              )}
+              {commaHint && !isCompleted && (
+                <span className="text-accent-strong font-semibold text-sm" style={floatShadow}>
+                  Después de una coma va un espacio antes de la siguiente palabra.
+                </span>
+              )}
+
+              {/* Combo hint — light floating glass pill. */}
+              {combo && !isCompleted && (
+                <div
+                  className="inline-flex items-center gap-2 flex-wrap justify-center rounded-full px-4 py-1.5 bg-amber-200/45 backdrop-blur-md border border-amber-300/60 shadow-sm"
+                  aria-label={`Combinación: ${combo.join(" + ")}`}
+                >
+                  <span className="text-sm font-bold text-amber-900">
+                    Para escribir {expectedChar || "este símbolo"}
+                  </span>
+                  {combo.map((step, i) => (
+                    <span key={`${step}-${i}`} className="flex items-center gap-1">
+                      {i > 0 && <span className="text-amber-700 font-bold">+</span>}
+                      <kbd className="bg-white/90 rounded px-2 py-0.5 text-sm font-bold text-text shadow-sm border border-amber-200">
+                        {step}
+                      </kbd>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {altCombos && !isCompleted && (
+                <div className="flex items-center gap-2 flex-wrap justify-center text-sm" style={floatShadow} aria-label="Otras formas">
+                  <span className="text-text/70 font-medium">o también</span>
+                  {altCombos.map((alt, idx) => (
+                    <span key={idx} className="flex items-center gap-1">
+                      {alt.map((step, i) => (
+                        <span key={`${step}-${i}`} className="flex items-center gap-1">
+                          {i > 0 && <span className="text-text/60 font-bold">+</span>}
+                          <kbd className="bg-white/80 rounded px-2 py-0.5 text-xs font-bold text-text shadow-sm border border-white/60">
+                            {step}
+                          </kbd>
+                        </span>
+                      ))}
+                      {idx < altCombos.length - 1 && <span className="text-text/50 mx-1">·</span>}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {(activity.requiresShift || activity.requiresAccent) && !isCompleted && (
+                <span className="text-text/70 text-sm font-medium" style={floatShadow}>
+                  {activity.requiresShift && "Usá Shift para mayúsculas y símbolos. "}
+                  {activity.requiresAccent && "Respetá tildes y la ñ."}
+                </span>
+              )}
+
+              {/* Typed preview — light floating glass (word/phrase levels). */}
               {showTypedPreview && (
-                <div className="typed-preview" aria-live="polite">
-                  <span className="typed-preview__label">Lo que estás escribiendo</span>
+                <div
+                  className="inline-flex flex-col items-center gap-1 shrink-0 min-h-[4.5rem] rounded-2xl px-6 py-2.5 bg-white/25 backdrop-blur-2xl border border-white/40 shadow-md"
+                  aria-live="polite"
+                >
+                  <span className="text-[11px] font-bold text-text/55 uppercase tracking-wider">
+                    Lo que estás escribiendo
+                  </span>
                   <span
                     ref={typedScrollRef}
-                    className={`typed-preview__value ${typed ? "" : "is-empty"}`}
+                    className={`font-mono text-2xl sm:text-3xl text-text font-bold overflow-x-auto no-scrollbar whitespace-nowrap max-w-[70vw] flex items-center ${!typed ? "text-text/50 italic text-lg" : ""}`}
                   >
                     {typed
                       ? Array.from(typed).map((ch, i) =>
                           ch === " " ? (
-                            <span key={i} className="typed-space" aria-label="espacio" />
+                            <span
+                              key={i}
+                              className="inline-block w-4 h-8 border-b-2 border-dashed border-text/40 mx-0.5"
+                              aria-label="espacio"
+                            />
                           ) : (
-                            <span key={i} className="typed-char">{ch}</span>
+                            <span key={i} className="inline-block">{ch}</span>
                           ),
                         )
                       : "Empezá a escribir…"}
-                    {typed && <span className="typed-preview__caret" aria-hidden="true" />}
+                    {typed && (
+                      <span
+                        className="inline-block w-0.5 h-8 bg-accent-strong ml-0.5 animate-caret-blink"
+                        aria-hidden="true"
+                      />
+                    )}
                   </span>
                 </div>
               )}
+
             </>
           );
         })()}
+      </section>
 
-        <div className="game-metrics">
+      {/* Errors / precision — own compact row so it never overlaps the keyboard. */}
+      {!isCompleted && (
+        <div
+          className="shrink-0 flex justify-center gap-5 text-xs font-bold text-text/70 pb-1 z-10"
+          style={{ textShadow: "0 1px 8px rgba(255,255,255,0.9)" }}
+        >
           <span>Errores: {errors}</span>
           <span>Precisión: {accuracy}%</span>
         </div>
-      </section>
+      )}
 
       {/* Two motivational robots flank the keyboard, switching phrases each target. */}
       {!isCompleted && (() => {
@@ -887,88 +1002,180 @@ export function GameplayPage() {
         const leftPhrase = isIdleHintActive && locationHint ? locationHint : phrasePool[targetIndex % phrasePool.length];
         const rightPhrase = phrasePool[(targetIndex + Math.max(1, Math.floor(phrasePool.length / 2))) % phrasePool.length];
         return (
-          <div className="game-mascots" aria-hidden="true">
-            <figure className="game-mascot game-mascot--left">
-              <div className={`game-mascot__bubble ${errored ? "is-warn" : ""}`}>{leftPhrase}</div>
-              <img src={assets.mascotFemaleWave} alt="" decoding="async" />
+          <>
+            {/* Robots APOYADOS sobre el suelo pintado del arte (anclados al
+                borde inferior, no flotando a mitad de pantalla). */}
+            <figure className="absolute bottom-2 left-1 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
+              <div
+                className={`glass-surface rounded-2xl rounded-br-sm px-2.5 py-1.5 text-xs font-semibold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
+              >
+                {leftPhrase}
+              </div>
+              <img
+                src={assets.mascotFemaleWave}
+                alt=""
+                decoding="async"
+                className="w-28 sm:w-40 h-auto object-contain animate-mascot-float"
+              />
             </figure>
-            <figure className="game-mascot game-mascot--right">
-              <div className={`game-mascot__bubble ${errored ? "is-warn" : ""}`}>{rightPhrase}</div>
-              <img src={assets.mascotMaleJump} alt="" decoding="async" />
+            <figure className="absolute bottom-2 right-1 z-10 flex flex-col items-center gap-2 max-w-[160px] pointer-events-none" aria-hidden="true">
+              <div
+                className={`glass-surface rounded-2xl rounded-bl-sm px-2.5 py-1.5 text-xs font-semibold text-text shadow-sm animate-bubble-pop ${errored ? "bg-rose/20 border-rose/40 text-rose" : ""}`}
+              >
+                {rightPhrase}
+              </div>
+              <img
+                src={assets.mascotMaleJump}
+                alt=""
+                decoding="async"
+                className="w-28 sm:w-40 h-auto object-contain animate-mascot-float"
+                style={{ animationDelay: "1s" }}
+              />
             </figure>
-          </div>
+          </>
         );
       })()}
 
-      <section className="visual-keyboard" aria-label="Teclado visual">
-        {keyboardRows.map((row) => (
-          <div className={`keyboard-row keyboard-row--${row.tone}`} key={row.id}>
-            {row.keys.map((key) => {
-              const isTarget = !isCompleted && expectedKeys.has(key);
-              const isCombo = isTarget && expectedKeys.size > 1;
-              const isFindHint = isTarget && isIdleHintActive;
-              const isPressed = lastKey === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  className={`key key--${row.tone} ${key === "Space" ? "key--space" : ""} ${key === "Backspace" || key === "Shift" || key === "Enter" ? "key--wide" : ""} ${isTarget ? "is-target" : ""} ${isCombo ? "is-target-combo" : ""} ${isFindHint ? "is-find-hint" : ""} ${isPressed ? "is-pressed" : ""}`}
-                  tabIndex={-1}
-                >
-                  {key === "Space" ? "Espacio" : key}
-                </button>
-              );
-            })}
-          </div>
-        ))}
+      <section className="px-4 pb-2 shrink-0" aria-label="Teclado visual">
+        <div
+          className={`flex flex-col gap-2 w-fit mx-auto rounded-2xl transition-all duration-150 ${
+            isErrorActive ? "animate-error-shake ring-2 ring-rose-400/70" : ""
+          }`}
+        >
+          {keyboardRows.map((row) => {
+            /* Each row has its own pastel colour so kids can scan home-row
+               position by colour (gold numbers, pink top, mint home, violet
+               bottom, sky modifiers). Applied to the KEYS, not a panel. */
+            /* Keycaps con profundidad real: borde inferior grueso (el "lado"
+               de la tecla), brillo superior tipo keycap y sombra suave en
+               capas. El color sigue identificando cada fila. */
+            const rowKeyTone: Record<string, string> = {
+              num: "bg-gradient-to-b from-amber-50 via-amber-100 to-amber-200 border-amber-300 border-b-amber-400 text-amber-900",
+              top: "bg-gradient-to-b from-pink-50 via-pink-100 to-pink-200 border-pink-300 border-b-pink-400 text-pink-900",
+              home: "bg-gradient-to-b from-emerald-50 via-emerald-100 to-emerald-200 border-emerald-300 border-b-emerald-400 text-emerald-900",
+              bot: "bg-gradient-to-b from-violet-50 via-violet-100 to-violet-200 border-violet-300 border-b-violet-400 text-violet-900",
+              mod: "bg-gradient-to-b from-sky-50 via-sky-100 to-sky-200 border-sky-300 border-b-sky-400 text-sky-900",
+            };
+            return (
+              <div
+                key={row.id}
+                className="flex justify-center gap-1.5"
+              >
+                {row.keys.map((key) => {
+                  const isTarget = !isCompleted && expectedKeys.has(key);
+                  const isCombo = isTarget && expectedKeys.size > 1;
+                  const isFindHint = isTarget && isIdleHintActive;
+                  const isPressed = lastKey === key;
+                  const isSpace = key === "Space";
+                  const isWide = key === "Backspace" || key === "Shift" || key === "Enter";
+
+                  const keyClasses = [
+                    "gp-key relative rounded-[0.6rem] font-black transition-all duration-100 border-2 border-b-[4px]",
+                    "shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_5px_12px_rgba(23,53,95,0.16)]",
+                    "hover:-translate-y-[2px] hover:brightness-[1.04]",
+                    "active:translate-y-[1px] active:border-b-2 active:shadow-[inset_0_1px_2px_rgba(23,53,95,0.18)]",
+                    "flex items-center justify-center select-none",
+                    isSpace ? "w-48 sm:w-72 h-8 sm:h-9 text-sm" : isWide ? "w-16 sm:w-24 h-8 sm:h-9 text-xs" : "w-10 h-8 sm:w-12 sm:h-9 text-sm",
+                    // Target/combo override the row colour with the accent blue.
+                    isTarget && !isCombo
+                      ? "bg-accent text-white border-accent-strong border-b-accent-strong shadow-[0_6px_18px_rgba(49,89,232,0.45),inset_0_1px_0_rgba(255,255,255,0.4)] scale-105 animate-target-pulse"
+                      : isCombo
+                        ? "bg-accent-strong text-white border-accent-strong border-b-accent-strong shadow-[0_6px_18px_rgba(49,89,232,0.5),inset_0_1px_0_rgba(255,255,255,0.4)] scale-110 animate-target-pulse"
+                        : rowKeyTone[row.tone],
+                    isFindHint ? "animate-key-find ring-4 ring-accent-pink/50" : "",
+                    isPressed ? "animate-key-pop scale-90" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+
+                  return (
+                    <button key={key} type="button" className={keyClasses} tabIndex={-1}>
+                      {key === "Space" ? "Espacio" : key}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </section>
 
-      <section className="instruction-panel" aria-live="polite">
-        <div>
-          <h1>{activity.instruction}</h1>
-          <p>{feedback}</p>
-        </div>
-        <div className="instruction-actions">
-          <button type="button" onClick={listen}>
-            <Volume2 size={21} />
-            Escuchar consigna
-          </button>
-          <button type="button" onClick={retry}>
-            <RotateCcw size={20} />
-            Reintentar
-          </button>
-        </div>
-      </section>
+      {/* Aire inferior: levanta el teclado del borde de la pantalla. */}
+      <div className="pb-6 shrink-0" aria-hidden="true" />
 
       {isCompleted && (
-        <div className="level-complete-overlay" role="dialog" aria-modal="true" aria-labelledby="level-complete-title">
-          <div className="level-complete-card">
-            <div className="level-complete-burst" aria-hidden="true">
-              <span>★</span><span>✦</span><span>✧</span><span>★</span><span>✦</span><span>✧</span>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center animate-overlay-fade"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="level-complete-title"
+        >
+          <div className="modal-overlay" aria-hidden="true" />
+          <div className="glass-card-smooth modal-card px-8 py-10 flex flex-col items-center gap-4 max-w-md w-full mx-4 relative animate-card-pop">
+            <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-3xl" aria-hidden="true">
+              <span className="absolute top-4 left-8 text-3xl text-amber-400 animate-sparkle-burst" style={{ animationDelay: "0s" }}>★</span>
+              <span className="absolute top-12 right-12 text-2xl text-pink-400 animate-sparkle-burst" style={{ animationDelay: "0.1s" }}>✦</span>
+              <span className="absolute bottom-16 left-12 text-2xl text-accent-sky animate-sparkle-burst" style={{ animationDelay: "0.2s" }}>✧</span>
+              <span className="absolute bottom-8 right-8 text-3xl text-amber-400 animate-sparkle-burst" style={{ animationDelay: "0.3s" }}>★</span>
+              <span className="absolute top-1/2 left-4 text-2xl text-pink-400 animate-sparkle-burst" style={{ animationDelay: "0.4s" }}>✦</span>
+              <span className="absolute top-1/3 right-4 text-2xl text-accent-sky animate-sparkle-burst" style={{ animationDelay: "0.5s" }}>✧</span>
             </div>
-            <div className="level-complete-trophy" aria-hidden="true">🏆</div>
-            <h2 id="level-complete-title">¡Nivel completado!</h2>
-            <p>Sumaste {accuracy}% de precisión.</p>
-            <div className="level-complete-stars" aria-hidden="true">
-              {[1, 2, 3].map((index) => (
-                <span
-                  key={index}
-                  className={`level-complete-star ${getStarsFromAccuracy(accuracy) >= index ? "is-on" : ""}`}
-                  style={{ animationDelay: `${0.18 + index * 0.18}s` }}
-                >
-                  ★
-                </span>
-              ))}
+            <div className="text-6xl animate-trophy" aria-hidden="true">🏆</div>
+            <h2 id="level-complete-title" className="font-display font-bold text-3xl text-text">
+              ¡Nivel completado!
+            </h2>
+            <p className="text-muted font-bold text-lg">Sumaste {accuracy}% de precisión.</p>
+            {unlockedAch.length > 0 && (
+              <div className="flex flex-col items-center gap-2 w-full">
+                <span className="text-xs font-black uppercase tracking-wider text-accent-strong">¡Logro desbloqueado!</span>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {unlockedAch.map((id) => {
+                    const m = achievementMeta(id);
+                    return (
+                      <span key={id} className="glass-surface rounded-2xl px-3 py-2 flex items-center gap-2 animate-card-pop">
+                        <span className="text-2xl">{m.emoji}</span>
+                        <span className="text-sm font-bold text-text">{m.label}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            <div className="flex items-end gap-4" aria-hidden="true">
+              {[1, 2, 3].map((index) => {
+                const isOn = getStarsFromAccuracy(accuracy) >= index;
+                // The middle star sits a touch higher for a playful arc.
+                const lift = index === 2 ? "-translate-y-2" : "";
+                return isOn ? (
+                  <span
+                    key={index}
+                    className={`inline-block text-6xl animate-star-bounce ${lift}`}
+                    style={{ animationDelay: `${0.18 + index * 0.16}s` }}
+                  >
+                    <span className="inline-block text-amber-400 animate-star-wiggle drop-shadow-[0_4px_12px_rgba(250,204,21,0.7)]">
+                      ★
+                    </span>
+                  </span>
+                ) : (
+                  <span key={index} className={`inline-block text-5xl text-gray-300/80 ${lift}`}>
+                    ★
+                  </span>
+                );
+              })}
             </div>
-            <div className="level-complete-actions">
-              <button type="button" className="level-complete-action level-complete-action--ghost" onClick={retry}>
+            <div className="flex items-center gap-3 mt-4">
+              <button
+                type="button"
+                onClick={retry}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-text bg-white/80 border border-white/60 shadow-sm hover:scale-105 transition-transform"
+              >
                 <RotateCcw size={18} />
                 Reintentar
               </button>
               <button
                 type="button"
-                className="level-complete-action level-complete-action--primary"
                 onClick={() => navigate(`/worlds/${activity.worldId}`)}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-accent to-accent-strong shadow-btn hover:scale-105 transition-transform"
               >
                 <ArrowRight size={20} />
                 Volver a la isla

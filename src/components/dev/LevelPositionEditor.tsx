@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Crosshair, Grid3x3, RotateCcw, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Crosshair, Grid3x3, Move, RotateCcw, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { LevelPosition } from "../../data/levelPositions";
 
 /* =====================================================================
@@ -17,7 +18,7 @@ import type { LevelPosition } from "../../data/levelPositions";
      P                toggle PERSPECTIVE mode   ↑↓ adjust (depth)
      Escape           deselect node + exit mode
      Ctrl/Cmd + C     copy config array to clipboard + console
-===================================================================== */
+   ===================================================================== */
 
 export interface EditorLevel {
   activityId: string;
@@ -123,18 +124,22 @@ function TinySlider({
   onChange: (v: number) => void;
 }) {
   return (
-    <label className="lpe-slider">
-      <span className="lpe-slider__label">{label}</span>
-      <input
-        type="range"
-        className="lpe-slider__input"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
-      <span className="lpe-slider__val">{R1(value)}</span>
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] font-bold text-muted uppercase tracking-wide">{label}</span>
+      <div className="flex items-center gap-2">
+        <input
+          type="range"
+          className="flex-1 h-1.5 accent-accent-strong cursor-pointer"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+        />
+        <span className="text-xs font-mono font-bold text-text min-w-[3rem] text-right tabular-nums">
+          {R1(value)}
+        </span>
+      </div>
     </label>
   );
 }
@@ -161,15 +166,42 @@ export function LevelPositionEditor({
 }: LevelPositionEditorProps) {
   const sel = selectedIndex >= 0 && selectedIndex < positions.length ? positions[selectedIndex] : null;
 
+  /* Drag-to-move the HUD panel so it never permanently covers a level node. */
+  const [hudPos, setHudPos] = useState<{ left: number; top: number } | null>(null);
+  const hudDrag = useRef<{ sx: number; sy: number; bl: number; bt: number } | null>(null);
+  useEffect(() => {
+    function onMove(e: PointerEvent) {
+      const d = hudDrag.current;
+      if (!d) return;
+      const left = Math.max(0, Math.min(window.innerWidth - 80, d.bl + (e.clientX - d.sx)));
+      const top = Math.max(0, Math.min(window.innerHeight - 40, d.bt + (e.clientY - d.sy)));
+      setHudPos({ left, top });
+    }
+    function onUp() { hudDrag.current = null; }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, []);
+  function startHudDrag(e: React.PointerEvent) {
+    const panel = (e.currentTarget as HTMLElement).closest("[data-hud]") as HTMLElement | null;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    hudDrag.current = { sx: e.clientX, sy: e.clientY, bl: r.left, bt: r.top };
+    setHudPos({ left: r.left, top: r.top });
+  }
+
   function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if ((e.target as HTMLElement).closest(".lpe-hud")) return;
+    if ((e.target as HTMLElement).closest("[data-hud]")) return;
     onCursorMove(e.clientX, e.clientY);
   }
   function handlePointerLeave() {
     onCursorMove(-99999, -99999);
   }
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
-    if ((e.target as HTMLElement).closest(".lpe-hud")) return;
+    if ((e.target as HTMLElement).closest("[data-hud]")) return;
     onCopyAt(e.clientX, e.clientY);
   }
 
@@ -192,94 +224,158 @@ export function LevelPositionEditor({
 
   return (
     <>
-      {/* In-map layer: grid + crosshair + click/move capture. */}
-      <div className="lpe-layer" aria-hidden="true">
+      {/* ── In-map layer: grid + crosshair + click/move capture. ── */}
+      <div className="absolute inset-0 z-[7] pointer-events-none" aria-hidden="true">
         {gridOn && (
-          <svg className="lpe-grid" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
             {GRID_LINES.map((n) => (
-              <line key={`v${n}`} x1={n} y1={0} x2={n} y2={100} className={n === 50 ? "lpe-grid__mid" : ""} />
+              <line
+                key={`v${n}`}
+                x1={n} y1={0} x2={n} y2={100}
+                stroke={n === 50 ? "rgba(49,89,232,0.55)" : "rgba(49,89,232,0.18)"}
+                strokeWidth={n === 50 ? "0.35" : "0.15"}
+              />
             ))}
             {GRID_LINES.map((n) => (
-              <line key={`h${n}`} x1={0} y1={n} x2={100} y2={n} className={n === 50 ? "lpe-grid__mid" : ""} />
+              <line
+                key={`h${n}`}
+                x1={0} y1={n} x2={100} y2={n}
+                stroke={n === 50 ? "rgba(49,89,232,0.55)" : "rgba(49,89,232,0.18)"}
+                strokeWidth={n === 50 ? "0.35" : "0.15"}
+              />
             ))}
           </svg>
         )}
 
         {cursor && (
           <>
-            <div className="lpe-crosshair lpe-crosshair--v" style={{ left: `${cursor.x}%` }} />
-            <div className="lpe-crosshair lpe-crosshair--h" style={{ top: `${cursor.y}%` }} />
-            <div className="lpe-cursor-label" style={{ left: `${cursor.x}%`, top: `${cursor.y}%` }}>
+            {/* Vertical crosshair */}
+            <div
+              className="absolute top-0 bottom-0 w-px bg-accent-strong/60"
+              style={{ left: `${cursor.x}%` }}
+            />
+            {/* Horizontal crosshair */}
+            <div
+              className="absolute left-0 right-0 h-px bg-accent-strong/60"
+              style={{ top: `${cursor.y}%` }}
+            />
+            {/* Cursor coordinate label */}
+            <div
+              className="absolute -translate-x-1/2 -translate-y-full px-1.5 py-0.5 rounded bg-accent-strong/90 text-white text-[10px] font-mono font-bold whitespace-nowrap pointer-events-none"
+              style={{ left: `${cursor.x}%`, top: `${cursor.y}%` }}
+            >
               x {cursor.x} · y {cursor.y}
             </div>
           </>
         )}
 
         <div
-          className="lpe-capture"
+          className="pointer-events-auto cursor-crosshair absolute inset-0"
           onPointerMove={handlePointerMove}
           onPointerLeave={handlePointerLeave}
           onClick={handleClick}
         />
       </div>
 
-      {/* Fixed HUD panel. */}
-      <div className="lpe-hud" role="dialog" aria-label="Editor de posiciones de niveles">
-        <div className="lpe-hud__head">
-          <strong><Crosshair size={15} /> Editor · {worldSlug}</strong>
-          <button type="button" className="lpe-hud__close" aria-label="Cerrar editor" onClick={onClose}>
+      {/* ── Fixed HUD panel. ── */}
+      <div
+        data-hud
+        className="fixed right-4 top-4 z-20 glass-surface p-4 rounded-xl w-72 flex flex-col gap-3 max-h-[calc(100dvh-2rem)] overflow-y-auto animate-hud-in"
+        style={hudPos ? { left: hudPos.left, top: hudPos.top, right: "auto" } : undefined}
+        role="dialog"
+        aria-label="Editor de posiciones de niveles"
+      >
+        {/* Head — drag handle (move the panel so it never covers a node). */}
+        <div className="flex items-center justify-between gap-2">
+          <strong
+            onPointerDown={startHudDrag}
+            className="flex items-center gap-1.5 text-text text-sm font-extrabold cursor-move select-none touch-none"
+            title="Arrastrá para mover el editor"
+          >
+            <Move size={14} className="text-muted" /> Editor · {worldSlug}
+          </strong>
+          <button
+            type="button"
+            className="grid place-items-center w-7 h-7 rounded-lg text-muted hover:bg-rose/10 hover:text-rose transition cursor-pointer"
+            aria-label="Cerrar editor"
+            onClick={onClose}
+          >
             <X size={16} />
           </button>
         </div>
 
-        <p className="lpe-hud__hint">
+        <p className="text-xs text-muted leading-relaxed">
           Arrastra cada numero hasta su plataforma. Clic en un nodo para editar su perspectiva 3D.
         </p>
 
-        <div className="lpe-hud__readout">
+        {/* Readout */}
+        <div className="flex flex-col gap-1.5 text-xs text-muted font-mono">
           <span>Cursor: {cursor ? `x ${cursor.x} · y ${cursor.y}` : "—"}</span>
           <span>Ultimo clic: {lastClick ? `x ${lastClick.x} · y ${lastClick.y}` : "—"}</span>
           <span>
             Nodo seleccionado:{" "}
             {sel ? `Nivel ${selectedIndex + 1}  x ${sel.x} · y ${sel.y}` : "ninguno"}
           </span>
-          <span>
+          <span className="flex items-center gap-1.5 flex-wrap">
             Modo:{" "}
-            <strong className={`lpe-mode-badge ${perspMode ? "is-on" : ""}`}>
+            <strong
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${
+                perspMode
+                  ? "bg-accent-strong text-white"
+                  : "bg-white/60 text-muted"
+              }`}
+            >
               {modeLabel}
             </strong>
             {" "}(teclea S / X / Y / Z / P para cambiar)
           </span>
         </div>
 
-        <div className="lpe-hud__toggles">
-          <button type="button" className={`lpe-chip ${gridOn ? "is-on" : ""}`} onClick={onToggleGrid}>
+        {/* Toggles */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+              gridOn
+                ? "bg-accent-strong text-white shadow-sm"
+                : "glass-surface text-muted hover:text-text"
+            }`}
+            onClick={onToggleGrid}
+          >
             <Grid3x3 size={14} /> Grilla 10%
           </button>
-          <button type="button" className="lpe-chip" onClick={onReset}>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold glass-surface text-muted hover:text-text transition cursor-pointer"
+            onClick={onReset}
+          >
             <RotateCcw size={14} /> Restaurar
           </button>
         </div>
 
         {/* ── Global number size ── */}
-        <label className="lpe-slider">
-          <span className="lpe-slider__label">NumSize</span>
-          <input
-            type="range"
-            className="lpe-slider__input"
-            min={0.5}
-            max={2.5}
-            step={0.05}
-            value={numScale}
-            onChange={(e) => onNumScaleChange(Number(e.target.value))}
-          />
-          <span className="lpe-slider__val">{R1(numScale)}</span>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-bold text-muted uppercase tracking-wide">NumSize</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              className="flex-1 h-1.5 accent-accent-strong cursor-pointer"
+              min={0.5}
+              max={2.5}
+              step={0.05}
+              value={numScale}
+              onChange={(e) => onNumScaleChange(Number(e.target.value))}
+            />
+            <span className="text-xs font-mono font-bold text-text min-w-[3rem] text-right tabular-nums">
+              {R1(numScale)}
+            </span>
+          </div>
         </label>
 
         {/* ── 3D Perspective controls (visible only when a node is selected) ── */}
         {sel && (
-          <div className="lpe-perspective">
-            <strong className="lpe-perspective__title">
+          <div className="flex flex-col gap-2.5 p-3 rounded-xl bg-white/40 border border-white/50">
+            <strong className="text-xs font-extrabold text-text uppercase tracking-wide">
               Perspectiva 3D — Nivel {selectedIndex + 1}
             </strong>
             <TinySlider
@@ -326,30 +422,80 @@ export function LevelPositionEditor({
         )}
 
         {/* ── Keyboard shortcut cheatsheet ── */}
-        <details className="lpe-kbd">
-          <summary className="lpe-kbd__summary">Atajos de teclado</summary>
-          <table className="lpe-kbd__table">
+        <details className="flex flex-col gap-1">
+          <summary className="text-xs font-bold text-muted cursor-pointer hover:text-text transition select-none">
+            Atajos de teclado
+          </summary>
+          <table className="text-[11px] text-muted mt-1 border-separate border-spacing-y-0.5">
             <tbody>
-              <tr><td><kbd><ArrowLeft size={10} /></kbd><kbd><ArrowRight size={10} /></kbd><kbd><ArrowUp size={10} /></kbd><kbd><ArrowDown size={10} /></kbd></td><td>Mover nodo (posicion)</td></tr>
-              <tr><td><kbd>S</kbd></td><td><strong>Toggle modo ESCALA</strong> (↑↓)</td></tr>
-              <tr><td><kbd>X</kbd></td><td><strong>Toggle modo ROTATE X</strong> (↑↓) — inclina adelante/atras como apoyado en el piso</td></tr>
-              <tr><td><kbd>Y</kbd></td><td><strong>Toggle modo ROTATE Y</strong> (←→) — inclina izquierda/derecha</td></tr>
-              <tr><td><kbd>Z</kbd></td><td><strong>Toggle modo ROTATE Z</strong> (←→) — gira sobre su centro</td></tr>
-              <tr><td><kbd>P</kbd></td><td><strong>Toggle modo PERSPECTIVA</strong> (↑↓) — profundidad 3D</td></tr>
-              <tr><td><kbd>Shift</kbd> + flechas</td><td>Multiplica el paso por 10</td></tr>
-              <tr><td><kbd>Escape</kbd></td><td>Deseleccionar nodo + salir de modo</td></tr>
-              <tr><td><kbd>Ctrl</kbd> + <kbd>C</kbd></td><td>Copiar config a portapapeles + consola</td></tr>
+              <tr>
+                <td className="pr-2">
+                  <span className="inline-flex gap-0.5">
+                    <kbd className="grid place-items-center w-5 h-5 rounded bg-white/70 border border-white/80 text-text shadow-sm"><ArrowLeft size={10} /></kbd>
+                    <kbd className="grid place-items-center w-5 h-5 rounded bg-white/70 border border-white/80 text-text shadow-sm"><ArrowRight size={10} /></kbd>
+                    <kbd className="grid place-items-center w-5 h-5 rounded bg-white/70 border border-white/80 text-text shadow-sm"><ArrowUp size={10} /></kbd>
+                    <kbd className="grid place-items-center w-5 h-5 rounded bg-white/70 border border-white/80 text-text shadow-sm"><ArrowDown size={10} /></kbd>
+                  </span>
+                </td>
+                <td>Mover nodo (posicion)</td>
+              </tr>
+              <tr>
+                <td className="pr-2"><kbd className="px-1.5 py-0.5 rounded bg-white/70 border border-white/80 text-text text-[10px] font-bold shadow-sm">S</kbd></td>
+                <td><strong className="text-text">Toggle modo ESCALA</strong> (↑↓)</td>
+              </tr>
+              <tr>
+                <td className="pr-2"><kbd className="px-1.5 py-0.5 rounded bg-white/70 border border-white/80 text-text text-[10px] font-bold shadow-sm">X</kbd></td>
+                <td><strong className="text-text">Toggle modo ROTATE X</strong> (↑↓) — inclina adelante/atras como apoyado en el piso</td>
+              </tr>
+              <tr>
+                <td className="pr-2"><kbd className="px-1.5 py-0.5 rounded bg-white/70 border border-white/80 text-text text-[10px] font-bold shadow-sm">Y</kbd></td>
+                <td><strong className="text-text">Toggle modo ROTATE Y</strong> (←→) — inclina izquierda/derecha</td>
+              </tr>
+              <tr>
+                <td className="pr-2"><kbd className="px-1.5 py-0.5 rounded bg-white/70 border border-white/80 text-text text-[10px] font-bold shadow-sm">Z</kbd></td>
+                <td><strong className="text-text">Toggle modo ROTATE Z</strong> (←→) — gira sobre su centro</td>
+              </tr>
+              <tr>
+                <td className="pr-2"><kbd className="px-1.5 py-0.5 rounded bg-white/70 border border-white/80 text-text text-[10px] font-bold shadow-sm">P</kbd></td>
+                <td><strong className="text-text">Toggle modo PERSPECTIVA</strong> (↑↓) — profundidad 3D</td>
+              </tr>
+              <tr>
+                <td className="pr-2"><kbd className="px-1.5 py-0.5 rounded bg-white/70 border border-white/80 text-text text-[10px] font-bold shadow-sm">Shift</kbd> + flechas</td>
+                <td>Multiplica el paso por 10</td>
+              </tr>
+              <tr>
+                <td className="pr-2"><kbd className="px-1.5 py-0.5 rounded bg-white/70 border border-white/80 text-text text-[10px] font-bold shadow-sm">Escape</kbd></td>
+                <td>Deseleccionar nodo + salir de modo</td>
+              </tr>
+              <tr>
+                <td className="pr-2">
+                  <kbd className="px-1.5 py-0.5 rounded bg-white/70 border border-white/80 text-text text-[10px] font-bold shadow-sm">Ctrl</kbd> + <kbd className="px-1.5 py-0.5 rounded bg-white/70 border border-white/80 text-text text-[10px] font-bold shadow-sm">C</kbd>
+                </td>
+                <td>Copiar config a portapapeles + consola</td>
+              </tr>
             </tbody>
           </table>
         </details>
 
-        <pre className="lpe-hud__json">{arrayLiteral(positions)}</pre>
+        {/* JSON preview */}
+        <pre className="text-[10px] font-mono text-muted bg-white/40 border border-white/50 rounded-lg p-2 overflow-x-auto whitespace-pre leading-relaxed max-h-40">
+          {arrayLiteral(positions)}
+        </pre>
 
-        <div className="lpe-hud__actions">
-          <button type="button" className="lpe-btn lpe-btn--primary" onClick={copyArray}>
+        {/* Action buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-accent-strong text-white shadow-btn hover:shadow-btn-hover hover:-translate-y-0.5 transition cursor-pointer"
+            onClick={copyArray}
+          >
             <Copy size={15} /> Copiar arreglo
           </button>
-          <button type="button" className="lpe-btn" onClick={copyJson}>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold glass-surface text-text hover:bg-white/80 transition cursor-pointer"
+            onClick={copyJson}
+          >
             <Copy size={15} /> Copiar JSON
           </button>
         </div>

@@ -12,9 +12,10 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { verifyAccessToken, hashPassword } from "../auth.js";
 import { assertCanGrant, canActOnSede, ForbiddenError } from "../rbac.js";
+import { audit } from "../audit.js";
 import type { AccessClaims } from "../auth.js";
 
 async function requireUser(req: FastifyRequest): Promise<AccessClaims> {
@@ -29,6 +30,10 @@ const createUserSchema = z.object({
   fullName: z.string().trim().min(1),
   email: z.string().trim().toLowerCase().email(),
   username: z.string().trim().min(1).optional(),
+  // When provided, the account is created with this exact password (no
+  // forced change). When omitted, a temporary password is generated and
+  // returned once. Lets the superadmin set user+password directly.
+  password: z.string().min(6).optional(),
   role: z.enum(["superadmin", "admin-general", "admin-sede", "profesor", "alumno"]),
   sedeId: z.string().uuid().optional().nullable(),
   classId: z.string().uuid().optional().nullable(),
@@ -49,10 +54,16 @@ function makeTempPassword(): string {
 }
 
 export async function userRoutes(app: FastifyInstance) {
-  /* ----- GET /api/users?role=&sedeId= ----- */
+  /* ----- GET /api/users?role=&sedeId=&includeDeleted= ----- */
   app.get("/api/users", async (req, reply) => {
     const actor = await requireUser(req);
-    const { role, sedeId } = req.query as { role?: string; sedeId?: string };
+    // Solo superficies de administración listan usuarios. Un token de alumno
+    // o profesor no puede enumerar emails/usuarios de toda la plataforma
+    // (los profesores tienen /api/teacher/students para su propio alcance).
+    if (actor.role === "alumno" || actor.role === "profesor") {
+      return reply.code(403).send({ error: "No autorizado." });
+    }
+    const { role, sedeId, includeDeleted } = req.query as { role?: string; sedeId?: string; includeDeleted?: string };
     const conditions = [];
     if (role) conditions.push(eq(schema.users.role, role as schema.Role));
     // admin_sede can only see their own sede
@@ -62,6 +73,9 @@ export async function userRoutes(app: FastifyInstance) {
     } else if (sedeId) {
       conditions.push(eq(schema.users.sedeId, sedeId));
     }
+    // F6: by default we hide soft-deleted accounts (Borrar cuenta from
+    // the superadmin panel). Superadmin can opt in via ?includeDeleted=1.
+    if (!includeDeleted) conditions.push(isNull(schema.users.deletedAt));
     const where = conditions.length ? and(...conditions) : undefined;
     const rows = await db
       .select({
@@ -76,6 +90,7 @@ export async function userRoutes(app: FastifyInstance) {
         active: schema.users.active,
         mustChangePassword: schema.users.mustChangePassword,
         lastLoginAt: schema.users.lastLoginAt,
+        deletedAt: schema.users.deletedAt,
       })
       .from(schema.users)
       .where(where as any)
@@ -95,26 +110,37 @@ export async function userRoutes(app: FastifyInstance) {
       if (e instanceof ForbiddenError) return reply.code(e.status).send({ error: e.message });
       throw e;
     }
-    if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, data.sedeId ?? null)) {
+    // An admin-sede always creates within their OWN sede — never trust/require
+    // a client-sent sedeId for them. Superadmin/admin-general may target any.
+    const targetSede = actor.role === "admin-sede" ? (actor.sede ?? null) : (data.sedeId ?? null);
+    if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, targetSede)) {
       return reply.code(403).send({ error: "No podés crear usuarios en otra sede." });
     }
-    const tempPassword = makeTempPassword();
-    const passwordHash = await hashPassword(tempPassword);
-    const [row] = await db
-      .insert(schema.users)
-      .values({
-        fullName: data.fullName,
-        email: data.email,
-        username: data.username ?? makeUsername(data.fullName),
-        role: data.role,
-        sedeId: data.sedeId ?? null,
-        classId: data.classId ?? null,
-        grade: data.grade ?? "libre",
-        passwordHash,
-        mustChangePassword: true,
-        temporaryPassword: true,
-      })
-      .returning();
+    const chosen = !!data.password;
+    const effectivePassword = data.password ?? makeTempPassword();
+    const passwordHash = await hashPassword(effectivePassword);
+    let row;
+    try {
+      [row] = await db
+        .insert(schema.users)
+        .values({
+          fullName: data.fullName,
+          email: data.email,
+          username: data.username ?? makeUsername(data.fullName),
+          role: data.role,
+          sedeId: targetSede,
+          classId: data.classId ?? null,
+          grade: data.grade ?? "libre",
+          passwordHash,
+          mustChangePassword: !chosen,
+          temporaryPassword: !chosen,
+        })
+        .returning();
+    } catch (e: any) {
+      // Unique violation on email/username → friendly message.
+      if (e?.code === "23505") return reply.code(409).send({ error: "Ya existe un usuario con ese email o usuario." });
+      throw e;
+    }
     if (!row) return reply.code(500).send({ error: "No se pudo crear el usuario." });
     if (data.classId) {
       if (data.role === "alumno") {
@@ -123,9 +149,17 @@ export async function userRoutes(app: FastifyInstance) {
         await db.insert(schema.classTeachers).values({ classId: data.classId, userId: row.id }).onConflictDoNothing();
       }
     }
+    await audit({
+      actor,
+      action: "create_user",
+      entityType: "user",
+      entityId: row.id,
+      meta: { role: data.role, email: data.email, sedeId: targetSede, classId: data.classId ?? null, generatedPassword: !chosen },
+    });
     return reply.send({
-      user: { id: row.id, email: row.email, name: row.fullName, role: row.role, sedeId: row.sedeId, classId: row.classId },
-      temporaryPassword: tempPassword,
+      user: { id: row.id, email: row.email, name: row.fullName, username: row.username, role: row.role, sedeId: row.sedeId, classId: row.classId },
+      // Only surface a password when WE generated it; a chosen one is not echoed.
+      temporaryPassword: chosen ? null : effectivePassword,
     });
   });
 
@@ -140,25 +174,58 @@ export async function userRoutes(app: FastifyInstance) {
     if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, target.sedeId)) {
       return reply.code(403).send({ error: "No podés modificar usuarios de otra sede." });
     }
+    // El destino del cambio de sede también tiene que estar dentro del
+    // alcance del actor (un admin-sede no puede mover usuarios a otra sede).
+    if (
+      parsed.data.sedeId !== undefined &&
+      !canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, parsed.data.sedeId ?? null)
+    ) {
+      return reply.code(403).send({ error: "No podés mover usuarios a otra sede." });
+    }
     if (target.role === "superadmin" && actor.role !== "superadmin") {
       return reply.code(403).send({ error: "Solo el superadmin puede modificar al superadmin." });
     }
-    const [row] = await db
-      .update(schema.users)
-      .set({
-        fullName: parsed.data.fullName ?? target.fullName,
-        email: parsed.data.email ?? target.email,
-        sedeId: parsed.data.sedeId !== undefined ? parsed.data.sedeId : target.sedeId,
-        classId: parsed.data.classId !== undefined ? parsed.data.classId : target.classId,
-        grade: parsed.data.grade ?? target.grade,
-        active: parsed.data.active !== undefined ? parsed.data.active : target.active,
-      })
-      .where(eq(schema.users.id, id))
-      .returning();
+    // El curso destino también tiene que ser de una sede sobre la que el
+    // actor puede actuar.
+    if (parsed.data.classId) {
+      const [cls] = await db.select().from(schema.classes).where(eq(schema.classes.id, parsed.data.classId)).limit(1);
+      if (!cls) return reply.code(400).send({ error: "El curso no existe." });
+      if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, cls.sedeId)) {
+        return reply.code(403).send({ error: "El curso es de otra sede." });
+      }
+    }
+    let row;
+    try {
+      [row] = await db
+        .update(schema.users)
+        .set({
+          fullName: parsed.data.fullName ?? target.fullName,
+          email: parsed.data.email ?? target.email,
+          username: parsed.data.username ?? target.username,
+          sedeId: parsed.data.sedeId !== undefined ? parsed.data.sedeId : target.sedeId,
+          classId: parsed.data.classId !== undefined ? parsed.data.classId : target.classId,
+          grade: parsed.data.grade ?? target.grade,
+          active: parsed.data.active !== undefined ? parsed.data.active : target.active,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, id))
+        .returning();
+    } catch (e: any) {
+      if (e?.code === "23505") return reply.code(409).send({ error: "Ya existe un usuario con ese email o usuario." });
+      throw e;
+    }
+    // Mantener el roster (class_students) en sincronía cuando se cambia el
+    // curso de un alumno desde la edición — igual que POST /classes/:id/students.
+    if (target.role === "alumno" && parsed.data.classId !== undefined && parsed.data.classId !== target.classId) {
+      await db.delete(schema.classStudents).where(eq(schema.classStudents.userId, id));
+      if (parsed.data.classId) {
+        await db.insert(schema.classStudents).values({ classId: parsed.data.classId, userId: id }).onConflictDoNothing();
+      }
+    }
     return reply.send(row);
   });
 
-  /* ----- DELETE /api/users/:id ----- */
+  /* ----- DELETE /api/users/:id (F6: soft delete) ----- */
   app.delete("/api/users/:id", async (req, reply) => {
     const actor = await requireUser(req);
     const { id } = req.params as { id: string };
@@ -176,7 +243,50 @@ export async function userRoutes(app: FastifyInstance) {
     if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, target.sedeId)) {
       return reply.code(403).send({ error: "No podés eliminar usuarios de otra sede." });
     }
-    await db.delete(schema.users).where(eq(schema.users.id, id));
+    // F6: soft delete — keeps progress, attempts and audit history intact.
+    // The account can no longer log in, is hidden from listings, and is
+    // excluded from class rosters via the active=true filter (also flipped
+    // to false so any in-flight session sees "user inactive" on next call).
+    await db
+      .update(schema.users)
+      .set({ deletedAt: new Date(), active: false, updatedAt: new Date() })
+      .where(eq(schema.users.id, id));
+    await audit({
+      actor,
+      action: "delete_user",
+      entityType: "user",
+      entityId: id,
+      meta: { email: target.email, role: target.role },
+    });
+    return reply.send({ ok: true });
+  });
+
+  /* ----- POST /api/users/:id/restore (F6: re-activate a soft-deleted account) ----- */
+  app.post("/api/users/:id/restore", async (req, reply) => {
+    const actor = await requireUser(req);
+    const { id } = req.params as { id: string };
+    const [target] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
+    if (!target) return reply.code(404).send({ error: "Usuario no encontrado." });
+    try {
+      assertCanGrant(actor.role as schema.Role, target.role);
+    } catch (e) {
+      if (e instanceof ForbiddenError) return reply.code(e.status).send({ error: e.message });
+      throw e;
+    }
+    if (!canActOnSede({ role: actor.role as schema.Role, sedeId: actor.sede }, target.sedeId)) {
+      return reply.code(403).send({ error: "No podés restaurar usuarios de otra sede." });
+    }
+    await db
+      .update(schema.users)
+      .set({ deletedAt: null, active: true, updatedAt: new Date() })
+      .where(eq(schema.users.id, id));
+    await audit({
+      actor,
+      action: "restore_user",
+      entityType: "user",
+      entityId: id,
+      meta: { email: target.email, role: target.role },
+    });
     return reply.send({ ok: true });
   });
 
@@ -201,6 +311,13 @@ export async function userRoutes(app: FastifyInstance) {
       .update(schema.users)
       .set({ passwordHash, mustChangePassword: true, temporaryPassword: true })
       .where(eq(schema.users.id, id));
+    await audit({
+      actor,
+      action: "reset_password",
+      entityType: "user",
+      entityId: id,
+      meta: { email: target.email, role: target.role },
+    });
     return reply.send({ temporaryPassword: tempPassword });
   });
 
@@ -211,8 +328,10 @@ export async function userRoutes(app: FastifyInstance) {
     if (actor.sub !== id) {
       return reply.code(403).send({ error: "Solo podés cambiar tu propia contraseña." });
     }
-    const body = z.object({ newPassword: z.string().min(8) }).safeParse(req.body);
-    if (!body.success) return reply.code(400).send({ error: "La contraseña nueva debe tener al menos 8 caracteres." });
+    // Mínimo 6 — consistente con la creación de usuarios, la aceptación de
+    // invitaciones y el formulario "Cambiar contraseña" del frontend.
+    const body = z.object({ newPassword: z.string().min(6) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: "La contraseña nueva debe tener al menos 6 caracteres." });
     const passwordHash = await hashPassword(body.data.newPassword);
     await db
       .update(schema.users)
