@@ -1,26 +1,26 @@
 ---
-description: Branching and pull-request workflow (dev vs master) — always apply
+description: Branching and pull-request workflow (dev vs main) — always apply
 alwaysApply: true
 ---
 
-# Git workflow — branch on `dev`, never commit to `master`
+# Git workflow — work on `dev`, never commit to `main`
 
-The repo has two long-lived branches. **The primary/production branch is
-`master`** — there is no `main`; when anyone says "main" they mean `master`.
+The repo has two long-lived branches:
 
-- **`dev`** — all development happens here. Branch off `dev`, commit your work
+- **`dev`** — ALL development happens here. Branch off `dev`, commit your work
   to `dev` (or to short-lived feature branches that merge back into `dev`), and
-  push `dev`. This is the default working branch for everyone.
-- **`master`** — host/production only. It is deployed to
-  `mecanografia.bauhub.online` and must stay releasable at all times.
+  push `dev`. This is the default working branch for everyone (humans and
+  agents).
+- **`main`** — host/production ONLY. It is what `typely.bauhub.online` runs
+  (the GitHub Action `.github/workflows/deploy.yml` auto-deploys every push to
+  `main` to the VPS). It must stay releasable at all times.
 
 Hard rules:
 
-1. Never commit or push directly to `master`.
-2. `master` changes **only** through a reviewed **pull request from `dev`**, and
-   **only** when the work is finished and tested.
-3. Before opening the PR, run `npm run build` (`tsc --noEmit && vite build`) and
-   the deploy checklist so `master` never breaks.
-4. Keep `dev` up to date with `master` after each release so they don't drift.
-
-Full details in `CLAUDE.md` §17.
+1. Never commit or push directly to `main`.
+2. `main` changes **only** through a **pull request from `dev`**, and **only**
+   when the work is finished and tested ("cuando esté todo listo").
+3. Before opening the PR, run `npm run build` (`tsc --noEmit && vite build`)
+   and `npx tsc -p api/tsconfig.json` so `main` never breaks.
+4. After each release, merge `main` back into `dev` so they don't drift.
+5. The legacy `master` branch is historical — do not use it.

@@ -1,5 +1,11 @@
 # Deploying TYPELY on Oracle VPS
 
+> **Branching:** el desarrollo vive en la rama **`dev`**; **`main` es solo
+> host/producción** y cada push a `main` se auto-despliega vía
+> `.github/workflows/deploy.yml`. `main` solo cambia por **pull request desde
+> `dev`** cuando está todo listo. Nunca commitear directo a `main`.
+> Ver `CLAUDE.md` §17.
+
 > **Estado real del VPS actual (`bauhub`, 168.75.68.75):** el repo vive en
 > **`/opt/apps/typely`** (no `/typely`) y existe un
 > **`docker-compose.override.yml` local (NO commiteado)** que (1) publica el

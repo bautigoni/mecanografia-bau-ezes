@@ -106,11 +106,14 @@ are taught.
 Before telling the user to deploy, confirm `git status`, build success,
 container status, and the correct exposed port.
 
-## 21. Branch on `dev`, never commit to `master`
+## 21. Branch on `dev`, never commit to `main`
 The repo has two long-lived branches. **`dev`** is where all development
 happens — branch off it, commit there (or via short-lived feature branches
-that merge back into `dev`), and push `dev`. **`master`** is the
-host/production branch deployed to `mecanografia.bauhub.online` and there is
-no `main` ("main" means `master`). Never commit or push directly to `master`:
-it only changes through a reviewed **pull request from `dev` → `master`**, and
-only when the work is finished and `npm run build` passes. See `CLAUDE.md` §17.
+that merge back into `dev`), and push `dev`. **`main`** is the
+host/production branch: every push to it auto-deploys to
+`typely.bauhub.online` via `.github/workflows/deploy.yml`. Never commit or
+push directly to `main`: it only changes through a **pull request from
+`dev` → `main`**, and only when the work is finished ("cuando esté todo
+listo") and `npm run build` passes. Merge `main` back into `dev` after each
+release. The legacy `master` branch is historical — don't use it. See
+`CLAUDE.md` §17 and `.cursor/rules/git-workflow.mdc`.

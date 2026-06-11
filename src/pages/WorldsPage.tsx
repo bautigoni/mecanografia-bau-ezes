@@ -402,8 +402,10 @@ export function WorldsPage() {
         aria-hidden="true"
       />
 
-      {/* ── Star counter + hamburger menu (top-right, always visible) ── */}
-      <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-2">
+      {/* ── Star counter + hamburger menu (top-right, always visible).
+          z-50: por encima de TODO el mapa (los badges de costo de las islas
+          usan z-10 y pisaban el menú desplegado cuando compartían z-30). ── */}
+      <div className="fixed top-4 right-4 z-50 flex flex-col items-end gap-2">
         <div className="flex items-center gap-2">
           <StarCounter />
           <button
@@ -757,7 +759,7 @@ export function WorldsPage() {
                 {cost > 0 && (
                   <span
                     className={[
-                      "absolute z-30 flex items-center gap-1 rounded-full glass-strong",
+                      "absolute z-10 flex items-center gap-1 rounded-full glass-strong",
                       "border border-white/70 shadow-md font-black whitespace-nowrap pointer-events-none",
                       isLocked
                         ? "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 text-base"

@@ -303,30 +303,33 @@ the API/DB require the backend (see `DEPLOY.md`). Reset demo data by clearing th
 
 ## 17. Branching & Git Workflow
 
-The repo has two long-lived branches. **The primary/production branch is
-`master`** (there is no `main` — when anyone says "main" they mean `master`).
+The repo has two long-lived branches:
 
 - **`dev` — all development happens here.** Branch off `dev`, commit your work to
   `dev` (or to short-lived feature branches that merge back into `dev`), and push
-  `dev`. This is the default working branch for everyone.
-- **`master` — host/production only.** It is deployed to
-  `mecanografia.bauhub.online` and must stay releasable at all times.
+  `dev`. This is the default working branch for everyone — humans and agents.
+- **`main` — host/production only.** Every push to `main` **auto-deploys** to
+  `typely.bauhub.online` via `.github/workflows/deploy.yml`, so it must stay
+  releasable at all times.
 
 Hard rules:
 
-1. **Never commit or push directly to `master`.** It changes *only* through a
-   pull request, and *only* when the work is finished and tested.
-2. **`dev` → `master` via Pull Request.** When everything is ready, open a PR from
-   `dev` into `master`, review it, then merge. Do not fast-forward random branches
-   into `master` by hand.
+1. **Never commit or push directly to `main`.** It changes *only* through a
+   pull request from `dev`, and *only* when the work is finished and tested
+   ("cuando esté todo listo").
+2. **`dev` → `main` via Pull Request.** When everything is ready, open a PR from
+   `dev` into `main`, review it, then merge. Do not fast-forward random branches
+   into `main` by hand.
 3. **Before opening the PR**, run `npm run build` (`tsc --noEmit && vite build`)
-   and the deploy checklist (see `DEPLOY.md` / §13) so `master` never breaks.
-4. Keep `dev` rebased/merged up to date with `master` after each release so the
-   two don't drift.
+   plus `npx tsc -p api/tsconfig.json`, and the deploy checklist (see
+   `DEPLOY.md` / §13) so `main` never breaks.
+4. Keep `dev` merged up to date with `main` after each release so the two don't
+   drift.
+5. The legacy `master` branch is historical only — do not use it.
 
 ```bash
 git checkout dev          # work happens here
 # …edit, commit…
-git push                  # pushes to origin/dev
-# when ready for production: open a PR  dev → master  and merge it
+git push origin dev       # pushes to origin/dev (never to main)
+# when ready for production: open a PR  dev → main  and merge it
 ```

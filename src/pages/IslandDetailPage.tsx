@@ -98,16 +98,25 @@ export function IslandDetailPage() {
     setSelectedIndex(initialIndex);
   }, [initialIndex]);
 
+  /* Natural size of the BACKGROUND art — needed to anchor the level map to
+     the image's object-cover rect (see computeIslandContainer). */
+  const [bgImgSize, setBgImgSize] = useState<{ w: number; h: number } | null>(null);
+
   useEffect(() => {
     if (!maybeWorld) return;
     setBgReady(false);
+    setBgImgSize(null);
     const bgSrc = ISLAND_BG[maybeWorld.slug] ?? maybeWorld.background;
     const img = new Image();
     img.decoding = "async";
-    img.onload = () => setBgReady(true);
+    const done = () => {
+      if (img.naturalWidth > 0) setBgImgSize({ w: img.naturalWidth, h: img.naturalHeight });
+      setBgReady(true);
+    };
+    img.onload = done;
     img.onerror = () => setBgReady(true);
     img.src = bgSrc;
-    if (img.complete && img.naturalWidth > 0) setBgReady(true);
+    if (img.complete && img.naturalWidth > 0) done();
   }, [maybeWorld]);
 
   // Seed the editor draft from the saved config whenever the island changes.
@@ -150,15 +159,34 @@ export function IslandDetailPage() {
   }, [islandImgPath]);
 
   const computeIslandContainer = useCallback(() => {
-    if (!islandImgSize) { setIslandContainer(null); return; }
     const vw = window.innerWidth, vh = window.innerHeight;
-    const iAR = islandImgSize.w / islandImgSize.h;
-    const vAR = vw / vh;
-    let cw: number, ch: number;
-    if (vAR > iAR) { ch = vh; cw = ch * iAR; }
-    else            { cw = vw; ch = cw / iAR; }
-    setIslandContainer({ left: (vw - cw) / 2, top: (vh - ch) / 2, w: cw, h: ch });
-  }, [islandImgSize]);
+    if (islandImgSize) {
+      /* Isla con PNG propio (island1): caja CONTAIN — la imagen entra entera
+         y los nodos comparten su sistema de coordenadas. */
+      const iAR = islandImgSize.w / islandImgSize.h;
+      const vAR = vw / vh;
+      let cw: number, ch: number;
+      if (vAR > iAR) { ch = vh; cw = ch * iAR; }
+      else            { cw = vw; ch = cw / iAR; }
+      setIslandContainer({ left: (vw - cw) / 2, top: (vh - ch) / 2, w: cw, h: ch });
+      return;
+    }
+    if (bgImgSize) {
+      /* Islas SIN PNG propio: las plataformas están pintadas en el FONDO, que
+         se renderiza con object-cover (recortado en pantallas anchas/altas).
+         El mapa de niveles se ancla al rectángulo COVER de la imagen — no al
+         viewport — así los % guardados caen sobre las plataformas pintadas en
+         CUALQUIER aspect ratio. (Antes los nodos eran % del viewport y en
+         pantallas anchas los candados quedaban flotando fuera de las
+         plataformas.) */
+      const scale = Math.max(vw / bgImgSize.w, vh / bgImgSize.h);
+      const cw = bgImgSize.w * scale;
+      const ch = bgImgSize.h * scale;
+      setIslandContainer({ left: (vw - cw) / 2, top: (vh - ch) / 2, w: cw, h: ch });
+      return;
+    }
+    setIslandContainer(null);
+  }, [islandImgSize, bgImgSize]);
 
   useEffect(() => {
     computeIslandContainer();
@@ -541,7 +569,7 @@ export function IslandDetailPage() {
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="false">
         <div className="relative w-full h-full">
           {/* Island PNG — only shown when separate island art is available */}
-          {islandContainer && (
+          {islandImgPath && islandContainer && (
             <div
               style={{
                 position: "absolute",
