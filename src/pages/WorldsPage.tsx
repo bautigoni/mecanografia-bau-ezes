@@ -32,6 +32,7 @@ import { useAuth } from "../hooks/useAuth";
 import { getWorldStarRequirements, getWorldStatesForUser, getWorldsForUser, worldStarProgress, type World } from "../data/worlds";
 import { Toast } from "../components/common/Toast";
 import { StarCounter } from "../components/common/StarCounter";
+import { CharacterSkin } from "../components/common/CharacterSkin";
 import { assets } from "../utils/assets";
 import { getUserContext, makeRapidClickDetector } from "../utils/userContext";
 import { getTotalStars, loadProgress } from "../utils/progress";
@@ -801,11 +802,10 @@ export function WorldsPage() {
           The <img> carries no filter so the rasterizer is not forced to
           re-blur the alpha channel of a 14–24rem tall PNG on every frame. */}
       <span className="absolute bottom-0 left-0 animate-mascot-float pointer-events-none select-none z-10">
-        <img
+        <CharacterSkin
+          kind="female"
           className="w-auto max-h-[33vh] drop-shadow-lg"
-          src={assets.mascotFemaleLaptop}
           alt=""
-          decoding="async"
           loading="lazy"
         />
       </span>
@@ -816,11 +816,10 @@ export function WorldsPage() {
           ¡Vamos!
         </span>
         <span className="animate-mascot-float">
-          <img
+          <CharacterSkin
+            kind="male"
             className="w-auto max-h-[33vh] drop-shadow-lg"
-            src={assets.mascotMaleProud}
             alt=""
-            decoding="async"
             loading="lazy"
           />
         </span>

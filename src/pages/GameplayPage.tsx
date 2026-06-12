@@ -9,6 +9,7 @@ import { achievementMeta } from "../data/achievements";
 import { SkillLevelView } from "./SkillLevelView";
 import { ShortcutLevelView } from "./ShortcutLevelView";
 import { StarCounter } from "../components/common/StarCounter";
+import { CharacterSkin } from "../components/common/CharacterSkin";
 
 const MOTIVATION_PHRASES = [
   "¡Vamos que podés!",
@@ -1011,10 +1012,9 @@ export function GameplayPage() {
               >
                 {leftPhrase}
               </div>
-              <img
-                src={assets.mascotFemaleWave}
+              <CharacterSkin
+                kind="female"
                 alt=""
-                decoding="async"
                 className="w-28 sm:w-40 h-auto object-contain animate-mascot-float"
               />
             </figure>
@@ -1024,10 +1024,9 @@ export function GameplayPage() {
               >
                 {rightPhrase}
               </div>
-              <img
-                src={assets.mascotMaleJump}
+              <CharacterSkin
+                kind="male"
                 alt=""
-                decoding="async"
                 className="w-28 sm:w-40 h-auto object-contain animate-mascot-float"
                 style={{ animationDelay: "1s" }}
               />

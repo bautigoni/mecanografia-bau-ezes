@@ -71,6 +71,38 @@ export const assets = {
 };
 
 /* =====================================================================
+   CHARACTER & SHIP PROGRESSION SKINS (unlocked by cumulative star total)
+   Five phases per object (f1…f5). The account-wide star total picks the
+   phase (see `getSkinPhaseIndex` in utils/progress): 0★→f1 · 5★→f2 · 10★→f3
+   · 20★→f4 · 30★→f5. `t1` is the BASE tier; a future character evolution adds
+   a `t2` set that restarts at f1 — drop the art in /skins as `<kind>-t2-f<n>`
+   and add `skinTier(kind, "t2")` below. Files: optimised WebP under
+   public/assets/edutic-art/skins/ (1024px, transparent).
+===================================================================== */
+const SKINS_DIR = "/assets/edutic-art/skins";
+
+export type SkinKind = "male" | "female" | "ship";
+
+function skinTier(kind: SkinKind, tier: string): string[] {
+  return [1, 2, 3, 4, 5].map((f) => `${SKINS_DIR}/${kind}-${tier}-f${f}.webp`);
+}
+
+/** [tierIndex][phaseIndex] — tier 0 = base (`t1`). Index 0 → f1 … 4 → f5. */
+export const characterSkins: Record<SkinKind, string[][]> = {
+  male:   [skinTier("male", "t1")],
+  female: [skinTier("female", "t1")],
+  ship:   [skinTier("ship", "t1")],
+};
+
+/** Resolve a skin URL, clamping tier/phase into range so it never returns
+ *  undefined even if thresholds or tier counts change later. */
+export function skinUrl(kind: SkinKind, phaseIndex: number, tier = 0): string {
+  const tiers = characterSkins[kind];
+  const set = tiers[Math.min(Math.max(tier, 0), tiers.length - 1)];
+  return set[Math.min(Math.max(phaseIndex, 0), set.length - 1)];
+}
+
+/* =====================================================================
    Expansion islands (island6 … island15) — THREE separate image families.
    They must NEVER be mixed. Index 0 → island6 … index 9 → island15, and
    all three share the SAME theme order (crystal, garden, frozen, autumn,

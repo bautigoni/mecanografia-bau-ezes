@@ -37,5 +37,9 @@ pnpm-debug.log*
 # Local asset backups (not shipped)
 _backups/
 
+# Skin source PNGs — only the optimised .webp siblings are shipped/tracked.
+# Regenerate the .webp with sharp/optimize_images.py after dropping new PNGs.
+public/assets/edutic-art/skins/*.png
+
 # Local verification scratch (Playwright screenshots, dev scripts)
 screenshots/

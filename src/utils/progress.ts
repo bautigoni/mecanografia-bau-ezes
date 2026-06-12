@@ -164,6 +164,26 @@ export function getTotalStars(progress: CurriculumProgress = loadProgress()): nu
   return total;
 }
 
+/* ===================================================================
+   CHARACTER SKIN PROGRESSION (by cumulative star total)
+   The student's character + ship change art as the account-wide star total
+   (`getTotalStars`) crosses these thresholds. Five phases (f1…f5):
+     0★ → f1 · 5★ → f2 · 10★ → f3 · 20★ → f4 · 30★ → f5.
+   The evolution "tier" (base vs. future evo) is a separate axis resolved in
+   assets.ts (`characterSkins` / `skinUrl`).
+=================================================================== */
+export const SKIN_PHASE_THRESHOLDS = [0, 5, 10, 20, 30] as const;
+
+/** Phase index 0..4 (f1..f5) for a cumulative star total. Defaults to the live
+ *  account total read from storage. */
+export function getSkinPhaseIndex(totalStars: number = getTotalStars()): number {
+  let phase = 0;
+  for (let i = 0; i < SKIN_PHASE_THRESHOLDS.length; i++) {
+    if (totalStars >= SKIN_PHASE_THRESHOLDS[i]) phase = i;
+  }
+  return phase;
+}
+
 export interface WorldStarProgress {
   earnedStars: number;
   totalStars: number;
