@@ -184,6 +184,31 @@ export function getSkinPhaseIndex(totalStars: number = getTotalStars()): number 
   return phase;
 }
 
+export interface SkinPhaseProgress {
+  /** Current phase index 0..4 (f1..f5). */
+  phaseIndex: number;
+  totalStars: number;
+  /** Star total where the CURRENT phase began (0 for f1). */
+  prevThreshold: number;
+  /** Star total that unlocks the NEXT phase, or null at max phase. */
+  nextThreshold: number | null;
+  isMax: boolean;
+}
+
+/** Progress toward the next skin phase — drives the SkinProgressBar
+ *  ("27/30 ⭐" + the mystery-character teaser). */
+export function getSkinPhaseProgress(totalStars: number = getTotalStars()): SkinPhaseProgress {
+  const phaseIndex = getSkinPhaseIndex(totalStars);
+  const isMax = phaseIndex >= SKIN_PHASE_THRESHOLDS.length - 1;
+  return {
+    phaseIndex,
+    totalStars,
+    prevThreshold: SKIN_PHASE_THRESHOLDS[phaseIndex],
+    nextThreshold: isMax ? null : SKIN_PHASE_THRESHOLDS[phaseIndex + 1],
+    isMax,
+  };
+}
+
 export interface WorldStarProgress {
   earnedStars: number;
   totalStars: number;

@@ -422,6 +422,25 @@ a { color: inherit; text-decoration: none; }
   filter: brightness(1.1);
 }
 
+/* ── Skin-progression bar + personaje misterioso (por estrellas) ── */
+/* Relleno dorado: el componente fija el width inline en %; esta transición
+   lo anima cuando suben las estrellas (al volver al mapa o en vivo). */
+.skin-bar-fill {
+  background-image: linear-gradient(90deg, #ffd552, #facc15, #ffb547);
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.55);
+  transition: width 1100ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Brillo de "ganancia": la barra destella mientras se llena con estrellas
+   nuevas (se aplica unos instantes y se quita). */
+@keyframes skinBarGain { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.4) saturate(1.25); } }
+.animate-skin-bar-gain { animation: skinBarGain 700ms ease-in-out 3; }
+/* El "?" del personaje misterioso respira con un glow blanco suave. */
+@keyframes mysteryPulse {
+  0%, 100% { text-shadow: 0 0 6px rgba(255, 255, 255, 0.9), 0 0 14px rgba(255, 255, 255, 0.55); opacity: 0.92; }
+  50%      { text-shadow: 0 0 10px rgba(255, 255, 255, 1), 0 0 24px rgba(255, 255, 255, 0.85); opacity: 1; }
+}
+.animate-mystery-pulse { animation: mysteryPulse 2.2s ease-in-out infinite; }
+
 /* ── Reduced Motion ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

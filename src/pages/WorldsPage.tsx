@@ -33,6 +33,8 @@ import { getWorldStarRequirements, getWorldStatesForUser, getWorldsForUser, worl
 import { Toast } from "../components/common/Toast";
 import { StarCounter } from "../components/common/StarCounter";
 import { CharacterSkin } from "../components/common/CharacterSkin";
+import { SkinProgressBar } from "../components/common/SkinProgressBar";
+import { SkinUnlockCelebration } from "../components/common/SkinUnlockCelebration";
 import { assets } from "../utils/assets";
 import { getUserContext, makeRapidClickDetector } from "../utils/userContext";
 import { getTotalStars, loadProgress } from "../utils/progress";
@@ -478,6 +480,11 @@ export function WorldsPage() {
             </button>
           </div>
         )}
+
+        {/* Progreso hacia el próximo personaje (fase de skin por estrellas):
+            barra dorada + "27/30 ⭐" + silueta misteriosa de la próxima fase.
+            Va DESPUÉS del menú para que el desplegable quede pegado a su botón. */}
+        <SkinProgressBar />
       </div>
 
       {/* ── Horizontally scrollable world journey ── */}
@@ -826,6 +833,9 @@ export function WorldsPage() {
       </div>
 
       <Toast message={message} />
+
+      {/* Celebración al desbloquear una fase de personaje nueva (por estrellas). */}
+      <SkinUnlockCelebration />
     </main>
   );
 }
