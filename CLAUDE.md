@@ -283,6 +283,9 @@ docs. Full runbook in `DEPLOY.md`.
 - Keep Docker building; do not bind host ports 80/443 in app compose; keep the
   `127.0.0.1:3005` / `:3006` ports stable. Don't ship dead buttons.
 - Spanish must be correct: tildes (á é í ó ú), ñ, mayúsculas, inverted `¿` `¡`.
+- **Branch on `dev`, never commit directly to `master`.** `master` is the
+  host/production branch; it only changes through a reviewed pull request from
+  `dev` when everything is ready (see §17).
 - After any code change run `npm run build` (= `tsc --noEmit && vite build`); fix
   failures before claiming done. Report which files changed and how to test.
 
@@ -297,3 +300,36 @@ npm run build        # tsc --noEmit && vite build
 Demo: the login "Entrar en modo demo" button enters as a student. Staff/admin and
 the API/DB require the backend (see `DEPLOY.md`). Reset demo data by clearing the
 `edutic_*` localStorage keys (listed in `README.md`).
+
+## 17. Branching & Git Workflow
+
+The repo has two long-lived branches:
+
+- **`dev` — all development happens here.** Branch off `dev`, commit your work to
+  `dev` (or to short-lived feature branches that merge back into `dev`), and push
+  `dev`. This is the default working branch for everyone — humans and agents.
+- **`main` — host/production only.** Every push to `main` **auto-deploys** to
+  `typely.bauhub.online` via `.github/workflows/deploy.yml`, so it must stay
+  releasable at all times.
+
+Hard rules:
+
+1. **Never commit or push directly to `main`.** It changes *only* through a
+   pull request from `dev`, and *only* when the work is finished and tested
+   ("cuando esté todo listo").
+2. **`dev` → `main` via Pull Request.** When everything is ready, open a PR from
+   `dev` into `main`, review it, then merge. Do not fast-forward random branches
+   into `main` by hand.
+3. **Before opening the PR**, run `npm run build` (`tsc --noEmit && vite build`)
+   plus `npx tsc -p api/tsconfig.json`, and the deploy checklist (see
+   `DEPLOY.md` / §13) so `main` never breaks.
+4. Keep `dev` merged up to date with `main` after each release so the two don't
+   drift.
+5. The legacy `master` branch is historical only — do not use it.
+
+```bash
+git checkout dev          # work happens here
+# …edit, commit…
+git push origin dev       # pushes to origin/dev (never to main)
+# when ready for production: open a PR  dev → main  and merge it
+```

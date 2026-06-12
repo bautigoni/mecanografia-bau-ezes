@@ -43,10 +43,12 @@ html, body { background-color: #f1effb; }
   --glass-white: 0.5;        /* translucency of the white film (lower = more see-through) */
   --glass-border: 0.7;
   --glass-sheen: 0.55;
-  /* Difuminado del FONDO detrás de cualquier popup/modal (estilo Apple).
-     Ajustable en vivo desde /editor-glass. */
-  --modal-blur: 26px;
-  --modal-tint: 0.10;        /* qué tan oscuro se pone el fondo (0 = nada) */
+  /* Difuminado del FONDO detrás de cualquier popup/modal. Necesita ser
+     FUERTE (28-40px) para que cualquier texto o card de atrás se vuelva
+     ilegible y el modal sea lo único que se lee claro. Ajustable en
+     vivo desde /editor-glass. */
+  --modal-blur: 32px;
+  --modal-tint: 0.12;        /* qué tan oscuro se pone el fondo (0 = nada) */
 }
 
 /* Opt-in heavier liquid glass for immersive GAME surfaces only (login,
@@ -123,31 +125,36 @@ a { color: inherit; text-decoration: none; }
   position: absolute;
   inset: 0;
   background: rgba(23, 53, 95, var(--modal-tint));
-  /* Usamos la utilidad NATIVA de Tailwind (vía @apply): es la única forma que
-     emite el `backdrop-filter` estándar que Chrome aplica. Lightning CSS
-     descarta la propiedad estándar cuando se escribe a mano como
-     `blur(var(...))`. */
-  @apply backdrop-blur-[var(--modal-blur)] backdrop-saturate-125;
-  /* El difuminado se CONCENTRA detrás del componente y se desvanece hacia
-     los bordes (profundidad de campo), en vez de empañar la pantalla entera
-     de manera uniforme. La máscara también atenúa el tinte gris en los
-     bordes, así no queda un velo plano. */
-  mask-image: radial-gradient(
-    ellipse 75% 70% at 50% 45%,
-    black 45%,
-    rgba(0, 0, 0, 0.85) 65%,
-    rgba(0, 0, 0, 0.45) 85%,
-    rgba(0, 0, 0, 0.18) 100%
-  );
+  /* Overlay "tint glass" con un blur SUAVE (10-14px): difumina lo justo
+     para que ningún texto/elemento nítido del fondo se cuele, pero deja
+     pasar el color pastel del fondo para que el card se vea con su tinte.
+     El look final es el de la captura de referencia (degradado del fondo
+     filtrándose) pero sin texto nítido asomando por debajo. */
+  @apply backdrop-blur-[var(--modal-blur)];
+  /* Saturamos un toque el fondo borroso para que el color pastel se note
+     más a través del card translúcido. */
+  -webkit-backdrop-filter: blur(var(--modal-blur)) saturate(1.4);
+  backdrop-filter: blur(var(--modal-blur)) saturate(1.4);
 }
 
 .modal-card {
-  /* La tarjeta sigue siendo liquid glass translúcido; solo sube el blur del
-     propio vidrio para legibilidad. NUNCA subir --glass-white acá (opacar
-     mata el efecto). */
-  --glass-blur: 48px;
-  --glass-saturate: 2;
-  box-shadow: 0 32px 90px rgba(23, 53, 95, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  /* Liquid glass "real": el overlay DEBAJO difumina el fondo con FUERZA
+     (--modal-blur 32px) → cualquier card o texto detrás queda borroso e
+     ilegible. La propia tarjeta sube su opacidad para que, aunque sea
+     translúcida, no deje pasar elementos nítidos (por si el card de
+     atrás quedara con poco blur por composición). */
+  --glass-blur: 28px;
+  --glass-saturate: 1.5;
+  --glass-white: 0.55;
+  --glass-border: 0.8;
+  --glass-sheen: 0.65;
+  box-shadow: 0 32px 90px rgba(23, 53, 95, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.80);
+  /* Capa de respaldo opaca: si el backdrop-filter falla, la tarjeta
+     sigue siendo 75% opaca → legible. Con backdrop-filter activo, la
+     tarjeta se ve translúcida con tinte del fondo borroso. */
+  background-color: rgba(255, 255, 255, 0.75);
+  position: relative;
+  z-index: 1;
 }
 
 @utility glass-surface {
@@ -414,6 +421,60 @@ a { color: inherit; text-decoration: none; }
 .world-scroll::-webkit-scrollbar-thumb:hover {
   filter: brightness(1.1);
 }
+
+/* ── Skin-progression bar + personaje misterioso (por estrellas) ── */
+/* Relleno dorado: el componente fija el width inline en %; esta transición
+   lo anima cuando suben las estrellas (al volver al mapa o en vivo). */
+.skin-bar-fill {
+  background-image: linear-gradient(90deg, #ffd552, #facc15, #ffb547);
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.55);
+  transition: width 1100ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Brillo de "ganancia": la barra destella mientras se llena con estrellas
+   nuevas (se aplica unos instantes y se quita). */
+@keyframes skinBarGain { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.4) saturate(1.25); } }
+.animate-skin-bar-gain { animation: skinBarGain 700ms ease-in-out 3; }
+/* El "?" del personaje misterioso respira con un glow blanco suave. */
+@keyframes mysteryPulse {
+  0%, 100% { text-shadow: 0 0 6px rgba(255, 255, 255, 0.9), 0 0 14px rgba(255, 255, 255, 0.55); opacity: 0.92; }
+  50%      { text-shadow: 0 0 10px rgba(255, 255, 255, 1), 0 0 24px rgba(255, 255, 255, 0.85); opacity: 1; }
+}
+.animate-mystery-pulse { animation: mysteryPulse 2.2s ease-in-out infinite; }
+
+/* ── Celebración ÉPICA de desbloqueo de personajes ── */
+/* Sunburst: rayos dorados/violetas en conic-gradient que giran detrás del
+   card de vidrio (el backdrop-blur del card los difumina → look soñado).
+   El mask los desvanece radialmente para que no toquen los bordes. */
+.skin-rays {
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(255, 216, 120, 0.30) 0deg 9deg,
+    rgba(255, 255, 255, 0) 9deg 18deg,
+    rgba(155, 124, 255, 0.18) 18deg 27deg,
+    rgba(255, 255, 255, 0) 27deg 36deg
+  );
+  -webkit-mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.95) 16%, transparent 62%);
+  mask-image: radial-gradient(circle, rgba(0, 0, 0, 0.95) 16%, transparent 62%);
+}
+/* Entrada de héroe: sube desde abajo con blur + overshoot y se asienta. */
+@keyframes skinHeroRise {
+  0%   { opacity: 0; transform: translateY(56px) scale(0.4); filter: blur(14px); }
+  60%  { opacity: 1; transform: translateY(-10px) scale(1.1); filter: blur(0); }
+  80%  { transform: translateY(4px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.animate-skin-hero-rise { animation: skinHeroRise 750ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* Anillo de impacto al "aterrizar" cada personaje (arranca invisible para
+   poder retrasarlo sin que se vea un puntito esperando). */
+@keyframes skinLandRing {
+  0%   { transform: scale(0.3); opacity: 0; }
+  12%  { opacity: 0.85; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+.animate-skin-land-ring { animation: skinLandRing 600ms ease-out both; }
+/* Lluvia de estrellas: reusa la caída i5-fall pero en loop y con duración/
+   retraso por partícula vía custom properties. */
+.skin-confetti { animation: i5-fall var(--fall-dur, 3.4s) linear var(--fall-delay, 0s) infinite; }
 
 /* ── Reduced Motion ── */
 @media (prefers-reduced-motion: reduce) {

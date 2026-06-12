@@ -24,6 +24,16 @@ for backward compat; only user-facing strings say "TYPELY".
 - **`dbnew.md`** — backend implementation log. **`DEPLOY.md`** — ops runbook.
 - **`Skills/`** — `skill.md` (EduTic design spec) and `frontend-design/SKILL.md`.
 
+## Branching (read before you commit)
+
+**Work on `dev`, never commit to `main`.** `main` is the host/production
+branch: every push to `main` auto-deploys to `typely.bauhub.online` via
+`.github/workflows/deploy.yml`. All development lands on `dev`; `main` only
+changes through a **pull request from `dev`**, and only when everything is
+ready ("cuando esté todo listo") and `npm run build` passes. After each
+release, merge `main` back into `dev`. The old `master` branch is historical —
+don't use it. Full rules in `CLAUDE.md` §17 and `.cursor/rules/git-workflow.mdc`.
+
 ## Non-negotiables (summary — see CLAUDE.md §15)
 
 1. Never modify originals in `Images/` or `Images-new/`; use/regenerate the web
@@ -38,3 +48,6 @@ for backward compat; only user-facing strings say "TYPELY".
    deploy or change the `127.0.0.1:3005`/`:3006` ports.
 6. Keep the app responsive (monitors / Chromebooks / phones — see CLAUDE.md §6).
 7. After any change run `npm run build`; report files changed and how to test.
+8. Branch on `dev`; never commit to `main`. `main` (production/host,
+   auto-deploys on push) only updates via a PR from `dev` when everything is
+   ready.

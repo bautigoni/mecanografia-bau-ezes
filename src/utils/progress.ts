@@ -164,6 +164,51 @@ export function getTotalStars(progress: CurriculumProgress = loadProgress()): nu
   return total;
 }
 
+/* ===================================================================
+   CHARACTER SKIN PROGRESSION (by cumulative star total)
+   The student's character + ship change art as the account-wide star total
+   (`getTotalStars`) crosses these thresholds. Five phases (f1…f5):
+     0★ → f1 · 5★ → f2 · 10★ → f3 · 20★ → f4 · 30★ → f5.
+   The evolution "tier" (base vs. future evo) is a separate axis resolved in
+   assets.ts (`characterSkins` / `skinUrl`).
+=================================================================== */
+export const SKIN_PHASE_THRESHOLDS = [0, 5, 10, 20, 30] as const;
+
+/** Phase index 0..4 (f1..f5) for a cumulative star total. Defaults to the live
+ *  account total read from storage. */
+export function getSkinPhaseIndex(totalStars: number = getTotalStars()): number {
+  let phase = 0;
+  for (let i = 0; i < SKIN_PHASE_THRESHOLDS.length; i++) {
+    if (totalStars >= SKIN_PHASE_THRESHOLDS[i]) phase = i;
+  }
+  return phase;
+}
+
+export interface SkinPhaseProgress {
+  /** Current phase index 0..4 (f1..f5). */
+  phaseIndex: number;
+  totalStars: number;
+  /** Star total where the CURRENT phase began (0 for f1). */
+  prevThreshold: number;
+  /** Star total that unlocks the NEXT phase, or null at max phase. */
+  nextThreshold: number | null;
+  isMax: boolean;
+}
+
+/** Progress toward the next skin phase — drives the SkinProgressBar
+ *  ("27/30 ⭐" + the mystery-character teaser). */
+export function getSkinPhaseProgress(totalStars: number = getTotalStars()): SkinPhaseProgress {
+  const phaseIndex = getSkinPhaseIndex(totalStars);
+  const isMax = phaseIndex >= SKIN_PHASE_THRESHOLDS.length - 1;
+  return {
+    phaseIndex,
+    totalStars,
+    prevThreshold: SKIN_PHASE_THRESHOLDS[phaseIndex],
+    nextThreshold: isMax ? null : SKIN_PHASE_THRESHOLDS[phaseIndex + 1],
+    isMax,
+  };
+}
+
 export interface WorldStarProgress {
   earnedStars: number;
   totalStars: number;

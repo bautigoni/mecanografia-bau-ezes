@@ -5,6 +5,8 @@ import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom"
 import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
 import { StarCounter } from "../components/common/StarCounter";
+import { CharacterSkin } from "../components/common/CharacterSkin";
+import { SkinUnlockCelebration } from "../components/common/SkinUnlockCelebration";
 import { getWorldBySlug, getWorlds, worldStarProgress, WORLD_PEDAGOGY_ORDER, type Level, type LevelPosition } from "../data/worlds";
 import { LevelPositionEditor } from "../components/dev/LevelPositionEditor";
 import { assets } from "../utils/assets";
@@ -98,16 +100,25 @@ export function IslandDetailPage() {
     setSelectedIndex(initialIndex);
   }, [initialIndex]);
 
+  /* Natural size of the BACKGROUND art — needed to anchor the level map to
+     the image's object-cover rect (see computeIslandContainer). */
+  const [bgImgSize, setBgImgSize] = useState<{ w: number; h: number } | null>(null);
+
   useEffect(() => {
     if (!maybeWorld) return;
     setBgReady(false);
+    setBgImgSize(null);
     const bgSrc = ISLAND_BG[maybeWorld.slug] ?? maybeWorld.background;
     const img = new Image();
     img.decoding = "async";
-    img.onload = () => setBgReady(true);
+    const done = () => {
+      if (img.naturalWidth > 0) setBgImgSize({ w: img.naturalWidth, h: img.naturalHeight });
+      setBgReady(true);
+    };
+    img.onload = done;
     img.onerror = () => setBgReady(true);
     img.src = bgSrc;
-    if (img.complete && img.naturalWidth > 0) setBgReady(true);
+    if (img.complete && img.naturalWidth > 0) done();
   }, [maybeWorld]);
 
   // Seed the editor draft from the saved config whenever the island changes.
@@ -150,15 +161,34 @@ export function IslandDetailPage() {
   }, [islandImgPath]);
 
   const computeIslandContainer = useCallback(() => {
-    if (!islandImgSize) { setIslandContainer(null); return; }
     const vw = window.innerWidth, vh = window.innerHeight;
-    const iAR = islandImgSize.w / islandImgSize.h;
-    const vAR = vw / vh;
-    let cw: number, ch: number;
-    if (vAR > iAR) { ch = vh; cw = ch * iAR; }
-    else            { cw = vw; ch = cw / iAR; }
-    setIslandContainer({ left: (vw - cw) / 2, top: (vh - ch) / 2, w: cw, h: ch });
-  }, [islandImgSize]);
+    if (islandImgSize) {
+      /* Isla con PNG propio (island1): caja CONTAIN — la imagen entra entera
+         y los nodos comparten su sistema de coordenadas. */
+      const iAR = islandImgSize.w / islandImgSize.h;
+      const vAR = vw / vh;
+      let cw: number, ch: number;
+      if (vAR > iAR) { ch = vh; cw = ch * iAR; }
+      else            { cw = vw; ch = cw / iAR; }
+      setIslandContainer({ left: (vw - cw) / 2, top: (vh - ch) / 2, w: cw, h: ch });
+      return;
+    }
+    if (bgImgSize) {
+      /* Islas SIN PNG propio: las plataformas están pintadas en el FONDO, que
+         se renderiza con object-cover (recortado en pantallas anchas/altas).
+         El mapa de niveles se ancla al rectángulo COVER de la imagen — no al
+         viewport — así los % guardados caen sobre las plataformas pintadas en
+         CUALQUIER aspect ratio. (Antes los nodos eran % del viewport y en
+         pantallas anchas los candados quedaban flotando fuera de las
+         plataformas.) */
+      const scale = Math.max(vw / bgImgSize.w, vh / bgImgSize.h);
+      const cw = bgImgSize.w * scale;
+      const ch = bgImgSize.h * scale;
+      setIslandContainer({ left: (vw - cw) / 2, top: (vh - ch) / 2, w: cw, h: ch });
+      return;
+    }
+    setIslandContainer(null);
+  }, [islandImgSize, bgImgSize]);
 
   useEffect(() => {
     computeIslandContainer();
@@ -179,9 +209,9 @@ export function IslandDetailPage() {
       ? editorPositions
       : world.levelPositions;
   const currentPosition = activePositions[currentIndex] ?? activePositions[0];
-  /* The ship is ALWAYS the same front-facing sprite (ship-front) in every
-     world — it's the game's main character, not a directional indicator. */
-  const shipAsset = assets.shipFront;
+  /* The ship is the game's main character (always front-facing, never a
+     directional indicator). Its art "evolves" with the cumulative star total,
+     same as the mascots — rendered via <CharacterSkin kind="ship" /> below. */
   /* Star progress toward unlocking the next world (70% gate). */
   const starProgress = worldStarProgress(world.slug);
   const isLastWorld = worldNumber >= WORLD_PEDAGOGY_ORDER.length;
@@ -541,7 +571,7 @@ export function IslandDetailPage() {
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="false">
         <div className="relative w-full h-full">
           {/* Island PNG — only shown when separate island art is available */}
-          {islandContainer && (
+          {islandImgPath && islandContainer && (
             <div
               style={{
                 position: "absolute",
@@ -618,11 +648,10 @@ export function IslandDetailPage() {
               className="absolute z-20 pointer-events-none"
               style={{ left: `${currentPosition.x}%`, top: `${currentPosition.y - 3}%`, transform: "translate(-50%,-100%)" }}
             >
-              <img
+              <CharacterSkin
+                kind="ship"
                 className="block w-[clamp(5rem,18vmin,16rem)] animate-ship-hover"
-                src={shipAsset}
                 alt="Nave de los estudiantes en el nivel actual"
-                decoding="async"
                 loading="lazy"
               />
             </span>
@@ -831,6 +860,10 @@ export function IslandDetailPage() {
 
       {/* Contador de estrellas de la cuenta (siempre visible, arriba a la derecha). */}
       <StarCounter className="fixed top-4 right-4 z-30" />
+
+      {/* Celebración al desbloquear una fase de personaje nueva — acá es donde
+          el alumno aterriza con "Volver" justo después de cruzar el umbral. */}
+      <SkinUnlockCelebration />
 
       {editorAvailable() && (
         <button
