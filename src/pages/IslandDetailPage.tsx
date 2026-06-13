@@ -7,6 +7,7 @@ import { Toast } from "../components/common/Toast";
 import { StarCounter } from "../components/common/StarCounter";
 import { CharacterSkin } from "../components/common/CharacterSkin";
 import { SkinUnlockCelebration } from "../components/common/SkinUnlockCelebration";
+import { SkinProgressBar } from "../components/common/SkinProgressBar";
 import { getWorldBySlug, getWorlds, worldStarProgress, WORLD_PEDAGOGY_ORDER, type Level, type LevelPosition } from "../data/worlds";
 import { LevelPositionEditor } from "../components/dev/LevelPositionEditor";
 import { assets } from "../utils/assets";
@@ -860,6 +861,10 @@ export function IslandDetailPage() {
 
       {/* Contador de estrellas de la cuenta (siempre visible, arriba a la derecha). */}
       <StarCounter className="fixed top-4 right-4 z-30" />
+
+      {/* Barra ÉPICA de progreso al próximo personaje — abajo-centro, igual
+          que en el mapa de mundos (pointer-events-none: no tapa los niveles). */}
+      <SkinProgressBar />
 
       {/* Celebración al desbloquear una fase de personaje nueva — acá es donde
           el alumno aterriza con "Volver" justo después de cruzar el umbral. */}
