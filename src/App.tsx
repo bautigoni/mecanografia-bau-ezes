@@ -16,6 +16,7 @@ import { ApiInspectorPage } from "./pages/admin/ApiInspectorPage";
 import { SedeAcademicYearLayout } from "./components/admin/SedeShell";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { ImpersonationBanner } from "./components/admin/ImpersonationBanner";
+import { DevLayoutEditorMount } from "./components/dev/layoutEditor";
 import { StudentDetailPage } from "./pages/admin/StudentDetailPage";
 import { TeacherDetailPage } from "./pages/admin/TeacherDetailPage";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage";
@@ -66,6 +67,9 @@ export function App() {
   return (
     <ErrorBoundary>
     <ImpersonationBanner />
+    {/* Editor de layout interno (SOLO desarrollo; se elimina del bundle de
+        producción por la doble compuerta de DevLayoutEditorMount). */}
+    <DevLayoutEditorMount />
     <Routes>
       <Route path="/" element={<LoginPage />} />
       <Route path="/login" element={<LoginPage />} />
