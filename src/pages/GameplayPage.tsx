@@ -4,12 +4,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { getActivityById } from "../data/activities";
 import { assets } from "../utils/assets";
 import { getGameplayBackground } from "../data/worlds";
-import { getStarsFromAccuracy, markLevelComplete } from "../utils/progress";
+import { getStarsFromAccuracy, getTotalStars, markLevelComplete } from "../utils/progress";
 import { achievementMeta } from "../data/achievements";
 import { SkillLevelView } from "./SkillLevelView";
 import { ShortcutLevelView } from "./ShortcutLevelView";
 import { StarCounter } from "../components/common/StarCounter";
 import { CharacterSkin } from "../components/common/CharacterSkin";
+import { LevelStarReward } from "../components/common/LevelStarReward";
+import { SkinUnlockCelebration } from "../components/common/SkinUnlockCelebration";
 
 const MOTIVATION_PHRASES = [
   "¡Vamos que podés!",
@@ -270,6 +272,11 @@ export function GameplayPage() {
   const [isIdleHintActive, setIsIdleHintActive] = useState(false);
   const [inputSignal, setInputSignal] = useState(0);
   const [unlockedAch, setUnlockedAch] = useState<string[]>([]);
+  /* Suma de estrellas a la colección (barra del modal): total ANTES/DESPUÉS de
+     completar el nivel. `celebPhase` dispara la celebración de personaje nuevo
+     DESPUÉS de que la barra termina de llenarse. */
+  const [starRun, setStarRun] = useState<{ before: number; after: number } | null>(null);
+  const [celebPhase, setCelebPhase] = useState<number | null>(null);
   const completionSaved = useRef(false);
   const activityRef = useRef(activity);
   const advanceTimeoutRef = useRef<number | null>(null);
@@ -343,9 +350,15 @@ export function GameplayPage() {
     if (completionSaved.current) return;
     completionSaved.current = true;
     const currentActivity = activityRef.current;
+    /* Total de la cuenta ANTES de guardar; markLevelComplete escribe el
+       progreso de forma síncrona, así que el total DESPUÉS ya refleja la
+       ganancia neta (sólo cuenta el mejor resultado por nivel). */
+    const before = getTotalStars();
     void markLevelComplete(currentActivity.worldId, currentActivity.levelNumber, finalAccuracy, finalAttempts).then((unlocked) => {
       if (unlocked.length) setUnlockedAch(unlocked);
     });
+    const after = getTotalStars();
+    setStarRun({ before, after });
   }
 
   function targetAt(index: number) {
@@ -741,6 +754,8 @@ export function GameplayPage() {
     setIsIdleHintActive(false);
     setInputSignal((value) => value + 1);
     completionSaved.current = false;
+    setStarRun(null);
+    setCelebPhase(null);
   }
 
   function listen() {
@@ -1162,6 +1177,18 @@ export function GameplayPage() {
                 );
               })}
             </div>
+
+            {/* Suma de estrellas a la colección: la barra sube con las estrellas
+                ganadas en este nivel; al cruzar de fase dispara la celebración
+                de personaje nuevo (después de esta barra). */}
+            {starRun && starRun.after > starRun.before && (
+              <LevelStarReward
+                before={starRun.before}
+                after={starRun.after}
+                onCrossPhase={(p) => setCelebPhase(p)}
+              />
+            )}
+
             <div className="flex items-center gap-3 mt-4">
               <button
                 type="button"
@@ -1182,6 +1209,13 @@ export function GameplayPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Celebración de personaje nuevo — CONTROLADA: aparece sólo después de
+          que la barra de estrellas terminó de sumar y cruzó de fase. Tapa el
+          modal (z-[55] > z-50); al cerrarla queda el modal con Reintentar/Volver. */}
+      {celebPhase !== null && (
+        <SkinUnlockCelebration phase={celebPhase} onDismiss={() => setCelebPhase(null)} />
       )}
     </main>
   );

@@ -51,18 +51,31 @@ function readCelebrated(): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function SkinUnlockCelebration() {
-  const [shownPhase, setShownPhase] = useState<number | null>(null);
+export function SkinUnlockCelebration({
+  phase,
+  onDismiss,
+}: {
+  /** Modo CONTROLADO: mostrar la celebración de ESTA fase directamente (lo usa
+   *  el modal de nivel completado, justo después de la barra que suma las
+   *  estrellas). Si es `undefined`, la celebración se AUTO-DETECTA en las
+   *  pantallas hub (mapa de mundos / detalle de isla) como hasta ahora. */
+  phase?: number;
+  onDismiss?: () => void;
+} = {}) {
+  const controlled = phase !== undefined;
+  const [shownPhase, setShownPhase] = useState<number | null>(controlled ? (phase as number) : null);
 
+  /* Auto-detección — SOLO en modo no controlado (pantallas hub). */
   useEffect(() => {
+    if (controlled) return;
     const check = () => {
-      const phase = getSkinPhaseIndex();
+      const currentPhase = getSkinPhaseIndex();
       const celebrated = readCelebrated();
-      if (celebrated === null || phase < celebrated) {
-        localStorage.setItem(CELEBRATED_KEY, String(phase));
+      if (celebrated === null || currentPhase < celebrated) {
+        localStorage.setItem(CELEBRATED_KEY, String(currentPhase));
         return;
       }
-      if (phase > celebrated) setShownPhase(phase);
+      if (currentPhase > celebrated) setShownPhase(currentPhase);
     };
     check();
     window.addEventListener("edutic:progress", check);
@@ -71,7 +84,12 @@ export function SkinUnlockCelebration() {
       window.removeEventListener("edutic:progress", check);
       window.removeEventListener("storage", check);
     };
-  }, []);
+  }, [controlled]);
+
+  /* Modo controlado — seguir el prop `phase`. */
+  useEffect(() => {
+    if (controlled) setShownPhase(phase as number);
+  }, [controlled, phase]);
 
   /* Cerrar con Escape mientras está visible. */
   useEffect(() => {
@@ -87,8 +105,11 @@ export function SkinUnlockCelebration() {
   if (shownPhase === null) return null;
 
   const dismiss = () => {
+    /* Registrar la fase ACTUAL como celebrada para que el hub no la repita
+       (vale tanto para el modo auto como para el controlado del modal). */
     localStorage.setItem(CELEBRATED_KEY, String(getSkinPhaseIndex()));
     setShownPhase(null);
+    onDismiss?.();
   };
 
   const threshold = SKIN_PHASE_THRESHOLDS[shownPhase] ?? SKIN_PHASE_THRESHOLDS[SKIN_PHASE_THRESHOLDS.length - 1];

@@ -481,10 +481,6 @@ export function WorldsPage() {
           </div>
         )}
 
-        {/* Progreso hacia el próximo personaje (fase de skin por estrellas):
-            barra dorada + "27/30 ⭐" + silueta misteriosa de la próxima fase.
-            Va DESPUÉS del menú para que el desplegable quede pegado a su botón. */}
-        <SkinProgressBar />
       </div>
 
       {/* ── Horizontally scrollable world journey ── */}
@@ -833,6 +829,10 @@ export function WorldsPage() {
       </div>
 
       <Toast message={message} />
+
+      {/* Barra ÉPICA de progreso al próximo personaje — protagonista
+          abajo-centro, entre los robots de las esquinas. */}
+      <SkinProgressBar />
 
       {/* Celebración al desbloquear una fase de personaje nueva (por estrellas). */}
       <SkinUnlockCelebration />
