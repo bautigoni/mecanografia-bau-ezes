@@ -117,14 +117,17 @@ export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = 
   ],
 
   island6: [
-    { x: 20.8, y: 88.9 },
-    { x: 18.6, y: 46.3 },
-    { x: 29.1, y: 34 },
-    { x: 46, y: 28.1 },
-    { x: 57.9, y: 37.9 },
-    { x: 74.2, y: 60.8 },
-    { x: 62.9, y: 13.6 },
-    { x: 44, y: 68 },
+    /* Mundo 2 "Isla de la escritura" — fondo bg01_crystal_portal.webp (1672×941).
+       Coordenadas = % de la imagen (la cover-rect math de IslandDetailPage las
+       fija a las plataformas pintadas en cualquier viewport). Cadena que sube
+       desde el disco de abajo-izquierda hasta el portal. 7 niveles. */
+    { x: 20, y: 87 },   // N1 — disco rúnico abajo-izquierda (inicio, lleva la nave)
+    { x: 24, y: 47 },   // N2 — disco de la cornisa izquierda
+    { x: 34, y: 38 },   // N3 — terraza verde sobre la cornisa
+    { x: 45, y: 31 },   // N4 — escalones de piedra hacia el centro
+    { x: 55, y: 48 },   // N5 — disco rúnico central
+    { x: 76, y: 61 },   // N6 — disco rúnico derecho (abajo)
+    { x: 60, y: 23 },   // N7 — explanada al pie del portal
   ],
 
   island7: [
