@@ -121,8 +121,8 @@ export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = 
        Coordenadas = % de la imagen (la cover-rect math de IslandDetailPage las
        fija a las plataformas pintadas en cualquier viewport). Cadena que sube
        desde el disco de abajo-izquierda hasta el portal. 7 niveles. */
-    { x: 20, y: 87 },   // N1 — disco rúnico abajo-izquierda (inicio, lleva la nave)
-    { x: 24, y: 47 },   // N2 — disco de la cornisa izquierda
+    { x: 20, y: 87, scale: 1.15 },   // N1 — disco rúnico abajo-izquierda (inicio, lleva la nave)
+    { x: 24, y: 47, scale: 1.7 },    // N2 — disco de la cornisa izquierda (más grande)
     { x: 34, y: 38 },   // N3 — terraza verde sobre la cornisa
     { x: 45, y: 31 },   // N4 — escalones de piedra hacia el centro
     { x: 55, y: 48 },   // N5 — disco rúnico central

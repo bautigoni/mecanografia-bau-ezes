@@ -713,6 +713,11 @@ export function IslandDetailPage() {
                   key={level.title}
                   type="button"
                   data-level-node=""
+                  /* Id estable por nodo (btnisland<isla>lvl<nivel>): es el
+                     CONTENEDOR de las 4 piezas (imagen normal, imagen apretada,
+                     número y el pulso celeste), así seleccionarlo en la dev tool
+                     mueve/escala todo junto y genera un selector limpio. */
+                  id={`btnisland${world.id.replace(/\D/g, "")}lvl${level.levelNumber}`}
                   className={[
                     "absolute -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto",
                     "w-[clamp(3rem,9.5vmin,9rem)] h-[clamp(3rem,9.5vmin,9rem)]",

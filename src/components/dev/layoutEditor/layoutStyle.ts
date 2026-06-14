@@ -35,9 +35,12 @@ export function readEdits(el: HTMLElement): LayoutEdits {
     width: Math.round(parseFloat(cs.width)) || null,
     height: Math.round(parseFloat(cs.height)) || null,
     scale: t.scale,
-    rotate: t.rotate,
+    rotateX: 0,
+    rotateY: 0,
+    rotateZ: t.rotate,
     translateX: t.translateX,
     translateY: t.translateY,
+    perspective: 0,
   };
 }
 
@@ -61,11 +64,15 @@ function decomposeTransform(transform: string): {
   return { scale, rotate, translateX: Math.round(e), translateY: Math.round(f) };
 }
 
-/** Arma el string `transform` a partir de las partes (orden estable). */
+/** Arma el string `transform` a partir de las partes (orden estable).
+ *  `perspective()` debe ir PRIMERO para que rotateX/rotateY tengan profundidad. */
 export function composeTransform(e: LayoutEdits): string {
   const parts: string[] = [];
+  if (e.perspective > 0) parts.push(`perspective(${e.perspective}px)`);
   if (e.translateX !== 0 || e.translateY !== 0) parts.push(`translate(${e.translateX}px, ${e.translateY}px)`);
-  if (e.rotate !== 0) parts.push(`rotate(${e.rotate}deg)`);
+  if (e.rotateX !== 0) parts.push(`rotateX(${e.rotateX}deg)`);
+  if (e.rotateY !== 0) parts.push(`rotateY(${e.rotateY}deg)`);
+  if (e.rotateZ !== 0) parts.push(`rotateZ(${e.rotateZ}deg)`);
   if (e.scale !== 1) parts.push(`scale(${round(e.scale)})`);
   return parts.join(" ");
 }
@@ -118,13 +125,12 @@ function round(n: number): number {
 export function generateCss(el: HTMLElement, e: LayoutEdits, dirty: Set<DirtyKey>): string {
   const selector = buildSelector(el);
   const lines: string[] = [];
-  // Si hay offsets editados, emitimos también `position` para que la regla
-  // funcione por sí sola (aunque no se haya tocado el modo explícitamente).
-  const needsPos = dirty.has("position") || (["top", "left", "right", "bottom"] as const).some((k) => dirty.has(k));
-  if (needsPos) {
-    const pos = effectivePosition(e);
-    if (pos !== "static") lines.push(`position: ${pos};`);
-  }
+  // Emitimos `position` siempre que haya ALGÚN cambio y el elemento esté
+  // posicionado (absolute/relative/fixed/sticky), no sólo al tocar offsets.
+  // Así la regla es autosuficiente: pegada en el .css funciona sola
+  // (p. ej. un mover con translate() necesita que el botón sea `absolute`).
+  const pos = effectivePosition(e);
+  if (dirty.size > 0 && pos !== "static") lines.push(`position: ${pos};`);
   for (const key of LENGTH_KEYS) {
     if (!dirty.has(key)) continue;
     const v = e[key];

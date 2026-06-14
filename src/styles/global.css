@@ -562,3 +562,65 @@ a { color: inherit; text-decoration: none; }
 @media (max-height: 560px) {
   .gp-key { height: 1.5rem; font-size: 0.74rem; }
 }
+#btnisland6lvl1 {
+  position: absolute;
+  transform: translate(15px, -35px) rotateX(-28deg) rotateY(2deg) scale(1.6);
+}
+#btnisland6lvl1 > span:nth-of-type(2) > span {
+  transform: scale(1.4);
+}
+#btnisland6lvl2 {
+  position: absolute;
+  transform: translate(-80px, -8px) rotateX(48deg) scale(0.9);
+}
+#btnisland6lvl2 > span:nth-of-type(2) > span {
+  transform: translate(0px, -2px) scale(1.5);
+}
+#btnisland6lvl3 {
+  position: absolute;
+  transform: translate(-55px, 0px) rotateX(58deg) scale(1.5);
+}
+#btnisland6lvl3 > span:nth-of-type(2) > span {
+  position: relative;
+  top: -2px;
+  left: 1px;
+  transform: scale(1.25);
+}
+#btnisland6lvl4 {
+  position: absolute;
+  transform: translate(25px, 38px) rotateX(49deg) scale(1.15);
+}
+#btnisland6lvl4 > span:nth-of-type(2) > span {
+  position: relative;
+  top: -5px;
+  left: 0px;
+  transform: scale(1.25);
+}
+#btnisland6lvl5 {
+  position: absolute;
+  transform: translate(47px, -38px) rotateX(49deg) rotateY(3deg) rotateZ(4deg) scale(1.6);
+}
+#btnisland6lvl5 > span:nth-of-type(2) > span {
+  position: relative;
+  top: -6px;
+  transform: rotateZ(13deg) scale(1.25);
+}
+#btnisland6lvl6 {
+  position: absolute;
+  right: 250px;
+  transform: translate(10px, -10px)rotateZ(6deg) rotateX(-40deg) scale(1.8);
+}
+#btnisland6lvl6 > span:nth-of-type(2) > span {
+  position: relative;
+  top: -6px;
+  transform: scale(1.35);
+}
+#btnisland6lvl7 {
+  position: absolute;
+  transform: translate(45px, 5px) rotateX(57deg) rotateY(2deg) rotateZ(-1deg) scale(1.85);
+}
+#btnisland6lvl7 > span:nth-of-type(2) > span {
+  position: relative;
+  top: -5px;
+  transform: rotateZ(17deg) scale(1.35);
+}
