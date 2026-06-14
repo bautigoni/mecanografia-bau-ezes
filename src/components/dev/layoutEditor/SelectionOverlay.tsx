@@ -5,9 +5,9 @@ import type { Rect } from "./types";
 
    Dibuja:
      · caja de hover (punteada) sobre el elemento bajo el cursor,
-     · caja de selección (sólida + manijas) sobre el elemento elegido,
-     · etiquetas de coordenadas (x, y) y de tamaño (w × h),
-     · guías que cruzan el viewport por los bordes del elemento.
+     · una caja de selección por cada elemento seleccionado,
+     · en el ÚLTIMO seleccionado (primario): manijas, guías que cruzan el
+       viewport y etiquetas de coordenadas (x, y) y tamaño (w × h).
 
    Recibe rects ya calculados en coordenadas de viewport.
    ===================================================================== */
@@ -19,12 +19,13 @@ function sameRect(a: Rect | null, b: Rect | null): boolean {
 
 export function SelectionOverlay({
   hoverRect,
-  selRect,
+  selRects,
 }: {
   hoverRect: Rect | null;
-  selRect: Rect | null;
+  selRects: Rect[];
 }) {
-  const showHover = hoverRect && !sameRect(hoverRect, selRect);
+  const primary = selRects.length ? selRects[selRects.length - 1] : null;
+  const showHover = hoverRect && !selRects.some((r) => sameRect(hoverRect, r));
 
   return (
     <>
@@ -35,34 +36,40 @@ export function SelectionOverlay({
         />
       )}
 
-      {selRect && (
+      {/* Una caja por cada elemento seleccionado. */}
+      {selRects.map((r, i) => (
+        <div
+          key={i}
+          className="dle-box dle-box-sel"
+          style={{ left: r.x, top: r.y, width: r.width, height: r.height }}
+        >
+          {i === selRects.length - 1 && (
+            <>
+              <span className="dle-handle tl" />
+              <span className="dle-handle tr" />
+              <span className="dle-handle bl" />
+              <span className="dle-handle br" />
+            </>
+          )}
+        </div>
+      ))}
+
+      {/* Guías + etiquetas: sólo en el primario, para no saturar. */}
+      {primary && (
         <>
-          {/* Guías que cruzan el viewport por los 4 bordes del elemento. */}
-          <div className="dle-guide h" style={{ top: selRect.y }} />
-          <div className="dle-guide h" style={{ top: selRect.y + selRect.height }} />
-          <div className="dle-guide v" style={{ left: selRect.x }} />
-          <div className="dle-guide v" style={{ left: selRect.x + selRect.width }} />
+          <div className="dle-guide h" style={{ top: primary.y }} />
+          <div className="dle-guide h" style={{ top: primary.y + primary.height }} />
+          <div className="dle-guide v" style={{ left: primary.x }} />
+          <div className="dle-guide v" style={{ left: primary.x + primary.width }} />
 
-          {/* Caja de selección + manijas en las esquinas. */}
-          <div
-            className="dle-box dle-box-sel"
-            style={{ left: selRect.x, top: selRect.y, width: selRect.width, height: selRect.height }}
-          >
-            <span className="dle-handle tl" />
-            <span className="dle-handle tr" />
-            <span className="dle-handle bl" />
-            <span className="dle-handle br" />
-          </div>
-
-          {/* Coordenadas (arriba-izquierda) y tamaño (abajo-centro). */}
-          <div className="dle-tag" style={{ left: selRect.x, top: Math.max(2, selRect.y - 22) }}>
-            {Math.round(selRect.x)}, {Math.round(selRect.y)}
+          <div className="dle-tag" style={{ left: primary.x, top: Math.max(2, primary.y - 22) }}>
+            {Math.round(primary.x)}, {Math.round(primary.y)}
           </div>
           <div
             className="dle-tag dle-tag-size"
-            style={{ left: selRect.x + selRect.width / 2 - 36, top: selRect.y + selRect.height + 6 }}
+            style={{ left: primary.x + primary.width / 2 - 36, top: primary.y + primary.height + 6 }}
           >
-            {Math.round(selRect.width)} × {Math.round(selRect.height)}
+            {Math.round(primary.width)} × {Math.round(primary.height)}
           </div>
         </>
       )}

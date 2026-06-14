@@ -4,17 +4,19 @@ import type { LayoutEdits, PositionMode } from "./types";
 /* =====================================================================
    PropertiesPanel — panel flotante tipo DevTools (requisito 3).
 
-   Muestra y permite editar en tiempo real los valores del elemento
-   seleccionado, ofrece "Generar CSS", "Reset" y "Deseleccionar", y muestra
-   un preview del CSS. Es arrastrable desde su cabecera.
+   · 0 seleccionados → estado vacío con la ayuda.
+   · 1 seleccionado  → editor completo de todas las propiedades.
+   · N seleccionados → vista múltiple: mover todos juntos (arrastrar/flechas),
+     CSS combinado y acciones sobre todo el conjunto.
 
-   Es presentacional: recibe `edits` y reporta cambios con `onPatch`. La
-   aplicación al DOM y la generación de CSS las hace el controlador.
+   Es presentacional: recibe los datos del PRIMARIO (último clickeado) y
+   reporta cambios con `onPatch`. Es arrastrable desde la cabecera.
    ===================================================================== */
 
 const POSITIONS: PositionMode[] = ["static", "relative", "absolute", "fixed", "sticky"];
 
 interface Props {
+  count: number;
   selector: string | null;
   describe: string | null;
   edits: LayoutEdits | null;
@@ -23,10 +25,10 @@ interface Props {
   onGenerate: () => void;
   onReset: () => void;
   onDeselect: () => void;
+  onSelectParent: () => void;
   onClose: () => void;
 }
 
-/** Campo numérico (px). `nullable` permite vaciarlo → `null` (= auto). */
 function NumField({
   label,
   value,
@@ -61,9 +63,9 @@ function NumField({
 }
 
 export function PropertiesPanel(props: Props) {
-  const { selector, describe, edits, css, onPatch, onGenerate, onReset, onDeselect, onClose } = props;
+  const { count, selector, describe, edits, css, onPatch, onGenerate, onReset, onDeselect, onSelectParent, onClose } =
+    props;
 
-  // Posición del panel (arrastrable). Por defecto, arriba a la derecha.
   const [pos, setPos] = useState(() => ({
     x: Math.max(8, window.innerWidth - 280 - 16),
     y: 16,
@@ -89,6 +91,8 @@ export function PropertiesPanel(props: Props) {
     };
   }, []);
 
+  const multi = count > 1;
+
   return (
     <div className="dle-panel" style={{ left: pos.x, top: pos.y }}>
       <div
@@ -98,7 +102,7 @@ export function PropertiesPanel(props: Props) {
         }}
       >
         <span className="dle-title">
-          <span className="dle-dot" /> Layout Editor
+          <span className="dle-dot" /> Layout Editor {count > 0 && <span className="dle-count">{count}</span>}
         </span>
         <span className="dle-spacer" />
         <button className="dle-x" title="Cerrar (Ctrl+Shift+D)" onClick={onClose}>
@@ -107,22 +111,58 @@ export function PropertiesPanel(props: Props) {
       </div>
 
       <div className="dle-body">
-        {!edits || !selector ? (
+        {count === 0 || !edits || !selector ? (
           <div className="dle-empty">
-            Hacé click en cualquier elemento para seleccionarlo.
+            Hacé click en un elemento para seleccionarlo.
             <br />
-            Arrastralo para moverlo.
+            <span className="dle-kbd">Shift</span> + click para sumar varios.
+            <br />
+            Arrastralos (o flechas) para moverlos.
             <br />
             <br />
             <span className="dle-kbd">Ctrl</span> + <span className="dle-kbd">Shift</span> +{" "}
             <span className="dle-kbd">D</span> para ocultar.
           </div>
+        ) : multi ? (
+          /* ── Vista MÚLTIPLE ── */
+          <>
+            <div className="dle-selector">
+              {count} elementos seleccionados
+              <div style={{ color: "#6f7c95", marginTop: 2 }}>
+                Arrastrá cualquiera, o usá las flechas (Shift = 10px), para moverlos juntos.
+              </div>
+            </div>
+            <pre className="dle-pre">{css}</pre>
+            <div className="dle-actions">
+              <button className="dle-btn dle-btn-primary" onClick={onGenerate}>
+                Generar CSS
+              </button>
+              <button className="dle-btn" onClick={onReset} title="Volver al estilo original">
+                Reset
+              </button>
+            </div>
+            <div className="dle-actions">
+              <button className="dle-btn" onClick={onDeselect}>
+                Deseleccionar todo
+              </button>
+            </div>
+            <div className="dle-hint">Shift + click sobre uno para quitarlo de la selección.</div>
+          </>
         ) : (
+          /* ── Vista de UN elemento ── */
           <>
             <div className="dle-selector" title={selector}>
               {describe}
               <div style={{ color: "#6f7c95", marginTop: 2 }}>{selector}</div>
             </div>
+
+            <button
+              className="dle-btn"
+              onClick={onSelectParent}
+              title="Subir al contenedor (mueve el grupo: p. ej. las imágenes normal + hover juntas). También: Alt+click."
+            >
+              ↑ Seleccionar padre
+            </button>
 
             <div className="dle-row">
               <label htmlFor="dle-pos">position</label>
@@ -147,19 +187,15 @@ export function PropertiesPanel(props: Props) {
               <NumField label="bottom" value={edits.bottom} nullable onChange={(v) => onPatch({ bottom: v })} />
               <NumField label="width" value={edits.width} nullable onChange={(v) => onPatch({ width: v })} />
               <NumField label="height" value={edits.height} nullable onChange={(v) => onPatch({ height: v })} />
-              <NumField
-                label="translate X"
-                value={edits.translateX}
-                onChange={(v) => onPatch({ translateX: v ?? 0 })}
-              />
-              <NumField
-                label="translate Y"
-                value={edits.translateY}
-                onChange={(v) => onPatch({ translateY: v ?? 0 })}
-              />
+              <NumField label="translate X" value={edits.translateX} onChange={(v) => onPatch({ translateX: v ?? 0 })} />
+              <NumField label="translate Y" value={edits.translateY} onChange={(v) => onPatch({ translateY: v ?? 0 })} />
               <NumField label="scale" value={edits.scale} step={0.05} onChange={(v) => onPatch({ scale: v ?? 1 })} />
-              <NumField label="rotate°" value={edits.rotate} onChange={(v) => onPatch({ rotate: v ?? 0 })} />
+              <NumField label="perspective" value={edits.perspective} onChange={(v) => onPatch({ perspective: v ?? 0 })} />
+              <NumField label="rotate X°" value={edits.rotateX} onChange={(v) => onPatch({ rotateX: v ?? 0 })} />
+              <NumField label="rotate Y°" value={edits.rotateY} onChange={(v) => onPatch({ rotateY: v ?? 0 })} />
+              <NumField label="rotate Z°" value={edits.rotateZ} onChange={(v) => onPatch({ rotateZ: v ?? 0 })} />
             </div>
+            <div className="dle-hint">Para rotar en X / Y en 3D, subí “perspective” (~600).</div>
 
             <div className="dle-actions">
               <button className="dle-btn dle-btn-primary" onClick={onGenerate}>
@@ -177,7 +213,9 @@ export function PropertiesPanel(props: Props) {
                 Deseleccionar
               </button>
             </div>
-            <div className="dle-hint">El CSS se copia al portapapeles al generar.</div>
+            <div className="dle-hint">
+              <span className="dle-kbd">Shift</span> + click para seleccionar varios.
+            </div>
           </>
         )}
       </div>

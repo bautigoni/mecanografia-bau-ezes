@@ -25,11 +25,16 @@ export interface LayoutEdits {
   height: number | null;
   /** 1 = sin escalar. */
   scale: number;
-  /** grados, 0 = sin rotar. */
-  rotate: number;
+  /** grados, 0 = sin rotar. Rotación 3D por eje. */
+  rotateX: number;
+  rotateY: number;
+  rotateZ: number;
   /** px, 0 = sin trasladar. */
   translateX: number;
   translateY: number;
+  /** px de profundidad para que rotateX/rotateY se vean en 3D. 0 = sin
+   *  perspectiva (la rotación X/Y queda "plana"). Valores típicos 400–800. */
+  perspective: number;
 }
 
 /** Claves de longitud (las que se editan en px y pueden ser `null`). */
@@ -42,7 +47,14 @@ export type LengthKey = "top" | "left" | "right" | "bottom" | "width" | "height"
 export type DirtyKey = LengthKey | "position" | "transform";
 
 /** Claves numéricas de transform. */
-export type TransformKey = "scale" | "rotate" | "translateX" | "translateY";
+export type TransformKey =
+  | "scale"
+  | "rotateX"
+  | "rotateY"
+  | "rotateZ"
+  | "translateX"
+  | "translateY"
+  | "perspective";
 
 /** Rectángulo en coordenadas de viewport (lo que devuelve getBoundingClientRect,
  *  ya redondeado para comparaciones estables entre frames). */

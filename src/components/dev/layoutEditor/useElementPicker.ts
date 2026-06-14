@@ -5,23 +5,23 @@ import { useEffect, useRef } from "react";
 
    Mientras el editor está ACTIVO, en fase de captura sobre `document`:
      · pointermove → resalta el elemento bajo el cursor (hover).
-     · pointerdown → selecciona ese elemento y empieza un posible arrastre.
+     · pointerdown → selecciona (o suma/quita con Shift) y, si corresponde,
+       empieza un arrastre del CONJUNTO seleccionado.
      · pointermove (con botón) → arrastra (delta dx/dy suave).
      · pointerup → termina el arrastre.
      · click       → se neutraliza sobre elementos de la app, para que los
                      botones/enlaces no se disparen al seleccionar.
 
-   Los nodos del propio editor (panel) se ignoran vía `isEditorNode`, así el
-   panel sigue siendo interactivo con normalidad.
-
-   Los callbacks se guardan en refs para no re-suscribir listeners en cada
-   render (drag suave, sin parpadeos).
+   `onSelect(el, additive)` devuelve si debe arrancar el arrastre (false p. ej.
+   cuando Shift+click DESELECCIONA un elemento). Los nodos del propio editor se
+   ignoran vía `isEditorNode` para no auto-seleccionar el panel.
    ===================================================================== */
 
 interface PickerCallbacks {
   onHover: (el: HTMLElement | null) => void;
-  onSelect: (el: HTMLElement) => void;
-  onDragStart: (el: HTMLElement) => void;
+  /** Devuelve true si tras la selección debe iniciarse un arrastre. */
+  onSelect: (el: HTMLElement, additive: boolean) => boolean;
+  onDragStart: () => void;
   onDragMove: (dx: number, dy: number) => void;
   onDragEnd: () => void;
 }
@@ -36,14 +36,12 @@ export function useElementPicker(
 
   const dragging = useRef(false);
   const start = useRef({ x: 0, y: 0 });
-  const target = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!active) return;
 
     function onPointerMove(e: PointerEvent) {
       if (dragging.current) {
-        // Arrastre en curso → delta desde el inicio del gesto.
         cb.current.onDragMove(e.clientX - start.current.x, e.clientY - start.current.y);
         e.preventDefault();
         return;
@@ -57,29 +55,31 @@ export function useElementPicker(
     }
 
     function onPointerDown(e: PointerEvent) {
-      // Sobre el panel del editor: dejar pasar (inputs, botones, drag del panel).
-      if (isEditorNode(e.target)) return;
+      if (isEditorNode(e.target)) return; // dejar pasar el panel
       if (!(e.target instanceof HTMLElement)) return;
-      if (e.button !== 0) return; // sólo botón principal
+      if (e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
-      const el = e.target;
-      target.current = el;
       start.current = { x: e.clientX, y: e.clientY };
-      dragging.current = true;
-      cb.current.onSelect(el);
-      cb.current.onDragStart(el);
+      // Alt+click selecciona el PADRE del elemento clickeado (subir un nivel
+      // para agarrar el contenedor en vez del hijo más profundo).
+      let target: HTMLElement = e.target;
+      if (e.altKey && target.parentElement instanceof HTMLElement && !isEditorNode(target.parentElement)) {
+        target = target.parentElement;
+      }
+      const startDrag = cb.current.onSelect(target, e.shiftKey);
+      if (startDrag) {
+        dragging.current = true;
+        cb.current.onDragStart();
+      }
     }
 
     function onPointerUp() {
       if (!dragging.current) return;
       dragging.current = false;
-      target.current = null;
       cb.current.onDragEnd();
     }
 
-    // Mientras el editor está activo, los clicks sobre la app se neutralizan
-    // (si no, seleccionar un botón lo "presionaría").
     function onClick(e: MouseEvent) {
       if (isEditorNode(e.target)) return;
       e.preventDefault();

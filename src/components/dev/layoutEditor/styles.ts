@@ -96,6 +96,12 @@ export const EDITOR_CSS = `
 .dle-header:active { cursor: grabbing; }
 .dle-title { font-weight: 700; letter-spacing: 0.02em; display: flex; align-items: center; gap: 6px; }
 .dle-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--dle-accent); box-shadow: 0 0 8px var(--dle-accent); }
+.dle-count {
+  display: inline-grid; place-items: center;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px; background: var(--dle-accent); color: #fff;
+  font: 700 11px/1 ui-monospace, monospace;
+}
 .dle-spacer { flex: 1; }
 .dle-x {
   all: unset; cursor: pointer; width: 22px; height: 22px;
