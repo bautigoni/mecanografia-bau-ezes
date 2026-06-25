@@ -8,7 +8,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { verifyAccessToken } from "../auth.js";
 import { syncStats, getAchievements, computeStats } from "../stats.js";
 import type { AccessClaims } from "../auth.js";
@@ -127,11 +127,11 @@ export async function progressRoutes(app: FastifyInstance) {
         classId: schema.users.classId,
       })
       .from(schema.users)
-      .where(sql`${schema.users.id} = ANY(${studentIds})`);
+      .where(inArray(schema.users.id, studentIds));
     const progress = await db
       .select()
       .from(schema.levelProgress)
-      .where(sql`${schema.levelProgress.userId} = ANY(${studentIds})`);
+      .where(inArray(schema.levelProgress.userId, studentIds));
     const progressByUser: Record<string, typeof progress> = {};
     for (const p of progress) {
       (progressByUser[p.userId] ??= []).push(p);
