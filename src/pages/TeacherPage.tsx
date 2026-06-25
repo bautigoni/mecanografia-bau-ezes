@@ -80,19 +80,32 @@ export function TeacherPage() {
         const entries = await Promise.all(
           mapped.map(async (c) => {
             try {
-              const m = await api.classMembers(c.id);
-              const roster: EduTicUser[] = m.students.map((s) => ({
-                id: s.id,
-                name: s.fullName,
-                username: s.username ?? "",
-                email: s.email,
-                role: "alumno",
-                // `password` is required by EduTicUser but irrelevant in the
-                // API-backed path (the API never sends the hash back to the
-                // client). Empty placeholder keeps the type system happy.
-                password: "",
-                active: true,
-              }));
+              // Identity from members + per-student rollup from progress, so
+              // the dashboard widgets (precision, "van volando", "necesitan
+              // ayuda") and the student list all reflect real Supabase data.
+              const [m, prog] = await Promise.all([
+                api.classMembers(c.id),
+                api.classProgress(c.id).catch(() => ({ students: [] as Awaited<ReturnType<typeof api.classProgress>>["students"] })),
+              ]);
+              const statById = new Map(prog.students.map((p) => [p.id, p]));
+              const roster: EduTicUser[] = m.students.map((s) => {
+                const p = statById.get(s.id);
+                return {
+                  id: s.id,
+                  name: s.fullName,
+                  username: s.username ?? "",
+                  email: s.email,
+                  role: "alumno",
+                  // `password` is required by EduTicUser but irrelevant in the
+                  // API-backed path (the API never sends the hash back to the
+                  // client). Empty placeholder keeps the type system happy.
+                  password: "",
+                  active: true,
+                  stats: p
+                    ? { precision: p.avgAccuracy, speed: 0, completedLevels: p.completedLevels, points: 0 }
+                    : undefined,
+                };
+              });
               return [c.id, roster] as const;
             } catch {
               return [c.id, [] as EduTicUser[]] as const;
