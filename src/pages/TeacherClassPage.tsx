@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BookOpen, GraduationCap, Home, KeyRound, Power, PowerOff, Users } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Toast } from "../components/common/Toast";
 import { DashboardShell, KpiCard, type DashNavItem } from "../components/dashboard/DashboardShell";
 import { useAuth } from "../hooks/useAuth";
 import { worlds } from "../data/worlds";
+import { api } from "../utils/api";
 import {
   getClassesForTeacher,
   getEnabledWorldsForClass,
@@ -32,25 +33,73 @@ const chipCls: Record<string, string> = {
 
 export function TeacherClassPage() {
   const { classId } = useParams();
-  const { user, logout } = useAuth();
+  const { user, logout, usingApi } = useAuth();
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
   const [version, setVersion] = useState(0);
 
-  /* Scope: a teacher can only open a class they teach. */
+  /* Scope: a teacher can only open a class they teach. localStorage path. */
   const classes = useMemo(() => getClassesForTeacher(user), [user]);
-  const course = classes.find((c) => c.id === classId);
-
-  const students = useMemo(
+  const localCourse = classes.find((c) => c.id === classId);
+  const localStudents = useMemo(
     () => (classId ? getStudentsInClass(classId) : []),
     [classId, version],
   );
+
+  /* API path: when usingApi, the class + roster + per-student progress come
+     from the backend (Supabase), not localStorage. */
+  const [apiCourse, setApiCourse] = useState<{ id: string; name: string } | null>(null);
+  const [apiStudents, setApiStudents] = useState<EduTicUser[] | null>(null);
+  const [loading, setLoading] = useState(usingApi);
+
+  useEffect(() => {
+    if (!usingApi || !classId) { setLoading(false); return; }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const [m, prog] = await Promise.all([
+          api.classMembers(classId),
+          api.classProgress(classId).catch(() => ({ students: [] as Awaited<ReturnType<typeof api.classProgress>>["students"] })),
+        ]);
+        if (cancelled) return;
+        const statById = new Map(prog.students.map((p) => [p.id, p]));
+        const roster: EduTicUser[] = m.students.map((s) => {
+          const p = statById.get(s.id);
+          return {
+            id: s.id,
+            name: s.fullName,
+            username: s.username ?? "",
+            email: s.email,
+            role: "alumno" as const,
+            password: "",
+            active: true,
+            stats: p
+              ? { precision: p.avgAccuracy, speed: 0, completedLevels: p.completedLevels, points: 0 }
+              : undefined,
+          };
+        });
+        setApiCourse({ id: m.class.id, name: m.class.name });
+        setApiStudents(roster);
+      } catch {
+        if (!cancelled) { setApiCourse(null); setApiStudents([]); }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [usingApi, classId]);
+
+  const course = usingApi ? apiCourse : localCourse;
+  const students = usingApi ? (apiStudents ?? []) : localStudents;
 
   const allWorldIds = useMemo(() => worlds.map((w) => w.id), []);
   const [enabled, setEnabled] = useState<Set<string>>(
     () => new Set(getEnabledWorldsForClass(classId) ?? allWorldIds),
   );
 
+  // Don't bounce to /profesor while the API roster is still loading.
+  if (usingApi && loading) return null;
   if (!course) return <Navigate to="/profesor" replace />;
 
   const avg = students.length
