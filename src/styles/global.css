@@ -54,11 +54,11 @@ html, body { background-color: #f1effb; }
 /* Opt-in heavier liquid glass for immersive GAME surfaces only (login,
    gameplay, world map, island, skill levels) — never admin/dashboards. */
 .liquid-glass {
-  --glass-blur: 48px;
-  --glass-saturate: 2.2;
-  --glass-white: 0.34;
-  --glass-border: 0.9;
-  --glass-sheen: 0.9;
+  --glass-blur: 40px;
+  --glass-saturate: 1.45;
+  --glass-white: 0.46;
+  --glass-border: 0.85;
+  --glass-sheen: 0.7;
 }
 /* Apply the app body font everywhere (was missing → fell back to default
    sans). Headings opt into the display font via the `font-display` utility. */
@@ -91,8 +91,7 @@ a { color: inherit; text-decoration: none; }
 
 @utility glass-card {
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, calc(var(--glass-white) + 0.2)), rgba(239, 248, 255, var(--glass-white))),
-    radial-gradient(circle at 25% 12%, rgba(51, 199, 240, 0.18), transparent 56%);
+    linear-gradient(135deg, rgba(255, 255, 255, calc(var(--glass-white) + 0.24)), rgba(244, 250, 255, calc(var(--glass-white) + 0.08)));
   @apply backdrop-blur-[var(--glass-blur)] backdrop-saturate-[var(--glass-saturate)];
   border: 1px solid rgba(255, 255, 255, calc(var(--glass-border) + 0.18));
   box-shadow: 0 24px 44px rgba(40, 70, 120, 0.12), inset 0 1px 0 rgba(255, 255, 255, var(--glass-sheen));
