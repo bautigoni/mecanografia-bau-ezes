@@ -1,6 +1,26 @@
 # TYPELY (formerly EduTic)
 
-TYPELY is a Vite + React + TypeScript + Tailwind CSS demo for a gamified Primary School digital literacy and keyboard skills platform.
+TYPELY is a gamified Primary School digital-literacy and keyboard-skills
+platform. Frontend: **Vite + React 19 + TypeScript + Tailwind 4**. It is backed
+by a **Fastify + Drizzle + Postgres 16 API** and ships as three Docker
+containers (Nginx frontend, API, Postgres) behind Caddy. The typing engine keeps
+reading/writing `localStorage` so play never blocks on the network, and falls
+back to localStorage-only when the API is offline (demo mode).
+
+> **Authoritative docs:** see `CLAUDE.md` (architecture, structure, design +
+> responsive systems, rules), `dbnew.md` (backend log) and `DEPLOY.md` (ops).
+
+## Branching workflow
+
+Work happens on **`dev`**; **`master`** is the host/production branch (there is
+no `main`). Never commit directly to `master` — it only updates through a
+reviewed **pull request from `dev` → `master`** when everything is ready and
+`npm run build` passes. See `CLAUDE.md` §17 for the full rules.
+
+```bash
+git checkout dev    # develop here, push to origin/dev
+# when ready for production: open a PR  dev → master  and merge it
+```
 
 ## Roles & dashboards
 
@@ -69,10 +89,11 @@ is gitignored — never commit it.
 If `VITE_GOOGLE_CLIENT_ID` is missing, the "Login with Google" button shows
 *"Google Login no está configurado."* and does nothing.
 
-> **Security:** never put `GOOGLE_CLIENT_SECRET` in this repo or in any
-> `VITE_…` variable — Vite inlines those into the browser bundle. The secret
-> is only used by a backend during an OAuth code exchange; this app has no
-> such backend, so the secret has no place here.
+> **Security:** never put `GOOGLE_CLIENT_SECRET` (or any private key) in this
+> repo or in a `VITE_…` variable — Vite inlines those into the public browser
+> bundle. Backend secrets (`JWT_SECRET`, `RESEND_API_KEY`, OAuth client secret)
+> live only in the API's server-side environment / `secrets/` — never in the
+> frontend. Google sign-in is verified server-side against Google's JWKS.
 
 ## Google Cloud setup
 

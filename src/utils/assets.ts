@@ -25,11 +25,13 @@ export const assets = {
   mascotFemaleWave: "/assets/edutic-art/mascot-women-wave.webp",
   mascotFemaleLaptop: "/assets/edutic-art/mascot-women-laptop.webp",
 
-  worldsIsland1: "/assets/processed/worlds-island1-transparent.webp",
-  worldsIsland2: "/assets/processed/worlds-island2-transparent.webp",
-  worldsIsland3: "/assets/processed/worlds-island3-transparent.webp",
-  worldsIsland4: "/assets/processed/worlds-island4-transparent.webp",
-  worldsIsland5: "/assets/edutic-art/world-island5.webp",
+  /* Small, high-quality map thumbnails (see Images-new/process_map_thumbs.py).
+     The big detail art lives elsewhere; the map only needs these. */
+  worldsIsland1: "/typely_islands_thumb_webp/worlds-island1-transparent.webp",
+  worldsIsland2: "/typely_islands_thumb_webp/worlds-island2-transparent.webp",
+  worldsIsland3: "/typely_islands_thumb_webp/worlds-island3-transparent.webp",
+  worldsIsland4: "/typely_islands_thumb_webp/worlds-island4-transparent.webp",
+  worldsIsland5: "/typely_islands_thumb_webp/world-island5.webp",
   island1: "/assets/edutic-art/island1.webp",
   island2: "/assets/edutic-art/island2.webp",
   island3: "/assets/edutic-art/island3.webp",
@@ -41,6 +43,9 @@ export const assets = {
   shipRight: "/assets/edutic-art/spaceships/ship-right.webp",
   shipDiagonalLeft: "/assets/edutic-art/spaceships/ship-diagonal-left.webp",
   shipDiagonalRight: "/assets/edutic-art/spaceships/ship-diagonal-right.webp",
+  /* 3D level button images (pre-rendered at base perspective, no number). */
+  levelButton: "/assets/level.png",
+  levelButtonPressed: "/assets/pressed_level.png",
 
   /* Island 5 props — used by SkillLevelView for the mouse-skill levels. */
   i5Star:    "/assets/edutic-art/island5/star.webp",
@@ -66,6 +71,38 @@ export const assets = {
 };
 
 /* =====================================================================
+   CHARACTER & SHIP PROGRESSION SKINS (unlocked by cumulative star total)
+   Five phases per object (f1…f5). The account-wide star total picks the
+   phase (see `getSkinPhaseIndex` in utils/progress): 0★→f1 · 5★→f2 · 10★→f3
+   · 20★→f4 · 30★→f5. `t1` is the BASE tier; a future character evolution adds
+   a `t2` set that restarts at f1 — drop the art in /skins as `<kind>-t2-f<n>`
+   and add `skinTier(kind, "t2")` below. Files: optimised WebP under
+   public/assets/edutic-art/skins/ (1024px, transparent).
+===================================================================== */
+const SKINS_DIR = "/assets/edutic-art/skins";
+
+export type SkinKind = "male" | "female" | "ship";
+
+function skinTier(kind: SkinKind, tier: string): string[] {
+  return [1, 2, 3, 4, 5].map((f) => `${SKINS_DIR}/${kind}-${tier}-f${f}.webp`);
+}
+
+/** [tierIndex][phaseIndex] — tier 0 = base (`t1`). Index 0 → f1 … 4 → f5. */
+export const characterSkins: Record<SkinKind, string[][]> = {
+  male:   [skinTier("male", "t1")],
+  female: [skinTier("female", "t1")],
+  ship:   [skinTier("ship", "t1")],
+};
+
+/** Resolve a skin URL, clamping tier/phase into range so it never returns
+ *  undefined even if thresholds or tier counts change later. */
+export function skinUrl(kind: SkinKind, phaseIndex: number, tier = 0): string {
+  const tiers = characterSkins[kind];
+  const set = tiers[Math.min(Math.max(tier, 0), tiers.length - 1)];
+  return set[Math.min(Math.max(phaseIndex, 0), set.length - 1)];
+}
+
+/* =====================================================================
    Expansion islands (island6 … island15) — THREE separate image families.
    They must NEVER be mixed. Index 0 → island6 … index 9 → island15, and
    all three share the SAME theme order (crystal, garden, frozen, autumn,
@@ -76,16 +113,16 @@ export const assets = {
 /* 1) WORLD MAP IMAGE — the floating island art on the worlds-selection map.
       Transparent islands shown small in the sky (from /typely_islands_webp). */
 export const expansionIslandThumbs: string[] = [
-  "/typely_islands_webp/background-island1.webp",  // crystal
-  "/typely_islands_webp/background-island2.webp",  // garden / library
-  "/typely_islands_webp/background-island3.webp",  // frozen / clockwork
-  "/typely_islands_webp/background-island4.webp",  // autumn / artist
-  "/typely_islands_webp/background-island5.webp",  // jungle / ruins
-  "/typely_islands_webp/background-island6.webp",  // candyland
-  "/typely_islands_webp/background-island7.webp",  // desert / canyon
-  "/typely_islands_webp/background-island8.webp",  // rainbow / playground
-  "/typely_islands_webp/background-island9.webp",  // alchemy / lab
-  "/typely_islands_webp/background-island10.webp", // lagoon
+  "/typely_islands_thumb_webp/background-island1.webp",  // crystal
+  "/typely_islands_thumb_webp/background-island2.webp",  // garden / library
+  "/typely_islands_thumb_webp/background-island3.webp",  // frozen / clockwork
+  "/typely_islands_thumb_webp/background-island4.webp",  // autumn / artist
+  "/typely_islands_thumb_webp/background-island5.webp",  // jungle / ruins
+  "/typely_islands_thumb_webp/background-island6.webp",  // candyland
+  "/typely_islands_thumb_webp/background-island7.webp",  // desert / canyon
+  "/typely_islands_thumb_webp/background-island8.webp",  // rainbow / playground
+  "/typely_islands_thumb_webp/background-island9.webp",  // alchemy / lab
+  "/typely_islands_thumb_webp/background-island10.webp", // lagoon
 ];
 
 /* 2) ISLAND DETAIL BACKGROUND — the full 16:9 scene WITH painted platforms,

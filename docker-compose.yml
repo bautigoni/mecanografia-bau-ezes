@@ -1,4 +1,46 @@
 services:
+  # ------------------------------------------------------------------
+  # Postgres now runs on Supabase (sa-east-1 pooler) — the single source
+  # of truth for users, sedes, classes, progress and the audit log. The
+  # local `db` container was retired to free RAM on this 1 GB VM; the API
+  # connects via DATABASE_URL (secrets/database_url.txt → Supabase pooler,
+  # transaction mode 6543, sslmode=require). The `dbdata` volume and the
+  # `db_password` secret are kept only as a rollback path.
+  # ------------------------------------------------------------------
+
+  # ------------------------------------------------------------------
+  # Fastify API — handles auth (manual + Google), users, sedes,
+  # classes, progress reporting, and teacher analytics. Bound to
+  # loopback only (port 3006 on the host). Caddy reverse-proxies
+  # /api/* to this service.
+  # ------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: mecanografia_api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL_FILE: /run/secrets/database_url
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      RESEND_API_KEY_FILE: /run/secrets/resend_api_key
+      GOOGLE_CLIENT_ID: "${VITE_GOOGLE_CLIENT_ID:-}"
+      INVITE_FROM: "${INVITE_FROM:-Typely <no-reply@example.com>}"
+      # Absolute origin used to build invitation links inside emails.
+      PUBLIC_ORIGIN: "${PUBLIC_ORIGIN:-https://typely.bauhub.online}"
+    secrets:
+      - database_url
+      - jwt_secret
+      - resend_api_key
+    ports:
+      - "127.0.0.1:3006:3000"
+
+  # ------------------------------------------------------------------
+  # Existing static-site container. Vite builds the frontend bundle,
+  # nginx serves /dist on port 80 (mapped to 127.0.0.1:3005 on host).
+  # ------------------------------------------------------------------
   mecanografia:
     build:
       context: .
@@ -16,3 +58,16 @@ services:
       # Bind to loopback so the container is only reachable via the Caddy
       # reverse proxy on the host, never directly from the public internet.
       - "127.0.0.1:3005:80"
+
+volumes:
+  dbdata:
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  database_url:
+    file: ./secrets/database_url.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  resend_api_key:
+    file: ./secrets/resend_api_key.txt

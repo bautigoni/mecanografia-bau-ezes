@@ -1,13 +1,24 @@
-import { useMemo, useState } from "react";
-import { BookOpen, GraduationCap, Home, LineChart, Power, PowerOff, TrendingUp, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowRight,
+  BookOpen,
+  GraduationCap,
+  Home,
+  KeyRound,
+  Sparkles,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
 import { DashboardShell, KpiCard, type DashNavItem } from "../components/dashboard/DashboardShell";
 import { useAuth } from "../hooks/useAuth";
-import { worlds } from "../data/worlds";
-import { getEnabledWorldsForClass, getTeacherStudents, updateTeacherWorldSelection } from "../utils/storage";
+import { getClassesForTeacher, getStudentsInClass, resetUserPassword } from "../utils/storage";
+import { api, ApiError } from "../utils/api";
+import { STATUS_LABEL, studentStatus } from "../utils/studentStatus";
 import { assets } from "../utils/assets";
+import type { ClassRoom, EduTicUser } from "../types";
 
 const NAV: DashNavItem[] = [
   { id: "inicio", label: "Inicio", icon: Home },
@@ -15,68 +26,198 @@ const NAV: DashNavItem[] = [
   { id: "estudiantes", label: "Estudiantes", icon: Users },
 ];
 
+/* Student-status chip styles (replaces tch-chip--{st}). */
+const chipCls: Record<string, string> = {
+  flying: "bg-mint/20 text-accent-teal",
+  atRisk: "bg-rose/20 text-rose",
+  idle: "bg-white/40 text-muted",
+  neutral: "bg-accent-sky/20 text-accent-sky",
+};
+
+function StatusChip({ student }: { student: EduTicUser }) {
+  const st = studentStatus(student);
+  return (
+    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${chipCls[st]}`}>
+      {STATUS_LABEL[st]}
+    </span>
+  );
+}
+
 export function TeacherPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, usingApi } = useAuth();
   const navigate = useNavigate();
   const [section, setSection] = useState("inicio");
   const [message, setMessage] = useState("");
+  const [version, setVersion] = useState(0);
 
-  const students = getTeacherStudents(user);
-  const classId = user?.classId ?? "clase-3a";
-  const allWorldIds = useMemo(() => worlds.map((w) => w.id), []);
-  const [enabled, setEnabled] = useState<Set<string>>(() => new Set(getEnabledWorldsForClass(classId) ?? allWorldIds));
+  /* API-backed state: when usingApi is true, fetch the teacher's classes
+     (the ones where they are assigned in class_teachers) and the roster
+     for each one. Stored as plain `ClassRoom` + `EduTicUser` shapes so
+     the rest of the component keeps using the same field accesses. */
+  const [apiClasses, setApiClasses] = useState<ClassRoom[]>([]);
+  const [apiRoster, setApiRoster] = useState<Record<string, EduTicUser[]>>({});
+  const [apiLoading, setApiLoading] = useState(false);
 
-  function toggleWorld(worldId: string) {
-    const next = !enabled.has(worldId);
-    const updated = updateTeacherWorldSelection(classId, worldId, next, allWorldIds);
-    setEnabled(new Set(updated));
-    setMessage(next ? "Isla habilitada para la clase." : "Isla deshabilitada para la clase.");
-  }
-  function leave() {
-    logout();
-    navigate("/login");
-  }
+  useEffect(() => {
+    if (!usingApi || !user) return;
+    let cancelled = false;
+    (async () => {
+      setApiLoading(true);
+      try {
+        const list = await api.listClasses();
+        if (cancelled) return;
+        const mapped: ClassRoom[] = list.map((c) => ({
+          id: c.id,
+          name: c.name,
+          siteId: c.sedeId,
+          grade: (c.grade as any) ?? "libre",
+          teacherIds: [],
+          studentIds: [],
+        }));
+        setApiClasses(mapped);
+        // Pull rosters in parallel; ignore individual failures so a single
+        // misbehaving class doesn't blank the whole dashboard.
+        const entries = await Promise.all(
+          mapped.map(async (c) => {
+            try {
+              // Identity from members + per-student rollup from progress, so
+              // the dashboard widgets (precision, "van volando", "necesitan
+              // ayuda") and the student list all reflect real Supabase data.
+              const [m, prog] = await Promise.all([
+                api.classMembers(c.id),
+                api.classProgress(c.id).catch(() => ({ students: [] as Awaited<ReturnType<typeof api.classProgress>>["students"] })),
+              ]);
+              const statById = new Map(prog.students.map((p) => [p.id, p]));
+              const roster: EduTicUser[] = m.students.map((s) => {
+                const p = statById.get(s.id);
+                return {
+                  id: s.id,
+                  name: s.fullName,
+                  username: s.username ?? "",
+                  email: s.email,
+                  role: "alumno",
+                  // `password` is required by EduTicUser but irrelevant in the
+                  // API-backed path (the API never sends the hash back to the
+                  // client). Empty placeholder keeps the type system happy.
+                  password: "",
+                  active: true,
+                  stats: p
+                    ? { precision: p.avgAccuracy, speed: 0, completedLevels: p.completedLevels, points: 0 }
+                    : undefined,
+                };
+              });
+              return [c.id, roster] as const;
+            } catch {
+              return [c.id, [] as EduTicUser[]] as const;
+            }
+          }),
+        );
+        if (cancelled) return;
+        setApiRoster(Object.fromEntries(entries));
+      } catch (e) {
+        if (!cancelled) {
+          setMessage(e instanceof ApiError ? e.message : "No se pudieron cargar tus cursos.");
+        }
+      } finally {
+        if (!cancelled) setApiLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [usingApi, user, version]);
 
-  const enabledWorlds = worlds.filter((w) => enabled.has(w.id));
+  const classes = useMemo<ClassRoom[]>(() => {
+    if (usingApi) return apiClasses;
+    return getClassesForTeacher(user);
+  }, [usingApi, apiClasses, user, version]);
+
+  /* Every student across the teacher's classes (de-duplicated), tagged with
+     their course name. */
+  const students = useMemo(() => {
+    const seen = new Set<string>();
+    const list: Array<EduTicUser & { className: string; classId: string }> = [];
+    for (const c of classes) {
+      const roster = usingApi
+        ? apiRoster[c.id] ?? []
+        : getStudentsInClass(c.id);
+      for (const s of roster) {
+        if (seen.has(s.id)) continue;
+        seen.add(s.id);
+        list.push({ ...s, className: c.name, classId: c.id });
+      }
+    }
+    return list;
+  }, [classes, usingApi, apiRoster, version]);
+
   const avgPrecision = students.length
-    ? Math.round(students.reduce((s, u) => s + (u.stats?.precision ?? 0), 0) / students.length)
+    ? Math.round(students.reduce((a, s) => a + (s.stats?.precision ?? 0), 0) / students.length)
     : 0;
+  const atRisk = students.filter((s) => studentStatus(s) === "atRisk");
+  const flying = students.filter((s) => studentStatus(s) === "flying");
   const firstName = (user?.name ?? "Profe").split(" ")[0];
 
-  const kpis = (
-    <div className="kpi-grid">
-      <KpiCard icon={GraduationCap} label="Mis cursos" value={enabledWorlds.length} tone="violet" onClick={() => setSection("cursos")} />
-      <KpiCard icon={BookOpen} label="Islas totales" value={`${enabledWorlds.length} / ${worlds.length}`} tone="green" />
-      <KpiCard icon={Users} label="Estudiantes" value={students.length} tone="pink" onClick={() => setSection("estudiantes")} />
-      <KpiCard icon={TrendingUp} label="Progreso promedio" value={`${avgPrecision}%`} tone="blue" />
-    </div>
-  );
+  function leave() {
+    void logout();
+    navigate("/login");
+  }
+  function resetPw(s: EduTicUser) {
+    const pw = resetUserPassword(s.id);
+    if (pw) {
+      setMessage(`Clave temporal de ${s.name}: ${s.username} / ${pw}`);
+      setVersion((v) => v + 1);
+    }
+  }
 
   const hero = (
     <>
-      <span className="dash-eyebrow"><Home size={18} /> Docente</span>
-      <h1>Hola, <span className="grad">{firstName}</span> 👋</h1>
-      <p>Gestioná tus cursos, revisá el progreso de tus estudiantes y acompañalos en su aprendizaje.</p>
+      <span className="inline-flex items-center gap-1.5 text-sm font-bold text-accent-teal uppercase tracking-wide">
+        <Home size={18} /> Docente
+      </span>
+      <h1 className="font-display text-3xl font-bold text-text">
+        Hola, <span className="bg-gradient-to-r from-accent-sky via-accent to-accent-pink bg-clip-text text-transparent">{firstName}</span> 👋
+      </h1>
+      <p className="text-muted font-semibold">Entrá a cada curso para ver a tus alumnos, asignar niveles y seguir su progreso.</p>
     </>
   );
 
-  const courseCards = (
-    <div className="course-grid">
-      {enabledWorlds.map((w) => (
-        <div key={w.id} className="course-card">
-          <div className="course-card__top">
-            <img className="course-card__thumb" src={w.thumbnail} alt="" decoding="async" loading="lazy" />
-            <div>
-              <strong>{w.title}</strong>
-              <span>{w.levels.length} niveles</span>
-            </div>
-          </div>
-          <div className="progress-track"><div className="progress-track__fill" style={{ width: `${avgPrecision}%` }} /></div>
-          <span className="kpi-card__trend">{avgPrecision}% progreso de la clase</span>
-        </div>
-      ))}
+  const kpis = (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <KpiCard icon={BookOpen} label="Mis cursos" value={classes.length} tone="violet" onClick={() => setSection("cursos")} />
+      <KpiCard icon={Users} label="Estudiantes" value={students.length} tone="pink" onClick={() => setSection("estudiantes")} />
+      <KpiCard icon={TrendingUp} label="Precisión promedio" value={`${avgPrecision}%`} tone="blue" />
+      <KpiCard icon={Sparkles} label="Van volando" value={flying.length} tone="green" />
     </div>
   );
+
+  function PeopleMini({ list, empty }: { list: typeof students; empty: string }) {
+    if (list.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center text-center gap-3 py-6 px-4">
+          <h3 className="font-display text-lg font-bold text-text">{empty}</h3>
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col gap-1">
+        {list.slice(0, 5).map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/30 cursor-pointer transition-colors border-0 bg-transparent text-left w-full"
+            onClick={() => navigate(`/profesor/alumno/${s.id}`)}
+          >
+            <span className="grid place-items-center w-9 h-9 rounded-full bg-accent/15 text-accent font-bold text-sm shrink-0">
+              {s.name.charAt(0).toUpperCase()}
+            </span>
+            <span className="flex flex-col min-w-0 flex-1">
+              <strong className="text-sm text-text truncate">{s.name}</strong>
+              <small className="text-xs text-muted truncate">{s.className} · {Math.round(s.stats?.precision ?? 0)}% precisión</small>
+            </span>
+            <ArrowRight size={16} className="text-muted shrink-0" />
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <DashboardShell
@@ -96,92 +237,155 @@ export function TeacherPage() {
       {section === "inicio" && (
         <>
           {kpis}
-          <div className="dash-grid-2">
-            <section className="dash-section">
-              <div className="dash-section__head"><h2><BookOpen size={20} /> Mis cursos</h2></div>
-              {enabledWorlds.length === 0
-                ? <div className="empty-state empty-state--compact"><h3>Sin cursos habilitados</h3><p>Activá islas en "Mis cursos".</p></div>
-                : courseCards}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <section className="glass-card p-6 flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <h2 className="font-display text-xl font-bold text-text">🆘 Necesitan ayuda</h2>
+              </div>
+              <PeopleMini list={atRisk} empty="Nadie en riesgo por ahora 🎉" />
             </section>
-            <section className="dash-section">
-              <div className="dash-section__head"><h2><LineChart size={20} /> Progreso de estudiantes</h2></div>
-              {students.length === 0 ? (
-                <div className="empty-state empty-state--compact"><h3>Sin estudiantes</h3></div>
-              ) : (
-                <div>
-                  {students.map((s) => (
-                    <div key={s.id} className="progress-row">
-                      <span className="progress-row__name">{s.name}</span>
-                      <div className="progress-track"><div className="progress-track__fill" style={{ width: `${s.stats?.precision ?? 0}%` }} /></div>
-                      <span className="progress-row__pct">{s.stats?.precision ?? 0}%</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <section className="glass-card p-6 flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <h2 className="font-display text-xl font-bold text-text">🚀 Van volando</h2>
+              </div>
+              <PeopleMini list={flying} empty="Todavía sin destacados" />
             </section>
           </div>
-          <section className="dash-section">
-            <div className="dash-tip">
-              <img src={assets.mascotFemaleLaptop} alt="" decoding="async" />
-              <div className="dash-tip__body">
-                <h3>¡Excelente trabajo! 💡</h3>
-                <p>Revisar el progreso a diario motiva a tus estudiantes y mejora sus resultados.</p>
-                <Button variant="secondary" onClick={() => setSection("cursos")}>Ver mis cursos</Button>
+          <section className="glass-card p-6 flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <h2 className="font-display text-xl font-bold text-text flex items-center gap-2">
+                  <BookOpen size={20} /> Mis cursos
+                </h2>
+                <p className="text-sm text-muted font-semibold">Entrá a un curso para gestionarlo.</p>
               </div>
             </div>
+            {classes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-center gap-3 py-6 px-4">
+                <h3 className="font-display text-lg font-bold text-text">Todavía no tenés cursos asignados</h3>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {classes.map((c) => {
+                  const roster = usingApi ? apiRoster[c.id] ?? [] : getStudentsInClass(c.id);
+                  const avg = roster.length ? Math.round(roster.reduce((a, s) => a + (s.stats?.precision ?? 0), 0) / roster.length) : 0;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className="glass-surface flex items-center gap-3 p-4 animate-card-in cursor-pointer border-0 text-left w-full hover:-translate-y-0.5 transition-transform"
+                      onClick={() => navigate(`/profesor/curso/${c.id}`)}
+                    >
+                      <span className="grid place-items-center w-10 h-10 rounded-full bg-mint/20 text-accent-teal shrink-0">
+                        <BookOpen size={20} />
+                      </span>
+                      <div className="flex flex-col min-w-0">
+                        <strong className="text-sm text-text truncate">{c.name}</strong>
+                        <span className="text-xs text-muted truncate">{roster.length} alumnos · {avg}% precisión</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </section>
         </>
       )}
 
       {section === "cursos" && (
-        <section className="dash-section">
-          <div className="dash-section__head">
-            <div><h2><BookOpen size={20} /> Islas de la clase</h2><p>Elegí qué islas pueden ver tus alumnos. Se guarda automáticamente.</p></div>
+        <section className="glass-card p-6 flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="font-display text-xl font-bold text-text flex items-center gap-2">
+                <BookOpen size={20} /> Mis cursos
+              </h2>
+              <p className="text-sm text-muted font-semibold">Tocá un curso para ver sus alumnos y asignar niveles.</p>
+            </div>
           </div>
-          <div className="island-toggle-grid">
-            {worlds.map((world) => {
-              const isOn = enabled.has(world.id);
-              return (
-                <article key={world.id} className={`island-toggle-card ${isOn ? "is-on" : "is-off"}`}>
-                  <div className="island-toggle-card__thumb">
-                    <img src={world.thumbnail} alt="" decoding="async" loading="lazy" />
-                    <span className="island-toggle-card__order">#{world.order}</span>
-                  </div>
-                  <div className="island-toggle-card__body">
-                    <strong>{world.title}</strong>
-                    <span className="island-toggle-card__topic">{world.topic}</span>
-                    <span className="island-toggle-card__meta">{world.levels.length} niveles</span>
-                  </div>
+          {classes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center text-center gap-3 py-6 px-4">
+              <h3 className="font-display text-lg font-bold text-text">Todavía no tenés cursos asignados</h3>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {classes.map((c) => {
+                const roster = usingApi ? apiRoster[c.id] ?? [] : getStudentsInClass(c.id);
+                const avg = roster.length ? Math.round(roster.reduce((a, s) => a + (s.stats?.precision ?? 0), 0) / roster.length) : 0;
+                return (
                   <button
+                    key={c.id}
                     type="button"
-                    className={`island-toggle-card__switch ${isOn ? "is-on" : "is-off"}`}
-                    onClick={() => toggleWorld(world.id)}
-                    aria-pressed={isOn}
+                    className="glass-surface flex items-center gap-3 p-4 animate-card-in cursor-pointer border-0 text-left w-full hover:-translate-y-0.5 transition-transform"
+                    onClick={() => navigate(`/profesor/curso/${c.id}`)}
+                    title="Abrir curso"
                   >
-                    {isOn ? <Power size={16} /> : <PowerOff size={16} />}
-                    {isOn ? "Habilitada" : "Deshabilitada"}
+                    <span className="grid place-items-center w-10 h-10 rounded-full bg-mint/20 text-accent-teal shrink-0">
+                      <BookOpen size={20} />
+                    </span>
+                    <div className="flex flex-col min-w-0">
+                      <strong className="text-sm text-text truncate">{c.name}</strong>
+                      <span className="text-xs text-muted truncate">{roster.length} alumnos · {avg}% precisión</span>
+                    </div>
                   </button>
-                </article>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
 
       {section === "estudiantes" && (
-        <section className="dash-section">
-          <div className="dash-section__head"><div><h2><Users size={20} /> Mis estudiantes</h2><p>Avance básico para acompañar a cada uno.</p></div></div>
-          {students.length === 0 ? (
-            <div className="empty-state empty-state--compact"><h3>Sin estudiantes</h3></div>
-          ) : (
+        <section className="glass-card p-6 flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              {students.map((s) => (
-                <div key={s.id} className="progress-row">
-                  <span className="progress-row__name">{s.name}</span>
-                  <div className="progress-track"><div className="progress-track__fill" style={{ width: `${s.stats?.precision ?? 0}%` }} /></div>
-                  <span className="progress-row__pct">{s.stats?.precision ?? 0}%</span>
-                </div>
-              ))}
+              <h2 className="font-display text-xl font-bold text-text flex items-center gap-2">
+                <Users size={20} /> Mis estudiantes
+              </h2>
+              <p className="text-sm text-muted font-semibold">Todos tus alumnos, de todos tus cursos.</p>
+            </div>
+          </div>
+          {students.length === 0 ? (
+            <div className="flex flex-col items-center justify-center text-center gap-3 py-6 px-4">
+              <h3 className="font-display text-lg font-bold text-text">Sin estudiantes</h3>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {students.map((s) => {
+                const pct = Math.round(s.stats?.precision ?? 0);
+                return (
+                  <div key={s.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/40">
+                    <span className="grid place-items-center w-9 h-9 rounded-full bg-accent/15 text-accent font-bold text-sm shrink-0">
+                      {s.name.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="flex flex-col min-w-0 w-32 shrink-0">
+                      <strong className="text-sm text-text truncate">{s.name}</strong>
+                      <small className="text-xs text-muted truncate">{s.className}</small>
+                    </span>
+                    <div className="flex-1 h-3 rounded-full bg-white/50 overflow-hidden">
+                      <div className="h-full rounded-full bg-gradient-to-r from-accent-sky to-accent-teal transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-sm font-bold text-muted w-12 text-right">{pct}%</span>
+                    <StatusChip student={s} />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold cursor-pointer bg-white/50 text-text hover:bg-white/70 border-0 transition-colors"
+                        onClick={() => navigate(`/profesor/alumno/${s.id}`)}
+                      >
+                        Ver
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold cursor-pointer bg-white/50 text-text hover:bg-white/70 border-0 transition-colors"
+                        onClick={() => resetPw(s)}
+                        title="Restablecer contraseña"
+                      >
+                        <KeyRound size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>

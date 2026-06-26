@@ -5,10 +5,30 @@ import type { Activity } from "../data/activities";
 import { assets } from "../utils/assets";
 import { getGameplayBackground } from "../data/worlds";
 import { getStarsFromAccuracy, markLevelComplete } from "../utils/progress";
+import { StarCounter } from "../components/common/StarCounter";
 
 interface SkillLevelViewProps {
   activity: Activity;
 }
+
+/* Tone map for clickable items (replaces i5-clickable--{tone}) */
+const clickableTones: Record<string, string> = {
+  violet: "bg-violet-400/20 ring-violet-400/30",
+  blue: "bg-blue-400/20 ring-blue-400/30",
+  teal: "bg-teal-400/20 ring-teal-400/30",
+  green: "bg-green-400/20 ring-green-400/30",
+  pink: "bg-pink-400/20 ring-pink-400/30",
+  amber: "bg-amber-400/20 ring-amber-400/30",
+  rose: "bg-rose-400/20 ring-rose-400/30",
+  sky: "bg-sky-400/20 ring-sky-400/30",
+  mint: "bg-emerald-300/20 ring-emerald-300/30",
+  lime: "bg-lime-400/20 ring-lime-400/30",
+  cyan: "bg-cyan-400/20 ring-cyan-400/30",
+  purple: "bg-purple-400/20 ring-purple-400/30",
+  orange: "bg-orange-400/20 ring-orange-400/30",
+  coral: "bg-rose-300/20 ring-rose-300/30",
+  gold: "bg-amber-300/20 ring-amber-300/30",
+};
 
 /* =====================================================================
    Island 5 — Mouse skills.
@@ -82,73 +102,101 @@ function Island5Shell({
   }
 
   return (
-    <main className={`i5-shell i5-shell--level-${activity.levelNumber} page-fade`}>
+    <main className="flex flex-col h-dvh relative overflow-hidden animate-page-fade" style={{ backgroundColor: "#cfeef8" }}>
+      {/* Full vivid scene background (was washed to 40% → looked grey). */}
       <div
-        className="i5-shell__bg"
+        className="absolute inset-0 bg-cover bg-center pointer-events-none -z-10"
         aria-hidden="true"
         style={{ backgroundImage: `url("${getGameplayBackground(activity.worldId)}")` }}
       />
-      <div className="i5-shell__sparkles" aria-hidden="true">
+      {/* Whisper-light top scrim only for header legibility. */}
+      <div className="absolute inset-x-0 top-0 h-40 -z-5 pointer-events-none bg-gradient-to-b from-white/35 to-transparent" aria-hidden="true" />
+      <div className="absolute inset-0 pointer-events-none overflow-hidden -z-5" aria-hidden="true">
         {Array.from({ length: 14 }).map((_, i) => (
-          <span key={i} className={`i5-sparkle i5-sparkle--${i % 5}`} />
+          <span
+            key={i}
+            className="absolute w-1.5 h-1.5 rounded-full bg-accent-sky/40 animate-twinkle"
+            style={{
+              left: `${8 + ((i * 19) % 84)}%`,
+              top: `${5 + ((i * 29) % 80)}%`,
+              animationDelay: `${(i * 0.4) % 4}s`,
+            }}
+          />
         ))}
       </div>
 
-      <header className="i5-shell__top">
-        <div className="i5-shell__card i5-shell__card--title">
-          <span className="i5-shell__kicker">{kicker}</span>
-          <strong>{title}</strong>
-          <em>{subtitle}</em>
+      <header className="flex items-center justify-between px-4 sm:px-6 py-3">
+        <div className="glass-surface rounded-2xl px-5 py-2.5 flex items-center gap-3">
+          <span className="text-xs font-bold uppercase tracking-wider text-accent-strong">{kicker}</span>
+          <strong className="font-display font-extrabold text-lg text-text">{title}</strong>
+          <em className="text-[10px] text-muted italic font-normal tracking-wider uppercase">{subtitle}</em>
+        </div>
+        <div className="flex items-center gap-2">
+          <StarCounter />
+          <button
+            type="button"
+            className="glass rounded-full w-10 h-10 grid place-items-center border-0 cursor-pointer text-text hover:bg-white/80 transition"
+            onClick={() => navigate(`/worlds/${activity.worldId}`)}
+            aria-label="Salir"
+          >
+            <X size={16} />
+            <span className="hidden sm:inline text-xs font-bold">Salir</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="flex justify-center px-5 py-2">
+        <div className="glass-strong rounded-full px-5 py-2 flex items-center gap-2.5 shadow-md">
+          <span className="text-xs font-black uppercase tracking-wider text-accent-strong whitespace-nowrap">
+            Objetivo {Math.min(progress + (completed ? 0 : 1), total)} / {total}
+          </span>
+          <h2 className="font-display font-extrabold text-text text-base">{goal}</h2>
+        </div>
+      </div>
+
+      <section className="flex-1 flex items-center justify-center relative min-h-0 overflow-hidden" aria-label="Escena">
+        <img className="absolute bottom-0 left-0 w-auto max-h-[44vh] pointer-events-none select-none animate-mascot-float z-10" src={assets.mascotFemaleWave} alt="" decoding="async" />
+        <span className="absolute glass-strong rounded-2xl px-2.5 py-1.5 text-xs font-bold text-text animate-bubble-pop max-w-[9rem] bottom-[44%] left-[2%] rounded-bl-sm z-20">¡Vos podés!</span>
+        <img className="absolute bottom-0 right-0 w-auto max-h-[44vh] pointer-events-none select-none animate-mascot-float z-10" src={assets.mascotMaleProud} alt="" decoding="async" />
+        <span className="absolute glass-strong rounded-2xl px-2.5 py-1.5 text-xs font-bold text-text animate-bubble-pop max-w-[9rem] bottom-[44%] right-[2%] rounded-br-sm z-20">¡Sos un crack!</span>
+
+        <div className="flex items-center justify-center w-full h-full">{children}</div>
+      </section>
+
+      {/* Readable glass bar for stats + instruction + actions (was plain text
+          floating over the bright art). */}
+      <div className="glass-strong mx-3 mb-3 rounded-2xl px-4 py-2.5 flex flex-col gap-2 shadow-md">
+        <div className="flex items-center justify-center gap-4 text-sm font-bold text-text">
+          <span className="text-amber-400">★</span>
+          <div><b>{metrics.left}:</b> {metrics.leftValue}</div>
+          <div className="w-px h-5 bg-text/15" />
+          <div><b>{metrics.mid}:</b> {metrics.midValue}</div>
+          <div className="w-px h-5 bg-text/15" />
+          <div><b>Precisión:</b> {metrics.precision}%</div>
+          <span className="text-amber-400">★</span>
+        </div>
+
+      <footer className="flex items-center justify-between gap-3">
+        <div className="text-sm text-text font-semibold flex-1 min-w-0">
+          <span aria-hidden="true" className="text-amber-400">★ </span>
+          {feedback ?? instruction}
         </div>
         <button
           type="button"
-          className="i5-shell__exit"
-          onClick={() => navigate(`/worlds/${activity.worldId}`)}
-          aria-label="Salir"
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-white/70 border border-white/60 text-text font-bold text-sm cursor-pointer transition hover:bg-white/90 hover:-translate-y-0.5 active:scale-95 shadow-sm"
+          onClick={speak}
         >
-          <X size={16} />
-          <span>Salir</span>
-        </button>
-      </header>
-
-      <div className="i5-shell__goal">
-        <span className="i5-shell__goal-label">
-          Objetivo {Math.min(progress + (completed ? 0 : 1), total)} / {total}
-        </span>
-        <h2>{goal}</h2>
-      </div>
-
-      <section className="i5-shell__stage" aria-label="Escena">
-        <img className="i5-mascot i5-mascot--left" src={assets.mascotFemaleWave} alt=""  decoding="async" />
-        <span className="i5-bubble i5-bubble--left">¡Vos podés!</span>
-        <img className="i5-mascot i5-mascot--right" src={assets.mascotMaleProud} alt=""  decoding="async" />
-        <span className="i5-bubble i5-bubble--right">¡Sos un crack!</span>
-
-        <div className="i5-scene">{children}</div>
-      </section>
-
-      <div className="i5-shell__metrics">
-        <span>★</span>
-        <div><b>{metrics.left}:</b> {metrics.leftValue}</div>
-        <div className="i5-divider" />
-        <div><b>{metrics.mid}:</b> {metrics.midValue}</div>
-        <div className="i5-divider" />
-        <div><b>Precisión:</b> {metrics.precision}%</div>
-        <span>★</span>
-      </div>
-
-      <footer className="i5-shell__bottom">
-        <div className="i5-shell__hint">
-          <span aria-hidden="true">★</span>
-          {feedback ?? instruction}
-        </div>
-        <button type="button" className="i5-btn-ghost" onClick={speak}>
           <span aria-hidden="true">🔊</span> Escuchar consigna
         </button>
-        <button type="button" className="i5-btn-ghost" onClick={onRetry}>
+        <button
+          type="button"
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-white/70 border border-white/60 text-text font-bold text-sm cursor-pointer transition hover:bg-white/90 hover:-translate-y-0.5 active:scale-95 shadow-sm"
+          onClick={onRetry}
+        >
           <RotateCcw size={16} /> Reintentar
         </button>
       </footer>
+      </div>
 
       {completed && (
         <CompletionModal
@@ -168,31 +216,44 @@ function Island5Shell({
 function CompletionModal({ activity, onRetry, stars = 3 }: { activity: Activity; onRetry: () => void; stars?: number }) {
   const navigate = useNavigate();
   return (
-    <div className="i5-modal" role="dialog" aria-modal="true">
-      <div className="i5-modal__backdrop" />
-      <div className="i5-modal__card">
-        <div className="i5-modal__confetti" aria-hidden="true">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-black/30" />
+      <div className="glass-card-smooth relative z-10 px-8 py-10 flex flex-col items-center gap-4 animate-modal-in w-[min(24rem,90vw)]">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
           {Array.from({ length: 18 }).map((_, i) => (
-            <span key={i} className={`i5-confetti i5-confetti--${i % 6}`} />
+            <span
+              key={i}
+              className="absolute w-2 h-2 rounded-full animate-fall"
+              style={{
+                left: `${(i * 17) % 100}%`,
+                animationDelay: `${(i * 0.12) % 2}s`,
+                animationDuration: `${1.5 + (i % 4) * 0.4}s`,
+                background: ["#ff7676", "#54e8c6", "#536bff", "#facc15", "#ff9cf5", "#76d4ff"][i % 6],
+              }}
+            />
           ))}
         </div>
-        <div className="i5-modal__trophy" aria-hidden="true">🏆</div>
-        <h3 className="i5-modal__title">¡Muy bien!</h3>
-        <p className="i5-modal__sub">Completaste el nivel</p>
-        <div className="i5-modal__stars" aria-hidden="true">
+        <div className="text-6xl animate-bounce-trophy" aria-hidden="true">🏆</div>
+        <h3 className="font-display text-2xl font-extrabold text-text">¡Muy bien!</h3>
+        <p className="text-base text-muted font-semibold">Completaste el nivel</p>
+        <div className="flex gap-1 text-3xl" aria-hidden="true">
           {[1, 2, 3].map((i) => (
-            <span key={i} className={stars >= i ? "" : "is-empty"}>{stars >= i ? "★" : "☆"}</span>
+            <span key={i} className={stars >= i ? "" : "opacity-30 grayscale"}>{stars >= i ? "★" : "☆"}</span>
           ))}
         </div>
-        <div className="i5-modal__actions">
+        <div className="flex gap-3 w-full mt-2">
           <button
             type="button"
-            className="i5-btn-primary"
+            className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-br from-accent-sky to-accent-strong text-white font-extrabold cursor-pointer transition hover:-translate-y-0.5 active:scale-95 shadow-btn flex-1"
             onClick={() => navigate(`/worlds/${activity.worldId}`)}
           >
             Volver a la isla
           </button>
-          <button type="button" className="i5-btn-ghost" onClick={onRetry}>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-white/70 border border-white/60 text-text font-bold text-sm cursor-pointer transition hover:bg-white/90 hover:-translate-y-0.5 active:scale-95 shadow-sm flex-1"
+            onClick={onRetry}
+          >
             <RotateCcw size={16} /> Repetir nivel
           </button>
         </div>
@@ -306,31 +367,45 @@ function LeftClickLevel({ activity }: { activity: Activity }) {
       completed={prog.completed}
       onRetry={retry}
     >
-      <div className="i5-l1-floor" onClick={onMiss}>
-        <div className="i5-l1-row" onClick={(e) => e.stopPropagation()}>
+      <div className="absolute bottom-0 left-0 right-0 h-1/2 flex items-end justify-center pb-[12%]" onClick={onMiss}>
+        <div className="flex items-center justify-center gap-6 sm:gap-10" onClick={(e) => e.stopPropagation()}>
           {LEVEL1_OBJECTS.map((o) => (
             <button
               key={o.id}
               type="button"
-              className={`i5-clickable i5-clickable--${o.tone} ${popped[o.id] ? "is-popped" : ""}`}
+              className={`relative flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 hover:scale-110 ${popped[o.id] ? "animate-pop-out" : ""}`}
               onClick={(e) => onPick(o.id, e)}
               disabled={popped[o.id]}
               aria-label={`Hacer clic en ${o.label}`}
             >
-              <span className="i5-clickable__aura" />
-              <img className="i5-clickable__art" src={o.art} alt="" draggable={false}  decoding="async" />
-              <span className="i5-clickable__pedestal" />
+              {/* Soft glow so the objects "brillan" — no solid colour box. */}
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 sm:w-24 sm:h-24 rounded-full animate-pulse-aura pointer-events-none" />
+              <img className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-lg" src={o.art} alt="" draggable={false} decoding="async" />
+              {/* Little ground shadow under the floating object. */}
+              <span className="w-10 h-2 rounded-[999px] bg-black/15 blur-[2px]" />
             </button>
           ))}
         </div>
       </div>
       {bursts.map((b) => (
-        <span
-          key={b.id}
-          className="i5-burst"
-          style={{ left: `${b.x}px`, top: `${b.y}px`, position: "fixed" }}
-          aria-hidden="true"
-        />
+        <span key={b.id} className="fixed z-50 pointer-events-none -translate-x-1/2 -translate-y-1/2" style={{ left: `${b.x}px`, top: `${b.y}px` }} aria-hidden="true">
+          {/* expanding ring */}
+          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full border-4 border-amber-300/80 animate-burst-ring" />
+          {/* particles flying outward */}
+          {["⭐", "✨", "💫", "⭐", "✨", "💫"].map((p, i) => {
+            const ang = (i / 6) * Math.PI * 2;
+            const dist = 46;
+            return (
+              <span
+                key={i}
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl animate-burst-fly"
+                style={{ ["--bx" as never]: `${Math.cos(ang) * dist}px`, ["--by" as never]: `${Math.sin(ang) * dist}px`, animationDelay: `${i * 12}ms` }}
+              >
+                {p}
+              </span>
+            );
+          })}
+        </span>
       ))}
     </Island5Shell>
   );
@@ -466,29 +541,29 @@ function RightClickLevel({ activity }: { activity: Activity }) {
       onRetry={retry}
       feedback={feedback}
     >
-      <div className="i5-l2-floor">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
         {/* The main task already shows in the top goal card — only a small,
             secondary device tip lives here to avoid repeating the instruction. */}
-        <p className="i5-l2-hint i5-l2-hint--touchpad">
+        <p className="absolute top-3 left-1/2 -translate-x-1/2 text-sm text-muted text-center">
           💻 En notebook: click derecho tocando con <strong>dos dedos</strong> en el touchpad.
         </p>
-        <div className="i5-l2-row">
+        <div className="flex items-center justify-center gap-6 sm:gap-10">
           {round.objects.map((o) => {
             const isTarget = o.id === round.target;
             return (
               <button
                 key={o.id}
                 type="button"
-                className={`i5-clickable i5-clickable--violet ${isTarget ? "is-target" : ""}`}
+                className={`relative flex flex-col items-center gap-2 cursor-pointer transition-all duration-200 hover:scale-110 group rounded-full ${clickableTones.violet} ${isTarget ? "animate-target-pulse-i5 ring-4 ring-rose-400/60" : ""}`}
                 onContextMenu={(e) => onContext(e, o.id)}
                 onClick={onLeft}
                 aria-label={o.label}
               >
-                <span className="i5-clickable__aura" />
-                <img className="i5-clickable__art" src={o.art} alt="" draggable={false}  decoding="async" />
-                <span className="i5-clickable__pedestal" />
-                <span className="i5-clickable__label">{o.label}</span>
-                {isTarget && <span className="i5-clickable__hint">↳ click derecho aquí</span>}
+                <span className="absolute inset-0 rounded-full animate-pulse-aura pointer-events-none" />
+                <img className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-lg" src={o.art} alt="" draggable={false} decoding="async" />
+                <span className="w-12 h-3 rounded-full bg-white/40 shadow-inner" />
+                <span className="text-xs font-bold text-text bg-white/70 px-2 py-0.5 rounded-full">{o.label}</span>
+                {isTarget && <span className="absolute -top-8 text-xs font-bold text-rose whitespace-nowrap animate-bob-arrow">↳ click derecho aquí</span>}
               </button>
             );
           })}
@@ -496,15 +571,19 @@ function RightClickLevel({ activity }: { activity: Activity }) {
       </div>
       {menu && (
         <ul
-          className="i5-ctxmenu"
+          className="fixed z-50 glass-card rounded-xl p-2 flex flex-col gap-1 min-w-[10rem] animate-menu-in"
           role="menu"
-          style={{ left: `${menu.x}px`, top: `${menu.y}px`, position: "fixed" }}
+          style={{ left: `${menu.x}px`, top: `${menu.y}px` }}
           onClick={(e) => e.stopPropagation()}
         >
           {round.menu.map((m) => (
             <li key={m.id}>
-              <button type="button" onClick={() => pickMenu(m.id)}>
-                <span className="i5-ctxmenu__emoji">{m.emoji}</span>
+              <button
+                type="button"
+                className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/40 cursor-pointer w-full text-left text-xs font-semibold text-text"
+                onClick={() => pickMenu(m.id)}
+              >
+                <span className="text-lg select-none">{m.emoji}</span>
                 {m.label}
               </button>
             </li>
@@ -632,45 +711,53 @@ function DragDropLevel({ activity }: { activity: Activity }) {
     >
       {/* Two-row layout: draggable items on top, mixed drop targets below.
           Keeps every item visible inside the viewport at laptop sizes. */}
-      <div className="i5-l3-board">
-        <div className="i5-l3-row i5-l3-row--items" role="list" aria-label="Objetos para arrastrar">
+      <div className="flex flex-col items-center gap-6 h-full justify-center">
+        <div className="flex items-center justify-center gap-6 flex-wrap" role="list" aria-label="Objetos para arrastrar">
           {LEVEL3_ITEMS.map((it) => (
             <div
               key={it.id}
               role="listitem"
-              className={`i5-drag-item ${placed[it.id] ? "is-placed" : ""} ${dragging === it.id ? "is-dragging" : ""}`}
+              className={`relative flex flex-col items-center gap-2 cursor-grab active:cursor-grabbing transition-all ${placed[it.id] ? "opacity-30 scale-90 pointer-events-none" : ""} ${dragging === it.id ? "opacity-70 scale-110" : ""}`}
               draggable={!placed[it.id]}
               onDragStart={(e) => onDragStart(e, it.id)}
               onDragEnd={onDragEnd}
               aria-label={`Arrastrar ${it.label}`}
             >
-              <span className="i5-drag-item__aura" />
-              <img className="i5-drag-item__art" src={it.art} alt="" draggable={false} decoding="async" />
+              <span className="absolute inset-0 rounded-full animate-float-item pointer-events-none" />
+              <img className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-lg" src={it.art} alt="" draggable={false} decoding="async" />
             </div>
           ))}
         </div>
-        <div className="i5-l3-arrow" aria-hidden="true">
+        <div className="flex items-center justify-center gap-4 text-2xl text-muted" aria-hidden="true">
           <span>↓ soltá acá ↓</span>
         </div>
-        <div className="i5-l3-row i5-l3-row--slots" role="list" aria-label="Destinos">
+        <div className="flex items-center justify-center gap-8 flex-wrap" role="list" aria-label="Destinos">
           {slotOrder.map((it) => (
             <div
               key={it.id}
               role="listitem"
-              className={`i5-drop-slot ${hovered === it.id ? "is-hover" : ""} ${placed[it.id] ? "is-filled" : ""} ${rejectingSlot === it.id ? "is-rejecting" : ""}`}
+              className={`relative flex flex-col items-center gap-1 w-24 h-24 rounded-2xl border-2 border-dashed transition-all ${
+                rejectingSlot === it.id
+                  ? "animate-shake-i5 border-rose bg-white/20"
+                  : hovered === it.id
+                    ? "border-accent-sky bg-accent-sky/10 scale-105"
+                    : placed[it.id]
+                      ? "border-mint bg-mint/10"
+                      : "border-white/60 bg-white/20"
+              }`}
               onDragOver={(e) => onDragOver(e, it.id)}
               onDragLeave={onDragLeave}
               onDrop={(e) => onDrop(e, it.id)}
             >
               <img
-                className={`i5-drop-slot__art ${placed[it.id] ? "is-filled" : ""}`}
+                className={`w-10 h-10 object-contain drop-shadow ${placed[it.id] ? "animate-reward-pop" : ""}`}
                 src={it.art}
                 alt=""
                 draggable={false}
                 decoding="async"
               />
-              <span className="i5-drop-slot__label">{it.label}</span>
-              {rejectingSlot === it.id && <span className="i5-drop-slot__cross" aria-hidden="true">✕</span>}
+              <span className="text-xs font-bold text-muted">{it.label}</span>
+              {rejectingSlot === it.id && <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose text-white rounded-full grid place-items-center text-xs font-bold animate-cross-pop" aria-hidden="true">✕</span>}
             </div>
           ))}
         </div>
@@ -692,10 +779,10 @@ interface WinState {
 }
 
 const LEVEL4_TASKS = [
-  { kind: "close-tab", windowId: "browser", tabId: "videos", text: "Cerrá la pestaña “Videos”." },
-  { kind: "close-window", windowId: "drawings", text: "Cerrá la ventana “Dibujos”." },
-  { kind: "open-tab", windowId: "browser", text: "Abrí una pestaña nueva en el explorador." },
-  { kind: "close-window", windowId: "notes", text: "Cerrá la ventana “Notas”." },
+  { kind: "close-tab", windowId: "browser", tabId: "videos", text: 'Cerrá la pestaña \u201cVideos\u201d.' },
+  { kind: "close-window", windowId: "drawings", text: 'Cerrá la ventana \u201cDibujos\u201d.' },
+  { kind: "open-tab", windowId: "browser", text: 'Abrí una pestaña nueva en el explorador.' },
+  { kind: "close-window", windowId: "notes", text: 'Cerrá la ventana \u201cNotas\u201d.' },
 ] as const;
 
 function WindowsLevel({ activity }: { activity: Activity }) {
@@ -807,32 +894,32 @@ function WindowsLevel({ activity }: { activity: Activity }) {
       onRetry={retry}
       feedback={feedback}
     >
-      <div className="i5-desktop i5-desktop--clean">
+      <div className="absolute inset-0 flex flex-col overflow-hidden">
         {/* Inline task pill — the spoken consigna duplicated as a readable
             cue right above the windows so kids always know what to do. */}
-        <div className="i5-desktop__task" role="status">
-          <span className="i5-desktop__task-kicker">Tarea</span>
+        <div className="glass-strong rounded-xl px-4 py-2 flex items-center gap-2 text-sm font-bold text-text" role="status">
+          <span className="text-accent-strong uppercase text-xs tracking-wider">Tarea</span>
           <strong>{task.text}</strong>
         </div>
 
         {/* Clean, illustrated windows — bodies are CSS-only so they never
             clash with painted artwork or stack messily. */}
-        <div className="i5-desktop__grid">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 p-3 flex-1 overflow-y-auto no-scrollbar content-start">
           {windows.filter((w) => w.open).map((w, idx) => (
             <div
               key={w.id}
-              className={`i5-window i5-window--${w.id}`}
+              className="glass-card rounded-xl overflow-hidden shadow-lg"
               style={{ ["--stack" as never]: idx }}
             >
-              <div className="i5-window__bar">
+              <div className="flex items-center gap-2 px-3 py-2 bg-white/30 border-b border-white/20">
                 {w.tabs ? (
-                  <div className="i5-window__tabstrip" role="tablist">
+                  <div className="flex items-center gap-1 flex-1 overflow-x-auto" role="tablist">
                     {w.tabs.filter((t) => t.open).map((t) => (
-                      <div key={t.id} className="i5-tab">
+                      <div key={t.id} className="flex items-center gap-1 px-3 py-1 rounded-md bg-white/40 text-xs font-bold text-text whitespace-nowrap">
                         <span aria-hidden="true">{t.emoji}</span> {t.title}
                         <button
                           type="button"
-                          className="i5-tab__close"
+                          className="w-4 h-4 grid place-items-center rounded-full hover:bg-white/60 text-muted cursor-pointer"
                           onClick={() => onCloseTab(w.id, t.id)}
                           aria-label={`Cerrar pestaña ${t.title}`}
                         >
@@ -842,7 +929,7 @@ function WindowsLevel({ activity }: { activity: Activity }) {
                     ))}
                     <button
                       type="button"
-                      className="i5-tab i5-tab--add"
+                      className="w-6 h-6 grid place-items-center rounded-full hover:bg-white/60 text-muted cursor-pointer"
                       onClick={() => onOpenTab(w.id)}
                       aria-label="Nueva pestaña"
                     >
@@ -850,49 +937,49 @@ function WindowsLevel({ activity }: { activity: Activity }) {
                     </button>
                   </div>
                 ) : (
-                  <span className="i5-window__title">
+                  <span className="text-xs font-bold text-text truncate">
                     <span aria-hidden="true">{w.emoji}</span> {w.title}
                   </span>
                 )}
-                <span className="i5-window__lights" aria-hidden="true">
-                  <i style={{ background: "#ffd552" }} />
-                  <i style={{ background: "#5be8ba" }} />
+                <span className="flex items-center gap-1.5 ml-auto" aria-hidden="true">
+                  <i className="w-2.5 h-2.5 rounded-full" style={{ background: "#ffd552" }} />
+                  <i className="w-2.5 h-2.5 rounded-full" style={{ background: "#5be8ba" }} />
                 </span>
                 <button
                   type="button"
-                  className="i5-window__close"
+                  className="w-6 h-6 grid place-items-center rounded-full hover:bg-rose/30 cursor-pointer text-muted"
                   onClick={() => onCloseWindow(w.id)}
                   aria-label={`Cerrar ${w.title}`}
                 >
                   ×
                 </button>
               </div>
-              <div className="i5-window__body">
+              <div className="p-2.5 flex flex-col gap-2 min-h-[5.5rem]">
                 {w.id === "browser" && (
-                  <div className="i5-fake-browser">
-                    <div className="i5-fake-browser__url">
-                      <span className="i5-fake-browser__dot" />
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-white/40 text-[11px] text-muted">
+                      <span className="w-2 h-2 rounded-full bg-mint" />
                       typely.test/aventura
                     </div>
-                    <div className="i5-fake-browser__hero">🌐</div>
-                    <p>Página de inicio</p>
+                    <div className="flex items-center justify-center text-4xl py-1">🌐</div>
+                    <p className="text-xs text-muted text-center">Página de inicio</p>
                   </div>
                 )}
                 {w.id === "drawings" && (
-                  <div className="i5-fake-paint">
-                    <div className="i5-fake-paint__toolbar">
-                      <span style={{ background: "#ff7676" }} />
-                      <span style={{ background: "#54e8c6" }} />
-                      <span style={{ background: "#536bff" }} />
-                      <span style={{ background: "#facc15" }} />
+                  <div className="bg-white rounded-lg p-3 flex flex-col gap-2">
+                    <div className="flex gap-1">
+                      <span className="w-3 h-3 rounded-full inline-block" style={{ background: "#ff7676" }} />
+                      <span className="w-3 h-3 rounded-full inline-block" style={{ background: "#54e8c6" }} />
+                      <span className="w-3 h-3 rounded-full inline-block" style={{ background: "#536bff" }} />
+                      <span className="w-3 h-3 rounded-full inline-block" style={{ background: "#facc15" }} />
                     </div>
-                    <div className="i5-fake-paint__canvas">🎨</div>
+                    <div className="flex items-center justify-center text-3xl h-12">🎨</div>
                   </div>
                 )}
                 {w.id === "notes" && (
-                  <div className="i5-fake-notes">
-                    <p>★ Mis tareas</p>
-                    <ul>
+                  <div className="bg-yellow-50/80 rounded-lg p-3">
+                    <p className="font-bold text-sm text-text">★ Mis tareas</p>
+                    <ul className="list-disc list-inside text-sm text-text space-y-1">
                       <li>Estudiar mecanografía</li>
                       <li>Explorar la isla</li>
                       <li>Saludar al robot</li>
@@ -1010,53 +1097,53 @@ function ScrollLevel({ activity }: { activity: Activity }) {
       onRetry={retry}
       feedback={feedback}
     >
-      <div className="i5-l5-grid i5-l5-grid--clean">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-4">
         {/* Scroll card — mouse illustration sits inside the same panel so
             arrows + scroll viewport feel like one coherent unit. */}
-        <section className="i5-l5-card">
-          <header className="i5-l5-card__head">
-            <span className="i5-l5-card__chip">SCROLL</span>
-            <h3>Rueda del mouse</h3>
+        <section className="glass-card overflow-hidden w-full max-w-2xl">
+          <header className="flex items-center justify-between px-5 py-3 border-b border-white/20">
+            <span className="px-3 py-0.5 rounded-full bg-accent-sky/20 text-accent-strong text-xs font-bold uppercase tracking-wider">SCROLL</span>
+            <h3 className="font-display font-bold text-text text-sm">Rueda del mouse</h3>
           </header>
-          <div className="i5-l5-card__body i5-l5-card__body--scroll">
-            <aside className="i5-l5-mouse" aria-hidden="true">
-              <div className="i5-l5-mouse__arrow i5-l5-mouse__arrow--up">↑</div>
-              <img src={assets.i5Mouse} alt="" draggable={false}  decoding="async" />
-              <div className="i5-l5-mouse__arrow i5-l5-mouse__arrow--down">↓</div>
+          <div className="flex gap-4 p-4">
+            <aside className="flex flex-col items-center gap-3 text-2xl text-muted" aria-hidden="true">
+              <div className="animate-bob-arrow">↑</div>
+              <img src={assets.i5Mouse} alt="" draggable={false} decoding="async" className="w-10 h-auto object-contain" />
+              <div className="animate-bob-arrow" style={{ animationDelay: "0.3s" }}>↓</div>
             </aside>
-            <div className="i5-l5-scrollview" onScroll={onScroll}>
+            <div className="flex-1 overflow-y-auto rounded-lg bg-white/40 h-60" onScroll={onScroll}>
               {/* The "tall vertical image" is composed in pure CSS so it
                   never depends on an external file and can never bug out
                   mid-scroll. Each band paints a different sky layer of a
                   fantasy mountain → castle → cave journey. */}
-              <div className="i5-l5-scene" aria-hidden="true">
-                <div className="i5-l5-scene__band i5-l5-scene__band--top">
-                  <span className="i5-l5-scene__icon">☀️</span>
-                  <strong>Cielo</strong>
+              <div className="relative flex flex-col" aria-hidden="true">
+                <div className="flex items-center justify-center gap-2 h-24 sm:h-32 text-2xl bg-sky-200/30">
+                  <span className="text-2xl sm:text-3xl">☀️</span>
+                  <strong className="font-bold text-text text-sm">Cielo</strong>
                 </div>
-                <div className="i5-l5-scene__band i5-l5-scene__band--clouds">
-                  <span className="i5-l5-scene__icon">☁️</span>
-                  <strong>Nubes</strong>
+                <div className="flex items-center justify-center gap-2 h-24 sm:h-32 text-2xl bg-white/30">
+                  <span className="text-2xl sm:text-3xl">☁️</span>
+                  <strong className="font-bold text-text text-sm">Nubes</strong>
                 </div>
-                <div className="i5-l5-scene__band i5-l5-scene__band--peak">
-                  <span className="i5-l5-scene__icon">🏔️</span>
-                  <strong>Montaña</strong>
+                <div className="flex items-center justify-center gap-2 h-24 sm:h-32 text-2xl bg-gray-200/30">
+                  <span className="text-2xl sm:text-3xl">🏔️</span>
+                  <strong className="font-bold text-text text-sm">Montaña</strong>
                 </div>
-                <div className="i5-l5-scene__band i5-l5-scene__band--castle">
-                  <span className="i5-l5-scene__icon">🏰</span>
-                  <strong>Castillo</strong>
+                <div className="flex items-center justify-center gap-2 h-24 sm:h-32 text-2xl bg-amber-100/30">
+                  <span className="text-2xl sm:text-3xl">🏰</span>
+                  <strong className="font-bold text-text text-sm">Castillo</strong>
                 </div>
-                <div className="i5-l5-scene__band i5-l5-scene__band--forest">
-                  <span className="i5-l5-scene__icon">🌲</span>
-                  <strong>Bosque</strong>
+                <div className="flex items-center justify-center gap-2 h-24 sm:h-32 text-2xl bg-green-200/30">
+                  <span className="text-2xl sm:text-3xl">🌲</span>
+                  <strong className="font-bold text-text text-sm">Bosque</strong>
                 </div>
-                <div className="i5-l5-scene__band i5-l5-scene__band--cave">
-                  <span className="i5-l5-scene__icon">🪄</span>
-                  <strong>Cueva mágica</strong>
+                <div className="flex items-center justify-center gap-2 h-24 sm:h-32 text-2xl bg-purple-200/30">
+                  <span className="text-2xl sm:text-3xl">🪄</span>
+                  <strong className="font-bold text-text text-sm">Cueva mágica</strong>
                 </div>
-                <div className="i5-l5-scene__band i5-l5-scene__band--end">
-                  <span className="i5-l5-scene__icon">🏁</span>
-                  <strong>¡Llegaste al final!</strong>
+                <div className="flex items-center justify-center gap-2 h-24 sm:h-32 text-2xl bg-rose-200/30">
+                  <span className="text-2xl sm:text-3xl">🏁</span>
+                  <strong className="font-bold text-text text-sm">¡Llegaste al final!</strong>
                 </div>
               </div>
             </div>
@@ -1065,34 +1152,45 @@ function ScrollLevel({ activity }: { activity: Activity }) {
 
         {/* Zoom card — castle artwork lives inside a clean stage with
             obvious + / − controls below, no overlay clash. */}
-        <section className="i5-l5-card">
-          <header className="i5-l5-card__head">
-            <span className="i5-l5-card__chip">ZOOM</span>
-            <h3>Acercá la imagen</h3>
+        <section className="glass-card overflow-hidden w-full max-w-2xl">
+          <header className="flex items-center justify-between px-5 py-3 border-b border-white/20">
+            <span className="px-3 py-0.5 rounded-full bg-accent-sky/20 text-accent-strong text-xs font-bold uppercase tracking-wider">ZOOM</span>
+            <h3 className="font-display font-bold text-text text-sm">Acercá la imagen</h3>
           </header>
-          <div className="i5-l5-card__body i5-l5-card__body--zoom">
-            <div className="i5-l5-zoomstage">
+          <div className="flex gap-4 p-4">
+            <div className="bg-white/40 rounded-lg flex-1">
               <img
-                className="i5-l5-zoomart"
+                className="bg-white rounded-lg w-full h-auto object-contain transition-transform duration-200"
                 src={assets.i5CastleSquare}
                 alt="Castillo de zoom"
                 draggable={false}
                 style={{ transform: `scale(${zoom})` }}
-               decoding="async" />
-              <span className="i5-l5-zoom-pct">{Math.round(zoom * 100)}%</span>
+                decoding="async"
+              />
+              <span className="text-lg font-bold text-text block text-center mt-1">{Math.round(zoom * 100)}%</span>
             </div>
-            <div className="i5-l5-zoom-controls">
-              <button type="button" className="i5-l5-zoom-btn" onClick={onZoomOut} aria-label="Alejar">
-                <strong>−</strong><span>Alejar</span>
+            <div className="flex gap-2 items-center">
+              <button
+                type="button"
+                className="glass-surface rounded-xl w-10 h-10 grid place-items-center text-lg font-bold cursor-pointer border-0"
+                onClick={onZoomOut}
+                aria-label="Alejar"
+              >
+                <strong>−</strong><span className="hidden sm:inline text-xs">Alejar</span>
               </button>
-              <button type="button" className="i5-l5-zoom-btn i5-l5-zoom-btn--primary" onClick={onZoomIn} aria-label="Acercar">
-                <strong>+</strong><span>Acercar</span>
+              <button
+                type="button"
+                className="glass-surface rounded-xl w-10 h-10 grid place-items-center text-lg font-bold cursor-pointer border-0 bg-accent text-white"
+                onClick={onZoomIn}
+                aria-label="Acercar"
+              >
+                <strong>+</strong><span className="hidden sm:inline text-xs">Acercar</span>
               </button>
             </div>
           </div>
         </section>
       </div>
-      <span className="i5-sr-only" aria-hidden="true">{didZoomIn ? "" : ""}{reachedTop ? "" : ""}</span>
+      <span className="sr-only" aria-hidden="true">{didZoomIn ? "" : ""}{reachedTop ? "" : ""}</span>
     </Island5Shell>
   );
 }
@@ -1174,27 +1272,27 @@ function DoubleClickLevel({ activity }: { activity: Activity }) {
       onRetry={retry}
       feedback={feedback}
     >
-      <div className="i5-l6-grid">
+      <div className="flex items-center justify-center gap-6 flex-wrap">
         {LEVEL6_FOLDERS.map((f) => (
           <button
             type="button"
             key={f.id}
-            className={`i5-folder ${opened[f.id] ? "is-open" : ""}`}
+            className={`glass-card rounded-2xl w-32 overflow-hidden cursor-pointer transition-all hover:scale-105 ${opened[f.id] ? "ring-2 ring-mint" : ""}`}
             onClick={() => onSingleClick(f.id)}
             onDoubleClick={() => onDoubleClick(f.id)}
             disabled={opened[f.id]}
             aria-label={`Doble clic en ${f.label}`}
           >
-            <div className="i5-folder__tab" />
-            <div className="i5-folder__body">
+            <div className="bg-white/30 px-3 py-1 flex items-center gap-1" />
+            <div className="p-4 flex flex-col items-center gap-2">
               {opened[f.id] ? (
-                <span className="i5-folder__check">✓</span>
+                <span className="text-mint font-bold">✓</span>
               ) : (
-                <img src={f.art} alt="" draggable={false}  decoding="async" />
+                <img src={f.art} alt="" draggable={false} decoding="async" className="w-12 h-12 object-contain drop-shadow-sm" />
               )}
             </div>
-            <span className="i5-folder__label">{f.label}</span>
-            {!opened[f.id] && <span className="i5-folder__hint">doble clic</span>}
+            <span className="text-sm font-bold text-text block text-center pb-1">{f.label}</span>
+            {!opened[f.id] && <span className="text-xs text-muted block text-center pb-2">doble clic</span>}
           </button>
         ))}
       </div>
@@ -1339,33 +1437,33 @@ function ShortcutsLevel({ activity }: { activity: Activity }) {
       onRetry={retry}
       feedback={feedback}
     >
-      <div className="i5-l7-cp">
-        <div className={`i5-l7-cp__source ${copied ? "is-copied" : ""}`}>
-          <span className="i5-l7-cp__label">1 · Texto para copiar</span>
+      <div className="flex items-center justify-center gap-4 flex-wrap max-w-4xl">
+        <div className={`glass-surface rounded-2xl p-4 flex flex-col items-center gap-2 w-48 ${copied ? "ring-2 ring-mint" : ""}`}>
+          <span className="text-xs font-bold uppercase tracking-wider text-muted">1 · Texto para copiar</span>
           <p
             ref={sourceRef}
-            className="i5-l7-cp__text"
+            className="text-lg font-bold text-text py-2 px-3 bg-white/50 rounded-lg text-center select-all cursor-pointer"
             onClick={selectSource}
             tabIndex={0}
             onFocus={selectSource}
           >
             {LEVEL7_SOURCE}
           </p>
-          <span className="i5-l7-cp__action">
-            <kbd>Ctrl</kbd><span className="i5-l7-plus">+</span><kbd>C</kbd>
+          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent-sky/20 text-accent-strong text-xs font-bold cursor-pointer hover:bg-accent-sky/30">
+            <kbd className="px-1.5 py-0.5 rounded bg-white/60 font-mono text-xs">Ctrl</kbd><span className="text-muted font-bold">+</span><kbd className="px-1.5 py-0.5 rounded bg-white/60 font-mono text-xs">C</kbd>
           </span>
         </div>
 
-        <div className="i5-l7-cp__middle">
-          <span className="i5-l7-cp__step">2</span>
-          <p>Seleccioná el mensaje, copialo y pegalo abajo.</p>
+        <div className="flex flex-col items-center gap-3">
+          <span className="text-sm font-bold text-muted">2</span>
+          <p className="text-sm text-muted text-center">Seleccioná el mensaje, copialo y pegalo abajo.</p>
         </div>
 
-        <div className={`i5-l7-cp__paste ${pasted && pasted.trim() === LEVEL7_SOURCE ? "is-ok" : ""}`}>
-          <span className="i5-l7-cp__label">3 · Pegá acá</span>
+        <div className={`glass-surface rounded-2xl p-4 flex flex-col items-center gap-2 w-48 ${pasted && pasted.trim() === LEVEL7_SOURCE ? "ring-2 ring-mint" : ""}`}>
+          <span className="text-xs font-bold uppercase tracking-wider text-muted">3 · Pegá acá</span>
           <textarea
             ref={pasteRef}
-            className="i5-l7-cp__box"
+            className="w-24 h-16 bg-white/50 rounded-lg text-sm text-text p-2 resize-none border-0 outline-none focus:ring-2 focus:ring-accent-sky/40"
             placeholder="Hacé click acá y presioná Ctrl + V…"
             value={pasted}
             onChange={(e) => setPasted(e.target.value)}
@@ -1373,8 +1471,8 @@ function ShortcutsLevel({ activity }: { activity: Activity }) {
             spellCheck={false}
             aria-label="Caja para pegar"
           />
-          <span className="i5-l7-cp__action">
-            <kbd>Ctrl</kbd><span className="i5-l7-plus">+</span><kbd>V</kbd>
+          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent-sky/20 text-accent-strong text-xs font-bold cursor-pointer hover:bg-accent-sky/30">
+            <kbd className="px-1.5 py-0.5 rounded bg-white/60 font-mono text-xs">Ctrl</kbd><span className="text-muted font-bold">+</span><kbd className="px-1.5 py-0.5 rounded bg-white/60 font-mono text-xs">V</kbd>
           </span>
         </div>
       </div>
@@ -1403,14 +1501,17 @@ function FallbackLevel({ activity }: { activity: Activity }) {
       completed={prog.completed}
       onRetry={() => prog.reset()}
     >
-      <div className="i5-l1-floor">
-        <button type="button" className="i5-clickable i5-clickable--violet" onClick={() => prog.tickCorrect()}>
-          <span className="i5-clickable__aura" />
-          <span className="i5-clickable__emoji">✨</span>
-          <span className="i5-clickable__pedestal" />
+      <div className="absolute bottom-0 left-0 right-0 h-1/2 flex items-end justify-center pb-[12%]">
+        <button
+          type="button"
+          className={`relative flex flex-col items-center gap-2 cursor-pointer transition-all duration-200 hover:scale-110 group rounded-full ${clickableTones.violet}`}
+          onClick={() => prog.tickCorrect()}
+        >
+          <span className="absolute inset-0 rounded-full animate-pulse-aura pointer-events-none" />
+          <span className="text-3xl sm:text-4xl select-none">✨</span>
+          <span className="w-12 h-3 rounded-full bg-white/40 shadow-inner" />
         </button>
       </div>
     </Island5Shell>
   );
 }
-

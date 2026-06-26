@@ -62,12 +62,27 @@ declare global {
   }
 }
 
-/** Read the public Client ID from the Vite environment. */
+let warnedMissingClientId = false;
+
+/** Read the public Client ID from the Vite environment.
+ *  NOTE: this is baked into the bundle at BUILD time (Vite inlines
+ *  `import.meta.env.VITE_*`), not read at runtime. An empty value here almost
+ *  always means the var was missing on the build host — see the one-time
+ *  console.warn below and DEPLOY.md. */
 export function getGoogleClientId(): string | undefined {
   const value = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  if (!value || typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (!trimmed) {
+    if (!warnedMissingClientId && typeof console !== "undefined") {
+      warnedMissingClientId = true;
+      console.warn(
+        "[TYPELY] VITE_GOOGLE_CLIENT_ID is empty at build time — Google login is disabled. " +
+          "Set it on the build host and rebuild (docker compose up -d --build); it is baked into the bundle, not read at runtime.",
+      );
+    }
+    return undefined;
+  }
+  return trimmed;
 }
 
 /** Read the optional allowlist of institutional email domains. */
@@ -149,9 +164,6 @@ export function loadGoogleIdentityServices(): Promise<void> {
 export async function promptGoogleSignIn(opts: {
   onCredential: (credential: string) => void;
   onError: (reason: "MISSING_CLIENT_ID" | "GIS_LOAD_FAILED" | "POPUP_DISMISSED") => void;
-  /** Optional anchor element for rendering the GIS button — used as a
-   *  reliable fallback when `prompt()` is blocked by the browser. */
-  fallbackAnchor?: HTMLElement | null;
 }): Promise<void> {
   const clientId = getGoogleClientId();
   if (!clientId) {
@@ -182,27 +194,15 @@ export async function promptGoogleSignIn(opts: {
     use_fedcm_for_prompt: true,
   });
 
-  // Try the lightweight prompt first. If the browser refuses to display
-  // it (FedCM / third-party cookies blocked / suppressed), render the
-  // official GIS button into the fallback anchor so the user has a way
-  // to complete sign-in.
+  // Open the Google account chooser — the FedCM "continuar como…" mini-popup.
+  // That popup IS the UI: we deliberately do NOT render any extra in-page
+  // button (it caused a layout jump and a duplicate control). The credential
+  // callback set in initialize() handles success. If the browser blocks the
+  // popup entirely, report it so the page can surface a toast.
   idApi.prompt((notification) => {
     const blocked =
       notification?.isNotDisplayed?.() || notification?.isSkippedMoment?.();
-    if (!blocked) return;
-    if (opts.fallbackAnchor && idApi.renderButton) {
-      opts.fallbackAnchor.innerHTML = "";
-      idApi.renderButton(opts.fallbackAnchor, {
-        type: "standard",
-        theme: "filled_blue",
-        size: "large",
-        text: "continue_with",
-        shape: "pill",
-        logo_alignment: "left",
-      });
-    } else {
-      opts.onError("POPUP_DISMISSED");
-    }
+    if (blocked) opts.onError("POPUP_DISMISSED");
   });
 }
 

@@ -10,13 +10,24 @@ interface GlassInputProps {
   action?: ReactNode;
 }
 
-export function GlassInput({ action, autoComplete, icon, label, onChange, type = "text", value }: GlassInputProps) {
+export function GlassInput({
+  action,
+  autoComplete,
+  icon,
+  label,
+  onChange,
+  type = "text",
+  value,
+}: GlassInputProps) {
   return (
-    <label className="login-field">
-      <span className="sr-only">{label}</span>
-      <span className="input-shell">
-        {icon}
+    <label className="grid gap-2">
+      <span className="absolute w-px h-px overflow-hidden whitespace-nowrap clip-0">
+        {label}
+      </span>
+      <span className="glass-surface grid grid-cols-[auto_1fr_auto] items-center gap-2.5 rounded-xl h-12 px-3">
+        <span className="text-muted grid place-items-center">{icon}</span>
         <input
+          className="bg-transparent outline-none text-text placeholder:text-muted/60 w-full h-full"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           type={type}

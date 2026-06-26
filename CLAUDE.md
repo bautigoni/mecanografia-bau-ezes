@@ -1,15 +1,17 @@
 # CLAUDE.md
 
+> Authoritative project guide for agents and developers. `AGENTS.md` points
+> here; `ENGINEERING_RULES.md` and `.cursor/rules/*` hold the condensed rules;
+> `dbnew.md` is the backend implementation log; `DEPLOY.md` is the ops runbook.
+
 ## 1. Project Overview
 
 **TYPELY** (previously codenamed *EduTic*) is a gamified typing and digital
 literacy learning app for primary school students. Spanish-first
 (Latin-American Spanish), keyboard-driven, real activities — no placeholder
-gameplay.
-
-The product teaches students to locate keys, type letters and words, use
-the spacebar, Shift, Backspace, tildes and the ñ, and to progress through
-four magical islands of increasing difficulty.
+gameplay. Students learn to locate keys, type letters/words, use the spacebar,
+Shift, Backspace, tildes and the ñ, and progress through a chain of magical
+floating islands of increasing difficulty.
 
 Core visual direction:
 
@@ -22,395 +24,312 @@ Core visual direction:
 ## 2. Brand & Naming
 
 - **Product name:** TYPELY (uppercase wordmark).
-- Internal identifiers like `EduTicUser`, the localStorage prefix `edutic_*`
-  and the npm `name` are kept for backward compatibility — only **user-facing
-  strings** read "TYPELY".
+- Internal identifiers like `EduTicUser`, the localStorage prefix `edutic_*`,
+  the world ids `island1..island15`, and the npm `name: "edutic"` are kept for
+  backward compatibility — only **user-facing strings** read "TYPELY". URLs,
+  asset paths and localStorage keys are stable and must not be renamed.
 
-## 3. Visual Design System
+## 3. Architecture (current)
+
+TYPELY started frontend-only (localStorage) and now has a real backend. It runs
+as **three Docker containers behind a Caddy reverse proxy** at
+`typely.bauhub.online`:
+
+| Layer | Stack | Where | Exposed |
+| --- | --- | --- | --- |
+| Frontend | Vite 7 + **React 19** + TypeScript + **Tailwind 4**, built to static files served by Nginx | `src/`, `Dockerfile`, `nginx.conf` | `127.0.0.1:3005` |
+| API | **Fastify + Drizzle ORM** (TS, ESM) | `api/`, `Dockerfile.api` | `127.0.0.1:3006`, proxied under `/api/*` |
+| Database | **Postgres 16** | `db/init/*.sql` | loopback only |
+
+- **Hot path stays local.** The typing engine reads/writes `localStorage` so the
+  game never blocks on the network. The API only receives a batched
+  level-complete POST and is the source of truth for cross-device progress +
+  teacher/admin dashboards.
+- **Graceful fallback.** `src/utils/api.ts` + `src/hooks/useAuth.tsx` fall back
+  to the localStorage user list when the API is unreachable, so demo mode and
+  offline play keep working. `usingApi` is exposed so dashboards can show a
+  "backend offline" state.
+- See `dbnew.md` for the full backend log and `DEPLOY.md` for the 3-container
+  deploy/ops runbook. The optional `server/index.mjs` is a separate invitation-
+  email scaffold (NOT in compose) — don't assume it's running.
+
+## 4. Roles & Auth
+
+Roles: `superadmin`, `admin-sede`, `profesor`, `alumno`. After login each role
+lands on its own surface via `routeForRole` (`/admin-general`, `/admin-sede`,
+`/profesor`, `/mundos`).
+
+- **Demo mode is student-only.** `demoLogin()` in `src/utils/storage.ts` always
+  returns the seeded demo student and routes to `/mundos`. It can never reach an
+  admin/teacher surface — this is a hard rule.
+- **Staff** (superadmin/admin-sede/profesor) sign in with username/password via
+  `authenticateAny`; students are blocked from the staff form path. Superadmin
+  `admin`/`admin` always works via a defensive fallback.
+- **Google sign-in** matches by normalised email (`normalizeEmail`, server-side
+  ID-token verification against Google JWKS — never trust the client payload).
+- **Temp passwords:** sede admins are created/reset with a temp password +
+  `mustChangePassword`; `ProtectedRoute` forces `/cambiar-contrasena` until
+  changed. Google (passwordless) bypasses it. Never display the current password.
+- **RBAC** (`api/src/rbac.ts`): `canGrantRole(actor,target)` — an `admin_sede`
+  can never grant `admin_sede` or higher; `canActOnSede` blocks cross-sede
+  mutations. Every user-mutating endpoint calls these.
+- **Read-only impersonation (support)** — `POST /api/admin/impersonate`
+  (`api/src/routes/support.ts`) lets superadmin/admin-general/admin-sede VIEW
+  another in-scope account for 30 min after a **triple check** (own password +
+  exact phrase `ACCEDER EN MODO LECTURA` + legal acknowledgment). It mints an
+  access token with a `readOnly` claim and NO refresh cookie (dies in 30 min);
+  a global preHandler in `server.ts` rejects every mutation made with a
+  `readOnly` token. Never targets a superadmin. Front: `ImpersonateModal` +
+  global `ImpersonationBanner` (countdown), wired through `useAuth`
+  (`startImpersonation`/`stopImpersonation`). Audited as `impersonate_start`.
+
+## 5. Visual Design System
 
 ### Typography
 - Loaded from Google Fonts in `index.html`:
-  - **Fredoka** (500/600/700) — display font for headings, key labels,
-    button text, brand wordmark.
-  - **Nunito** (600/700/800/900) — body font, inputs, paragraphs.
-- Exposed via CSS variables in `src/styles/global.css`:
-  - `--font-body: "Nunito", "Quicksand", Inter, system-ui, …`
-  - `--font-display: "Fredoka", "Baloo 2", "Nunito", ui-rounded, …`
-- Headings + emphasis bind to `--font-display` via a typography pass at the
-  bottom of `global.css`.
+  - **Fredoka** (500/600/700) — display: headings, key labels, buttons, wordmark.
+  - **Nunito** (600–900) — body, inputs, paragraphs.
+- CSS variables in `src/styles/global.css`:
+  `--font-display: "Fredoka", …` and `--font-body: "Nunito", …`.
 
 ### Color palette
-- Sky blue: `#9fc8ff`, `#cfeeff`
-- Deep navy: `#17355f`, `#153b78`
-- Turquoise / mint: `#22c7b8`, `#54e8c6`, `#5be8ba`
-- Electric blue / violet: `#536bff`, `#3159e8`, `#7c71ff`, `#9b7cff`, `#5932d4`
-- Soft pink: `#ff9fca`
-- Star/accent gold: `#facc15`, `#ffd552`
-- Glass white: `rgba(255, 255, 255, 0.55)` → `rgba(255, 255, 255, 0.92)`
+- Sky blue `#9fc8ff` `#cfeeff`; deep navy `#17355f` `#153b78`; turquoise/mint
+  `#22c7b8` `#54e8c6` `#5be8ba`; electric blue/violet `#536bff` `#3159e8`
+  `#7c71ff` `#9b7cff` `#5932d4`; soft pink `#ff9fca`; gold `#facc15` `#ffd552`;
+  glass white `rgba(255,255,255,0.55→0.92)`.
 
-### Gradients
-- Primary action / target: `linear-gradient(135deg, #54e8c6, #25c8df, #536bff)`
-  (often animated via `targetShimmer`).
-- Magical accent / completion: `linear-gradient(145deg, #5be8ba, #607bff, #ff9fca)`.
-- Heading shimmer: `linear-gradient(90deg, #5932d4, #25c8df, #5932d4)` with
-  background-position animation.
+### Gradients / radius / shadows / animation
+- Primary action gradient: `linear-gradient(135deg, #54e8c6, #25c8df, #536bff)`.
+- Magical/completion: `linear-gradient(145deg, #5be8ba, #607bff, #ff9fca)`.
+- Radius: small 14–18px, pills/buttons 18–24px, glass cards 24–36px, circle 999px.
+- Shadows are soft and colorful, never harsh black. Glass panels:
+  `0 24px 60px rgba(54,86,134,0.2)`.
+- Animations are soft and purposeful; honour `prefers-reduced-motion: reduce`.
 
-### Radius
-- Small controls: `14–18px`
-- Pills and buttons: `18–24px`
-- Glass cards: `24–36px`
-- Circular: `999px`
+### Keyboard (GameplayPage)
+- Five rows (`num`, `top`, `home`, `bot`, `mod`), each with its own gradient so
+  kids can scan home-row position by colour. Per-key hover lift, shine sweep,
+  press-pop. Assisted mode highlights the `expectedKey` derived in `keyCapFor()`.
 
-### Shadows
-- Soft colorful depth, never harsh black.
-- Glass panels: `0 24px 60px rgba(54, 86, 134, 0.2)`.
-- Buttons can glow softly on hover.
+## 6. Responsive System
 
-### Animation
-- Soft and purposeful. Mascots and islands use gentle floating loops.
-- Page entries fade/zoom.
-- Magical island entrance (`scene-full-image`) with zoom + flash + staggered
-  node pop + ship drop. Honours `prefers-reduced-motion: reduce`.
+`src/styles/global.css` is one large file (~9k lines) with the visual system +
+all page CSS. Responsiveness targets three device classes:
 
-### Keyboard
-- Five rows in `GameplayPage.tsx`: `num`, `top`, `home`, `bot`, `mod`.
-- Each row has its own gradient palette (gold / pink / mint / violet /
-  ice-blue) so kids can scan home-row position by colour.
-- Per-key hover lift, diagonal shine sweep (`::after`), press-pop animation.
-- Assisted-mode target: shimmering gradient + pulse, drawn from the
-  per-character `expectedKey` derived in `keyCapFor()`.
+- **Common monitors (≥1280px):** the default desktop layout.
+- **Small laptops / Chromebooks (1280–1366 wide but SHORT, ~768/800 tall):** the
+  real constraint is *height* — handled by the existing `@media (max-height: …)`
+  blocks (720/620/560). Width layout = desktop.
+- **Phones (≤768px):** handled by a single consolidated **"RESPONSIVE PASS"
+  section appended at the END of `global.css`** (width-only `≤768 / ≤600 / ≤430`
+  queries, placed last so they win the cascade without editing the scattered
+  earlier overrides). Desktop/Chromebook are untouched by it.
 
-## 4. Gameplay Curriculum (24 activities, 6 per island)
+Key responsive rules in that section:
+- Global `overflow-x: hidden` safety ≤768px.
+- **Gameplay:** the keyboard's per-key `min-width` is reduced so all rows fit a
+  phone (keys shrink, stay centred); target card / status / stage go full-width;
+  decorative robots hidden; compact exit button.
+- **Island detail:** back/profile become icon-only, compact HUD, no collision.
+- **Logros:** the 4-column reward grid collapses to 2×2.
 
-Defined in `src/data/activities.ts` as four arrays of 6 `Activity` records
-each. Each activity carries `worldId`, `levelNumber`, `inputType`
-(`letter | word | phrase | symbol | correction`), `mode`
-(`assisted | independent`), optional `requiresShift` / `requiresAccent`,
-and a `targets[]` array of strings to practice.
+### Login mascots — flanking robots
+The two login robots are positioned inline in `LoginPage.tsx` with Tailwind
+viewport units (no dedicated CSS class anymore): female left
+(`bottom-[17.5vh] left-[5.5vw] max-h-[62vh]`), male right
+(`bottom-[7.5vh] right-[8vw] max-h-[72vh]`). They're sized purely by height
+so both scale together; the `bottom` offsets stand each robot on a painted
+island. Tune those four values for placement/size. The login card is fixed
+at `w-[min(32rem,92vw)]` with the original (non-fluid) typography — do NOT
+reintroduce vmin-clamped fonts on the login card (it ballooned the UI and
+pushed buttons off-screen on short displays).
 
-- **World 1 — Bosque de teclas (`island1`):** letters only. Home row, vocals,
-  upper row, lower row, mixed alphabet, velocidad.
-- **World 2 — Isla de palabras (`island2`):** 3- to 6-letter words,
-  two-word phrases, Backspace correction.
-- **World 3 — Laboratorio (`island3`):** mayúsculas con Shift, ñ, tildes,
-  palabras con tilde, frases con ¿ ?, frases con ¡ !.
-- **World 4 — Isla del código (`island4`):** punctuation `. , : ; - _`,
-  símbolos con Shift (`@ ¿ ¡ ! ?`), correos electrónicos, frases con coma,
-  preguntas reales, corrección final.
+## 7. Gameplay Curriculum
 
-Helpers:
-- `getActivityById(id)` — fallback to the first activity if missing.
-- `activitiesByWorld[worldId]` — array per world for navigation between levels.
+Defined in `src/data/activities.ts`. Each `Activity` carries `worldId`,
+`levelNumber`, `inputType` (`letter | word | phrase | symbol | correction`),
+`mode` (`assisted | independent`), optional `requiresShift` / `requiresAccent`,
+and a `targets[]` array.
 
-### 4b. Digital-skills category (scaffold)
+- There are **15 worlds** (`island1..island15`) in difficulty order. The
+  **level count is per-island, NOT fixed** — it is driven by the number of
+  `Activity` records for that world. To add a level you must add BOTH a new
+  `Activity` AND a matching coordinate in `src/data/levelPositions.ts`.
+- Difficulty rises by world: letters → words/phrases → mayúsculas, ñ, tildes,
+  inverted signs `¿ ¡` → punctuation, symbols, emails, real questions, and
+  beyond (digital-skills worlds).
+- Helpers: `getActivityById(id)` (falls back to first), `activitiesByWorld[worldId]`.
+- Level ↔ activity id mapping: `<worldId>-l<level>` for worlds 2+, legacy ids for
+  world 1 (`letter-a1 … backspace-a1`).
 
-The product can host more than typing. `src/data/digitalSkills.ts` defines a
-parallel `SkillChallenge` model (`category: "digitalSkills"`) covering:
+### Digital-skills scaffold
+`src/data/digitalSkills.ts` defines a parallel `SkillChallenge` model (mouse,
+touchpad, windows, tabs, shortcuts, text editing, UI literacy). `SkillLevelView`
+/ `ShortcutLevelView` render these; `SkillChallengeShell` provides the pastel chrome.
 
-- **Mouse:** leftClick, rightClick, doubleClick, dragAndDrop, scroll.
-- **Touchpad:** twoFingerScroll.
-- **Windows:** open, close, minimize, maximize.
-- **Tabs:** open, close, switch.
-- **Shortcuts:** Ctrl+C, Ctrl+V, Ctrl+T, Ctrl+W, Ctrl+Tab.
-- **Text editing:** selectText, copyPaste.
-- **UI literacy:** spot the close / back / menu / settings buttons.
+## 8. Progress Persistence
 
-The catalog is seeded with 24 starter challenges. A reusable
-`SkillChallengeShell` component (`src/components/digitalSkills/`) renders
-the pastel chrome (header, instruction, feedback, metrics) so future mini
-simulators (mock desktop, mock browser) can plug in via the `children`
-slot. Nothing is wired into routes yet — this is foundation only.
+`src/utils/progress.ts` manages `localStorage.edutic_progress_v1` →
+`Record<WorldKey, Record<levelNumber, LevelProgress>>`.
 
-## 5. Progress Persistence
+- `markLevelComplete(worldId, level, accuracy, attempts)` at end of `GameplayPage`
+  (also POSTed to `/api/progress/complete` when API-backed).
+- `levelState()` → `"Completado" | "Actual" | "Bloqueado"`;
+  `getCurrentLevelNumber()`; `resetProgress()`.
+- `src/data/worlds.ts` rebuilds `World.levels[]` each render from
+  `activitiesByWorld` + the progress snapshot, so unlocks reflect live.
+- World order is the single source of truth in `WORLD_PEDAGOGY_ORDER`; each world
+  shows its pedagogical `displayNumber` (e.g. "M3").
 
-`src/utils/progress.ts` manages a single localStorage key:
-`edutic_progress_v1` → `Record<WorldKey, Record<levelNumber, LevelProgress>>`.
+## 9. Project Structure
 
-- `markLevelComplete(worldId, level, accuracy, attempts)` — called once at
-  end of `GameplayPage`.
-- `levelState(progress, worldId, level)` → `"Completado" | "Actual" | "Bloqueado"`.
-- `getCurrentLevelNumber(progress, worldId)` — first incomplete level.
-- `resetProgress()` — for QA / testing.
-- `worlds.ts` builds `World.levels[]` on every render by combining
-  `activitiesByWorld[worldId]` with the current progress snapshot — so the
-  island map reflects unlocks live.
+- `src/App.tsx` — routes + protected-route composition (lazy-loads heavy pages).
+- `src/pages/` — `LoginPage`, `WorldsPage`, `IslandDetailPage`, `GameplayPage`,
+  `RewardsPage`, `AccountPage`, `MissionsPage`, `SkillLevelView`,
+  `ShortcutLevelView`, `ChangePasswordPage`, `AdminGeneralPage`,
+  `TeacherPage`, `TeacherClassPage`, `TeacherStudentPage`, plus the routed
+  admin-sede screens in `src/pages/admin/` (incl. `ApiInspectorPage` at
+  `/admin/api` — superadmin/admin-general/admin-sede only, backed by
+  `GET /api/admin/inspector`).
+- `src/components/` — `auth/`, `common/` (`Brand`, `Button`, `Toast`),
+  `dashboard/DashboardShell`, `dev/LevelPositionEditor`, `digitalSkills/`,
+  `layout/TopNav`.
+- `src/data/` — `activities.ts`, `worlds.ts`, `levelPositions.ts`,
+  `digitalSkills.ts`, `seed.ts`.
+- `src/hooks/useAuth.tsx` — API-aware auth provider (async, localStorage fallback).
+- `src/utils/` — `api.ts` (typed API client), `assets.ts` (public-URL map),
+  `progress.ts`, `storage.ts`, `image.ts`, `googleAuth.ts`,
+  `studentStatus.ts`, `userContext.ts`.
+- `src/styles/global.css` — entire visual system + page CSS + the responsive pass.
+- `api/src/` — `server.ts`, `auth.ts`, `rbac.ts`, `seed.ts`, `db/{index,schema}.ts`,
+  `routes/{auth,users,sedes,progress,import}.ts`.
+- `db/init/` — `001_schema.sql`, `002_partitions.sql`.
+- `public/assets/edutic-art/` — web-safe image copies used by the app.
+- `Images/`, `Images-new/` — **original source art (never modified).**
 
-## 6. Navigation Flow
+## 10. Asset Pipeline
 
-- `/` → `/login` (LoginPage).
-- `/mundos` → `WorldsPage` (4 floating islands, click to enter).
-- `/worlds/:islandId` → `IslandDetailPage` (6 platform bubbles colored by
-  state, current-level ship, level detail panel).
-- `/gameplay/:activityId` → `GameplayPage` (target + keyboard + robots +
-  completion popup).
-- `/logros`, `/mi-cuenta`, `/admin-general`, `/admin-sede`, `/profesor` —
-  protected per role.
+Originals in `Images/` and `Images-new/` are **never** modified. Web copies live
+in `public/assets/edutic-art/` and are produced by the Python helpers
+(`Images-new/process_mecano.py` for mascots/favicons, `process_ships.py` for
+ships): verify alpha, **trim transparent padding**, downscale to a 1024px longest
+edge.
 
-The island detail page sets `sessionStorage.edutic.lastIslandSlug = islandId`
-before navigating into a level, and the completion popup navigates back to
-`/worlds/${activity.worldId}` (matches `islandId` directly).
+- Reference assets by their stable names via `src/utils/assets.ts` — do not rename.
+- The login web copies are kept trimmed (character fills the frame, no dead
+  padding) so positioning is predictable — e.g. `mascot-women-wave.webp` is
+  ~706×1024 (trimmed from the 1254² source). When replacing art, change the
+  original and re-run the scripts; keep the web copy trimmed.
+- One-off image edits may use `npx`/Node `sharp` (installed `--no-save`). Local
+  asset backups live in `_backups/` (gitignored, not shipped).
 
-## 7. Project Structure
+## 11. Mascots — Where They Appear
 
-- `src/App.tsx` — routes + protected route composition.
-- `src/main.tsx` — React entry.
-- `src/components/auth/` — `LoginCard`, `GlassInput`, `RoleSelector`,
-  `AnimatedButton`.
-- `src/components/common/` — `Brand` (TYPELY wordmark), `Button`, `Toast`.
-- `src/components/layout/TopNav.tsx` — legacy top-nav (kept; the active
-  student UI uses the floating hamburger bubble on `WorldsPage`).
-- `src/data/`
-  - `activities.ts` — the 24-activity typing curriculum.
-  - `worlds.ts` — per-island metadata + per-island level coordinates +
-    dynamic level state. The level-map is rendered inside a 16:9
-    `island-stage__frame` so `%` positions land on the painted platforms.
-  - `digitalSkills.ts` — `SkillChallenge` model + seed catalogue for the
-    future mouse / touchpad / windows / tabs / shortcuts curriculum.
-  - `seed.ts` — demo users + classes.
-- `src/components/digitalSkills/` — `SkillChallengeShell` (pastel chrome
-  for the future mini simulator).
-- `src/hooks/useAuth.tsx` — auth context + localStorage user.
-- `src/pages/`
-  - `LoginPage` — polished glass card with TYPELY brand, halo and
-    shimmering wordmark.
-  - `WorldsPage` — floating islands scattered around the sky + hamburger
-    bubble.
-  - `IslandDetailPage` — island art + 6 platform bubbles + ship over
-    current level + level detail panel.
-  - `GameplayPage` — playable keyboard activity.
-  - `RewardsPage`, `AccountPage`, `AdminGeneralPage`, `SiteAdminPage`,
-    `TeacherPage`.
-- `src/routes/ProtectedRoute.tsx` — role-based guard.
-- `src/styles/global.css` — all visual system + page CSS (single file).
-- `src/utils/`
-  - `assets.ts` — public-URL map for every PNG.
-  - `progress.ts` — per-island progress.
-  - `storage.ts` — auth, demo users, helper IDs.
-- `public/assets/edutic-art/` — copied web-safe image assets used by the app.
-- `public/assets/edutic-art/spaceships/` — `ship-{front,back,left,right,diagonal-{left,right}}.png`
-  processed from `Images/nave-*.png`.
-- `Images/` — **original** source images. Do not modify.
-- `Images-new/` — newer robot art delivered by the user (`robot-{salta,
-  saluda,compu,default,caja}.png`) plus the processing scripts
-  (`process_mecano.py`, `process_ships.py`).
-- `public/favicon.ico` + `public/favicon-256.png` — generated by
-  `process_mecano.py` from the head of `robot-default.png`.
+- **LoginPage:** large flanking robots (female left, male right), sized by the
+  proportional formula in §6. Decorative.
+- **WorldsPage:** smaller corner mascots, kept inset so islands don't collide.
+- **IslandDetailPage:** *no* robots — only the ship pointing at the current level.
+- **GameplayPage:** two flanking robots with motivational speech bubbles (error
+  tone when accuracy < 60% with ≥1 attempt). Hidden on phones.
 
-## 8. Asset Pipeline
+## 12. Behaviour Notes (gameplay / island map / login)
 
-The original PNGs in `Images/` and `Images-new/` are **never** modified. Web
-assets are produced into `public/assets/edutic-art/` by the Python helpers:
-
-- `Images-new/process_mecano.py` — verifies alpha, trims transparent
-  padding, downscales to a 1024px longest edge, writes:
-  - `mascot-jump.png`   (from `robot-salta.png`)
-  - `mascot-proud.png`  (from `robot-default.png`)
-  - `mascot-laptop.png` (from `robot-compu.png`)
-  - `mascot-wave.png`   (from `robot-saluda.png`)
-  - `mascot-natural.png` (from `robot-caja.png`)
-  - + favicon multi-size `.ico` and `favicon-256.png`.
-- `Images-new/process_ships.py` — same pipeline, capped at 700px, produces
-  the six `ship-*.png` files from `nave-*.png`.
-
-Run after dropping new source art:
-```
-python Images-new/process_mecano.py
-python Images-new/process_ships.py
-```
-
-## 9. Mascots — Where They Appear
-
-- **LoginPage:** large flanking robots, female wave (left) + male wave
-  (right), sized `clamp(28rem, 70vh, 52rem)`. Decorative.
-- **WorldsPage:** smaller corner mascots, female laptop (left) + male
-  proud (right) — kept inset (`max-width: 18vw`) so islands don't collide.
-- **IslandDetailPage:** *no* robots — only the ship pointing at the
-  current level. Keeps the island art readable.
-- **GameplayPage:** two large flanking robots with motivational speech
-  bubbles. Phrase pools rotate per target; switch to an "error" tone when
-  accuracy drops below 60% with ≥1 attempt. Hidden under 980px viewports.
-
-## 10. Gameplay Screen — Behaviour Notes
-
-- Background: `assets.gameplayBg` (a painted scene, not the sky).
-- `gameplay-shell` is locked into a 3-row grid (`minmax(20rem, 30vh) auto
-  minmax(7rem, auto)`) with `overflow: hidden` so the keyboard, bg, and
-  robots never shift when the kid types.
-- Adaptive `target-card` variants: `letter`, `word`, `phrase`, `symbol`.
-  Phrases render in a wide pill with a single horizontal line that scrolls
-  internally — never wraps to a new row.
-- `typed-preview` shows what the student is typing in big Fredoka type.
-  Single horizontal line; auto-scrolls to the right via a `ref` so the
-  caret stays visible.
-- Combo-hint chip appears next to the target for World 3 (accents) and
-  World 4 (symbols) — driven by `comboFor(expectedChar)`:
-  - Shift combos: `! ? @ # $ % & * ( ) _ + : ; ¿ ¡ " < >` and uppercase
-    letters.
-  - Accent combos: `á é í ó ú ü` (lowercase) → `´ + vowel`; uppercase
-    accented vowels → `´ + Shift + A` (3-step).
-- Level complete → modal popup with sparkles, bouncing trophy, shimmering
-  title, 3-star rating, two CTAs:
-  - **Reintentar** (resets the level state).
-  - **Volver a la isla** (`navigate('/worlds/' + activity.worldId)`). No
-    auto-advance — students must re-pick the next level deliberately.
-
-## 11. Island Detail — Behaviour Notes
-
-- The yellow polyline (`.magic-path`) is **removed**. The painted stone
-  path in the island artwork is the visual guide.
-- Level bubbles sit directly on the painted platforms (no synthetic
-  pedestal). Color = state:
-  - **Green** = `Completado` (3 filled stars)
-  - **Violet** = `Actual` (3 empty stars — earned only on completion)
-  - **Grey** = `Bloqueado` (lock icon, 3 empty stars)
-- `World.levelPositions` in `src/data/worlds.ts` are not generic layout
-  points. They represent the **visual center of each painted platform** in
-  the island background. When adjusting these values, align the center of
-  `.level-node__platform` to the platform art, not to the glowing path,
-  surrounding terrain, or the full node including the rating stars.
-- `.level-node` uses `left/top` as the platform center. The platform itself
-  is absolutely centered inside the node; the 3-star rating is positioned
-  underneath and must not affect centering. Keep this invariant when changing
-  level button CSS.
-- Every island currently has exactly 6 playable levels. Some island
-  background images may contain extra painted platforms. Those are part of
-  the artwork and should remain decorative unless the curriculum is expanded
-  deliberately. Do **not** edit the original images to remove them.
-- The ship is a supporting marker and sits behind level nodes (`level-ship`
-  below `.level-node` in z-index) so it never hides level numbers.
-- Ship asset above the current level is picked by `getShipAsset(from, to)`
-  based on the vector to the next level (front/back/left/right/diagonal).
-- Magical entrance: zoom-in on the island image + radial flash + staggered
-  `nodePop` on the 6 platform bubbles + ship parachute-in.
-
-## 12. Login Card — Behaviour Notes
-
-- New `login-card__halo` — multi-color blur drifts behind the card.
-- Brand pill: rounded chip with a shimmering gradient mark (mint→cyan→violet)
-  + gradient-text "TYPELY" wordmark in Fredoka.
-- Heading "Bienvenido a TYPELY" uses the heading-shimmer gradient.
-- Sparkle pinned above the brand pill (`sparkleSpin`).
+- **Gameplay shell** is a fixed-height (`100dvh`, `overflow:hidden`) flex column
+  so the keyboard/bg/robots never shift while typing. Adaptive `target-card`
+  variants (`letter | word | phrase | symbol | long`); phrases scroll on a single
+  line. Level complete → modal with 3-star rating + Reintentar / Volver (no auto-
+  advance).
+- **Island map**: level bubbles sit on the painted platforms; colour = state
+  (green Completado / violet Actual / grey Bloqueado). Positions are platform-
+  center % coords in `src/data/levelPositions.ts`. Compact floating HUD
+  (`.island-hud`) + popover beside the selected node. **Dev-only** position editor
+  (`?editor=1`, gated by `import.meta.env.DEV`, stripped from prod).
+- **Login card**: glass card with halo, shimmering "TYPELY" wordmark, role-aware
+  form. Card width `min(32rem, …)`.
 
 ## 13. Deployment
 
-Containerised behind Nginx, reverse-proxied by Caddy. Files in repo root:
+Containerised behind Nginx + Caddy. `Dockerfile` (frontend, multi-stage
+`node:22-alpine` → `nginx:alpine`, runs `npm ci && npm run build`),
+`Dockerfile.api` (API), `docker-compose.yml` (services `mecanografia`, `api`,
+`db`, all loopback-bound; `db` healthcheck; `api` reads secrets from
+`/run/secrets/*`). `nginx.conf` does SPA fallback. `.dockerignore` excludes
+`node_modules`, `dist`, `.env*`, `secrets/*`, `Images*/`, `Skills/`, `.claude/`,
+docs. Full runbook in `DEPLOY.md`.
 
-- **Dockerfile** — multi-stage `node:22-alpine` build → `nginx:alpine`
-  runtime. Runs `npm ci && npm run build` (= `tsc --noEmit && vite build`),
-  copies `/app/dist` to `/usr/share/nginx/html`.
-- **nginx.conf** — SPA fallback (`try_files $uri $uri/ /index.html`),
-  long-cache on `/assets/*`, no-store on `index.html`, gzip on.
-- **docker-compose.yml** — service `mecanografia`, container name
-  `mecanografia`, `restart: unless-stopped`, exposes only
-  `127.0.0.1:3005:80` (no public bind).
-- **.dockerignore** — excludes `node_modules`, `dist`, `.env`,
-  `.git`, logs, docker files, `Images/`, `Images-new/`, `Skills/`,
-  `.claude/`, and docs.
-- **DEPLOY.md** — Oracle VPS playbook: clone into
-  `/opt/apps/mecanografia`, `docker compose up -d --build`,
-  `curl -I http://127.0.0.1:3005` smoke test, the Caddy block for
-  `mecanografia.bauhub.online`, `caddy validate` + reload, the
-  `git pull && docker compose up -d --build` update flow, and a rollback
-  recipe.
+## 14. Skills (for agents)
 
-## 14. Playable Gameplay Rules (non-negotiable)
-
-- Do not modify any file inside `Images/` or `Images-new/` — they are
-  untouched originals.
-- Use only the copied public assets under `public/assets/`.
-- Keep student UI immersive and minimal — no dense forms, no admin look.
-- Gameplay must be real and keyboard-driven, never placeholder.
-- Level count is per-island, not fixed (see §17). It is driven by the number
-  of `Activity` records for that world in `src/data/activities.ts` — NOT by the
-  positions array. To add a level you must add BOTH a new `Activity` and a
-  matching coordinate. Current counts: island1 = 7, island2 = 6, island3 = 7,
-  island4 = 6, island5 = 7, island6–island15 = up to 8.
-- If the background art shows more painted platforms than the curriculum has
-  levels, keep the extra platform as decoration. Do not add fake levels to
-  match the art unless the curriculum is intentionally expanded.
-- Level node positions live in `src/data/levelPositions.ts` (`islandLevelLayouts`,
-  re-exported through `src/data/worlds.ts`) as platform-center % coordinates.
-  Do not compensate for bad placement with random CSS offsets on individual
-  numbers — use the dev editor (§17) instead.
-- Difficulty increases by world (see §4).
-- Spanish must be supported correctly: tildes (á é í ó ú), ñ, mayúsculas,
-  and inverted signs `¿` `¡`.
-- Each island level node must open its exact matching activity by ID
-  (`<worldId>-l<level>` for worlds 2/3/4; legacy IDs for world 1:
-  `letter-a1…backspace-a1`).
-- Progress persists in `localStorage.edutic_progress_v1`. Completing a
-  level unlocks the next.
-- Curriculum lives in `src/data/activities.ts`. Level ↔ activity mapping
-  is built in `src/data/worlds.ts` from `activitiesByWorld`. Progress
-  logic lives in `src/utils/progress.ts`.
+- `Skills/skill.md` — **EduTic Design Skill**: pixel-spec for the login card and
+  visual system; match reference images, compare by screenshot.
+- `Skills/frontend-design/SKILL.md` — Anthropic **frontend-design** skill
+  (distinctive, production-grade UI; avoid generic AI aesthetics). A working copy
+  also lives at `.claude/skills/frontend-design/` for local Claude Code use.
+- `.opencode/agents/` — OpenCode subagents (not Claude Code): `flash` (simple),
+  `chill` (standard logic), `pro` (architecture/infra) + the
+  `enrutador-complejidad` routing skill.
 
 ## 15. Non-Negotiables
 
-- Do not modify original images inside `Images/`.
-- Do not draw islands or mascots with CSS.
-- Do not put background art inside bordered frames.
-- Do not leave white boxes behind transparent assets.
-- Do not ship dead buttons.
-- Do not make student screens look like admin dashboards.
-- Do not show placeholder or demo gameplay — every level must be a real,
-  keyboard-driven activity.
-- Do not bake secrets into the Docker image — `.env*` is excluded by
-  `.dockerignore`.
+- Do not modify original images in `Images/` or `Images-new/` — use the web
+  copies under `public/assets/`; regenerate copies via the Python scripts.
+- Do not draw islands or mascots with CSS; no background art inside bordered
+  frames; no white boxes behind transparent assets.
+- Keep student UI immersive and minimal — never make it look like an admin
+  dashboard. Gameplay must be real and keyboard-driven, never placeholder.
+- Respect RBAC: students only on student surfaces; demo can never be superadmin;
+  lower roles never reach higher-role screens.
+- Never put secrets in `VITE_*` (inlined into the public bundle). Backend secrets
+  (`JWT_SECRET`, `RESEND_API_KEY`, OAuth client secret) stay server-side.
+- Keep Docker building; do not bind host ports 80/443 in app compose; keep the
+  `127.0.0.1:3005` / `:3006` ports stable. Don't ship dead buttons.
+- Spanish must be correct: tildes (á é í ó ú), ñ, mayúsculas, inverted `¿` `¡`.
+- **Branch on `dev`, never commit directly to `master`.** `master` is the
+  host/production branch; it only changes through a reviewed pull request from
+  `dev` when everything is ready (see §17).
+- After any code change run `npm run build` (= `tsc --noEmit && vite build`); fix
+  failures before claiming done. Report which files changed and how to test.
 
-## 16. Future Extension Notes
+## 16. Quick Start
 
-- Add sound effects and voice prompts (TTS already used for "Escuchar
-  consigna" via the Web Speech API).
-- Expand badge / reward progression beyond the current 3-star per-level model.
-- Add teacher analytics without exposing them to students.
-- Move beyond localStorage to a real backend when the app leaves demo mode.
-- Add a per-level "best time" leaderboard alongside accuracy.
-- Improve i18n: today copy is Argentinian Spanish — add neutral Spanish
-  variant if needed for other markets.
+```bash
+npm install          # frontend deps
+npm run dev          # Vite dev server (http://localhost:5173)
+npm run build        # tsc --noEmit && vite build
+```
 
-## 17. Recent Changes (2026-06-01)
+Demo: the login "Entrar en modo demo" button enters as a student. Staff/admin and
+the API/DB require the backend (see `DEPLOY.md`). Reset demo data by clearing the
+`edutic_*` localStorage keys (listed in `README.md`).
 
-### 17a. Roles, auth & security
-- **Demo mode is student-only.** `DEMO_STUDENT` (role `alumno`) in
-  `src/data/seed.ts`; `demoLogin()` in `src/utils/storage.ts` takes no role and
-  ALWAYS returns it (never the superadmin). "Entrar en modo demo" → `/mundos`.
-  Hard rule: demo can never reach an admin/teacher surface.
-- **Google login matches by normalised email.** `normalizeEmail()`
-  (trim + lowercase) is used on write (`createSedeAdmin`/`updateSedeAdmin`) and
-  lookup (`findUserByEmail`/`loginByGoogleEmail`) so the same Gmail resolves to
-  the same account with no duplicates. Unknown email → friendly Spanish error.
-- **Temporary-password forced change.** Sede admins are created / reset with a
-  temp password and `mustChangePassword`/`temporaryPassword` flags
-  (`resetUserPassword`, `setUserPassword`). On login `ProtectedRoute` redirects
-  to `/cambiar-contrasena` (`src/pages/ChangePasswordPage.tsx`) until a new
-  password is set. Google sign-in (passwordless) bypasses this. The current
-  password is never shown — only the new temp value, once.
-- `authenticateAny` now lets staff (superadmin/admin-general/admin-sede/
-  profesor) sign in via the form; students (`alumno`) and deactivated accounts
-  are blocked. Logout button ("Cerrar sesión") lives in the dashboard sidebar
-  footer (`DashboardShell`).
+## 17. Branching & Git Workflow
 
-### 17b. Superadmin dashboard (`AdminGeneralPage`)
-- Manages ONLY sedes + sede admins. Removed the "Coordinación TIC" field.
-- `Site` gained `photo?` (base64 data URL) + `active?`. Sede cards show a real
-  uploaded school photo (resize helper `src/utils/image.ts`) with a soft
-  placeholder fallback — never island art.
-- Sede admins: create (email REQUIRED), edit (name/email/sede/active), reset
-  password, and **delete** with a confirmation dialog (`deleteSedeAdmin`).
-- Smaller mascot (sidebar only — the hero/top robot was removed from all three
-  dashboards), compact buttons, scroll-safe modals (`max-height:88vh;
-  overflow-y:auto`). `Toast` already auto-dismisses, caps at 3, de-dupes.
+The repo has two long-lived branches:
 
-### 17c. Island map UI (`IslandDetailPage`)
-- Positions extracted to `src/data/levelPositions.ts` (single source of truth).
-- The big `.island-title-panel` and right-side `.level-detail-panel` were
-  replaced by a compact floating header (`.island-hud`, top-centre) and a small
-  popover (`.level-popover`) anchored BESIDE the selected node (opens right for
-  left-half nodes, left for right-half, vertically clamped) so it never covers
-  multiple level nodes. Selected node keeps a glowing ring. The map stays the
-  focus. Keep the Typely pastel/glass identity.
-- **Dev-only level position editor**: gated by `import.meta.env.DEV`
-  (`src/components/dev/LevelPositionEditor.tsx`). Enable via `?editor=1` or the
-  "Editar niveles" toggle. Drag markers, 10% grid + crosshair, click-to-copy a
-  coordinate, "Copiar arreglo" pastes straight into `levelPositions.ts`. Fully
-  stripped from production/student builds.
+- **`dev` — all development happens here.** Branch off `dev`, commit your work to
+  `dev` (or to short-lived feature branches that merge back into `dev`), and push
+  `dev`. This is the default working branch for everyone — humans and agents.
+- **`main` — host/production only.** Every push to `main` **auto-deploys** to
+  `typely.bauhub.online` via `.github/workflows/deploy.yml`, so it must stay
+  releasable at all times.
+
+Hard rules:
+
+1. **Never commit or push directly to `main`.** It changes *only* through a
+   pull request from `dev`, and *only* when the work is finished and tested
+   ("cuando esté todo listo").
+2. **`dev` → `main` via Pull Request.** When everything is ready, open a PR from
+   `dev` into `main`, review it, then merge. Do not fast-forward random branches
+   into `main` by hand.
+3. **Before opening the PR**, run `npm run build` (`tsc --noEmit && vite build`)
+   plus `npx tsc -p api/tsconfig.json`, and the deploy checklist (see
+   `DEPLOY.md` / §13) so `main` never breaks.
+4. Keep `dev` merged up to date with `main` after each release so the two don't
+   drift.
+5. The legacy `master` branch is historical only — do not use it.
+
+```bash
+git checkout dev          # work happens here
+# …edit, commit…
+git push origin dev       # pushes to origin/dev (never to main)
+# when ready for production: open a PR  dev → main  and merge it
+```

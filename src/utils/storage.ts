@@ -225,6 +225,45 @@ export function isDemoMode(): boolean {
   return localStorage.getItem(DEMO_MODE_KEY) === "true";
 }
 
+/* ------------------------------------------------------------------ */
+/* Superadmin "view as" (god mode)                                     */
+/* ------------------------------------------------------------------ */
+/** When a superadmin chooses to enter as another role / sede from the
+ *  "¿Cómo querés entrar?" chooser, we persist that choice so the scoped
+ *  dashboards (and the dev level editor) know which surface to render.
+ *  This is purely a client-side convenience — the superadmin token still
+ *  has full server-side authority, so RBAC is unaffected. */
+const VIEW_AS_KEY = "typely_view_as";
+const DEV_EDITOR_KEY = "typely_dev_editor";
+
+export interface ViewAs {
+  role: Role;
+  sedeId?: string;
+  /** True when entering the developer level-position editor mode. */
+  dev?: boolean;
+}
+
+export function getViewAs(): ViewAs | null {
+  const raw = localStorage.getItem(VIEW_AS_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as ViewAs;
+  } catch {
+    return null;
+  }
+}
+
+export function setViewAsStored(view: ViewAs | null) {
+  if (!view) {
+    localStorage.removeItem(VIEW_AS_KEY);
+    localStorage.removeItem(DEV_EDITOR_KEY);
+    return;
+  }
+  localStorage.setItem(VIEW_AS_KEY, JSON.stringify(view));
+  if (view.dev) localStorage.setItem(DEV_EDITOR_KEY, "1");
+  else localStorage.removeItem(DEV_EDITOR_KEY);
+}
+
 export function routeForRole(role: Role) {
   const routes: Record<Role, string> = {
     // Superadmin lands on the GLOBAL administration dashboard — never the
@@ -323,6 +362,23 @@ export function getTeacherStudents(activeUser: ActiveUser | null) {
   if (!classRoom) return [];
 
   return data.users.filter((user) => classRoom.studentIds.includes(user.id));
+}
+
+/** All classes a teacher teaches (teacherIds includes them). Falls back to the
+ *  single class on their user record if none reference them explicitly. */
+export function getClassesForTeacher(activeUser: ActiveUser | null): ClassRoom[] {
+  if (!activeUser) return [];
+  const data = getDemoData();
+  const byTeacher = data.classes.filter((c) => c.teacherIds.includes(activeUser.id));
+  if (byTeacher.length) return byTeacher;
+  if (activeUser.classId) return data.classes.filter((c) => c.id === activeUser.classId);
+  return [];
+}
+
+/** Look up a single user by id (used by the per-student detail screen). */
+export function getUserById(userId?: string): EduTicUser | undefined {
+  if (!userId) return undefined;
+  return getDemoData().users.find((u) => u.id === userId);
 }
 
 export function addUserToClass(user: EduTicUser, classId?: string) {
@@ -501,10 +557,16 @@ export function createTeacher(input: { name: string; email?: string; siteId?: st
     name: input.name.trim(),
     username: credentials.username,
     password: credentials.password,
-    email: input.email?.trim() || undefined,
+    // Normalised so a later Google sign-in with the same address matches.
+    email: input.email ? normalizeEmail(input.email) : undefined,
     role: "profesor",
     siteId: input.siteId,
     classId: input.classId,
+    // Same forced-change flow as a sede admin: the generated password is
+    // temporary and must be changed on first sign-in.
+    mustChangePassword: true,
+    temporaryPassword: true,
+    passwordResetAt: new Date().toISOString(),
   };
   addUserToClass(teacher, input.classId);
   return teacher;
@@ -538,6 +600,71 @@ export function createClass(input: { name: string; siteId: string; grade?: Class
   };
   patchDemoData({ classes: [...data.classes, classRoom] });
   return classRoom;
+}
+
+/* ---- Class-scoped getters + student management (sede-admin course view) ---- */
+
+/** Students (role alumno) that belong to a given class. */
+export function getStudentsInClass(classId?: string): EduTicUser[] {
+  if (!classId) return [];
+  const data = getDemoData();
+  const classRoom = data.classes.find((c) => c.id === classId);
+  if (!classRoom) return [];
+  return data.users.filter(
+    (u) => u.role === "alumno" && classRoom.studentIds.includes(u.id),
+  );
+}
+
+/** Teachers (role profesor) assigned to a given class. */
+export function getTeachersInClass(classId?: string): EduTicUser[] {
+  if (!classId) return [];
+  const data = getDemoData();
+  const classRoom = data.classes.find((c) => c.id === classId);
+  if (!classRoom) return [];
+  return data.users.filter(
+    (u) => u.role === "profesor" && classRoom.teacherIds.includes(u.id),
+  );
+}
+
+/** Rename any user (used to edit a student's display name in a course). */
+export function updateUserName(userId: string, name: string): void {
+  const clean = name.trim();
+  if (!clean) return;
+  const data = getDemoData();
+  patchDemoData({
+    users: data.users.map((u) => (u.id === userId ? { ...u, name: clean } : u)),
+  });
+}
+
+/** Removes a student from a class WITHOUT deleting the account. */
+export function removeStudentFromClass(userId: string, classId: string): void {
+  const data = getDemoData();
+  patchDemoData({
+    classes: data.classes.map((c) =>
+      c.id === classId
+        ? { ...c, studentIds: c.studentIds.filter((id) => id !== userId) }
+        : c,
+    ),
+    users: data.users.map((u) =>
+      u.id === userId && u.classId === classId ? { ...u, classId: undefined } : u,
+    ),
+  });
+}
+
+/** Permanently deletes a student account and removes it from every class.
+ *  Guarded so it can only ever delete an `alumno` record. */
+export function deleteStudent(userId: string): boolean {
+  const data = getDemoData();
+  const target = data.users.find((u) => u.id === userId);
+  if (!target || target.role !== "alumno") return false;
+  patchDemoData({
+    users: data.users.filter((u) => u.id !== userId),
+    classes: data.classes.map((c) => ({
+      ...c,
+      studentIds: c.studentIds.filter((id) => id !== userId),
+    })),
+  });
+  return true;
 }
 
 /* ---- Sede-scoped getters ---- */

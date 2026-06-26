@@ -18,8 +18,9 @@ interface DashboardShellProps {
   roleSubtitle: string;
   roleIcon: LucideIcon;
   account: { name: string; email?: string; initial: string };
-  /** Robot illustration shown in the sidebar. */
-  sidebarMascot: string;
+  /** Deprecated — the sidebar robot was removed so the footer logout is
+   *  always visible. Kept optional so existing callers don't break. */
+  sidebarMascot?: string;
   nav: DashNavItem[];
   activeId: string;
   onNavigate: (id: string) => void;
@@ -33,8 +34,34 @@ interface DashboardShellProps {
   hero: ReactNode;
   /** Decorative floating art for the hero (robot + island). */
   heroArt?: { mascot?: string; island?: string };
+  /** F6: optional override of the role chip block (e.g. for the SedeShell
+   *  which renders the year selector instead of the plain role row). */
+  sidebarTop?: ReactNode;
+  /** F6: optional slot rendered immediately below the role chip so the
+   *  SedeShell can drop its academic-year selector there. */
+  sidebarBelowRole?: ReactNode;
   children: ReactNode;
 }
+
+/* Accent → gradient mapping for the atmospheric background overlay. */
+const ACCENT_GRADIENT: Record<DashAccent, string> = {
+  violet:
+    "radial-gradient(ellipse 80% 60% at 20% 10%, rgba(156,113,255,0.18), transparent 60%)," +
+    "radial-gradient(ellipse 60% 50% at 80% 80%, rgba(51,199,240,0.12), transparent 55%)",
+  green:
+    "radial-gradient(ellipse 80% 60% at 20% 10%, rgba(89,205,183,0.20), transparent 60%)," +
+    "radial-gradient(ellipse 60% 50% at 80% 80%, rgba(51,199,240,0.12), transparent 55%)",
+  blue:
+    "radial-gradient(ellipse 80% 60% at 20% 10%, rgba(51,199,240,0.20), transparent 60%)," +
+    "radial-gradient(ellipse 60% 50% at 80% 80%, rgba(95,140,255,0.12), transparent 55%)",
+};
+
+/* Accent → ring colour for the active nav pill. */
+const ACCENT_RING: Record<DashAccent, string> = {
+  violet: "ring-accent/50 bg-accent/10 text-accent-strong",
+  green: "ring-mint/50 bg-mint/10 text-mint",
+  blue: "ring-accent-sky/50 bg-accent-sky/10 text-accent-sky",
+};
 
 /* Premium Typely dashboard shell: elegant glass sidebar + cloud hero +
    content area. Shared by superadmin / sede-admin / teacher so every admin
@@ -45,7 +72,6 @@ export function DashboardShell({
   roleSubtitle,
   roleIcon: RoleIcon,
   account,
-  sidebarMascot,
   nav,
   activeId,
   onNavigate,
@@ -55,66 +81,111 @@ export function DashboardShell({
   bellCount,
   hero,
   heroArt,
+  sidebarTop,
+  sidebarBelowRole,
   children,
 }: DashboardShellProps) {
   return (
-    <div className={`dash-shell dash-shell--${accent} page-fade`}>
-      <div className="dash-atmosphere" aria-hidden="true" />
+    <div className="grid grid-cols-[auto_1fr] h-dvh overflow-hidden animate-page-fade">
+      {/* Atmospheric gradient overlay — purely decorative. */}
+      <div
+        className="absolute inset-0 pointer-events-none -z-10"
+        style={{ background: ACCENT_GRADIENT[accent] }}
+        aria-hidden="true"
+      />
 
-      <aside className="dash-sidebar">
-        <div className="dash-brand">
-          <span className="brand__text">TYPELY</span>
-        </div>
-
-        <div className="dash-role-card">
-          <span className="dash-role-card__icon">
-            <RoleIcon size={20} />
+      <aside className="sticky top-0 h-dvh glass flex flex-col gap-3 p-4 w-[clamp(14rem,18vw,16rem)]">
+        {/* ── Brand: el robot de TYPELY + wordmark con la tipografía display
+            y el gradiente de marca (igual que el login). ── */}
+        <div className="flex items-center gap-2.5 px-1">
+          <img
+            src="/favicon-256.png"
+            alt=""
+            decoding="async"
+            className="w-10 h-10 rounded-xl shadow-card border border-white/80 bg-gradient-to-br from-accent-sky/20 to-accent/10 object-contain"
+          />
+          <span className="font-display text-[clamp(1.25rem,2vw,1.5rem)] font-black tracking-wide bg-gradient-to-r from-accent-sky via-accent to-accent-pink bg-clip-text text-transparent">
+            TYPELY
           </span>
-          <div>
-            <strong>{roleLabel}</strong>
-            <span>{roleSubtitle}</span>
-          </div>
         </div>
 
-        <nav className="dash-nav" aria-label="Navegación">
-          {nav.map(({ id, label, icon: Icon, badge }) => (
-            <button
-              key={id}
-              type="button"
-              className={id === activeId ? "is-active" : ""}
-              onClick={() => onNavigate(id)}
-            >
-              <Icon size={19} />
-              <span>{label}</span>
-              {badge ? <em className="dash-nav__badge">{badge}</em> : null}
-            </button>
-          ))}
-        </nav>
-
-        <img className="dash-sidebar__mascot" src={sidebarMascot} alt="" decoding="async" loading="lazy" />
-
-        <div className="dash-footer">
-          <div className="dash-account">
-            <span className="dash-account__avatar">{account.initial}</span>
-            <div className="dash-account__info">
-              <strong>{account.name}</strong>
-              {account.email ? <span>{account.email}</span> : null}
+        {/* ── Role chip (F6: overridable via `sidebarTop` for the SedeShell) ── */}
+        {sidebarTop ?? (
+          <div className="glass-surface flex items-center gap-2.5 p-3 rounded-xl">
+            <span className="grid place-items-center w-9 h-9 rounded-lg bg-accent/15 text-accent-strong">
+              <RoleIcon size={20} />
+            </span>
+            <div className="flex flex-col leading-tight">
+              <strong className="text-text text-sm font-extrabold">{roleLabel}</strong>
+              <span className="text-muted text-xs">{roleSubtitle}</span>
             </div>
           </div>
-          <button type="button" className="dash-logout" onClick={onLogout}>
+        )}
+
+        {/* ── F6: optional slot right below the role chip (academic-year selector) ── */}
+        {sidebarBelowRole}
+
+        {/* ── Navigation (grows + scrolls so the footer logout always pins
+            to the bottom and stays visible) ── */}
+        <nav className="flex flex-col gap-1 flex-1 min-h-0 overflow-y-auto" aria-label="Navegación">
+          {nav.map(({ id, label, icon: Icon, badge }) => {
+            const isActive = id === activeId;
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-150 cursor-pointer ${
+                  isActive
+                    ? `${ACCENT_RING[accent]} ring-2 shadow-sm`
+                    : "text-muted hover:bg-white/50 hover:text-text"
+                }`}
+                onClick={() => onNavigate(id)}
+              >
+                <Icon size={19} />
+                <span>{label}</span>
+                {badge ? (
+                  <em className="ml-auto grid place-items-center min-w-[1.35rem] h-[1.35rem] px-1 rounded-full bg-rose text-white text-[10px] font-black not-italic">
+                    {badge}
+                  </em>
+                ) : null}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* ── Footer: account + logout (sidebar robot removed) ── */}
+        <div className="mt-auto flex flex-col gap-3 pt-3 border-t border-white/40">
+          <div className="flex items-center gap-3">
+            <span className="grid place-items-center w-10 h-10 rounded-full bg-accent/15 text-accent-strong font-black text-sm shrink-0">
+              {account.initial}
+            </span>
+            <div className="flex flex-col leading-tight min-w-0">
+              <strong className="text-text text-sm font-extrabold truncate">{account.name}</strong>
+              {account.email ? (
+                <span className="text-muted text-xs truncate">{account.email}</span>
+              ) : null}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold text-muted hover:bg-rose/10 hover:text-rose transition cursor-pointer"
+            onClick={onLogout}
+          >
             <LogOut size={17} />
             <span>Cerrar sesión</span>
           </button>
         </div>
       </aside>
 
-      <div className="dash-main">
-        <header className="dash-topbar">
+      <div className="flex-1 overflow-y-auto">
+        {/* ── Top bar ── */}
+        <header className="flex items-center justify-between gap-4 p-4">
           {search ? (
-            <label className="dash-search">
-              <Search size={18} />
+            <label className="glass-surface grid grid-cols-[auto_1fr] items-center gap-2.5 rounded-xl h-12 px-4 min-w-[14rem] max-w-md w-full">
+              <Search size={18} className="text-muted shrink-0" />
               <input
                 type="search"
+                className="bg-transparent outline-none text-text placeholder:text-muted/60 w-full"
                 value={search.value}
                 onChange={(e) => search.onChange(e.target.value)}
                 placeholder={search.placeholder ?? "Buscar…"}
@@ -123,32 +194,83 @@ export function DashboardShell({
           ) : (
             <span />
           )}
-          <div className="dash-topbar__right">
-            <button type="button" className="dash-bell" onClick={onBell} aria-label="Notificaciones">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="relative grid place-items-center w-10 h-10 rounded-xl glass-surface text-muted hover:text-text transition cursor-pointer"
+              onClick={onBell}
+              aria-label="Notificaciones"
+            >
               <Bell size={20} />
-              {bellCount ? <em>{bellCount}</em> : null}
+              {bellCount ? (
+                <em className="absolute -top-1 -right-1 grid place-items-center min-w-[1.2rem] h-[1.2rem] px-1 rounded-full bg-rose text-white text-[10px] font-black not-italic">
+                  {bellCount}
+                </em>
+              ) : null}
             </button>
-            <span className="dash-topbar__avatar">{account.initial}</span>
+            <span className="grid place-items-center w-10 h-10 rounded-full bg-accent/15 text-accent-strong font-black text-sm">
+              {account.initial}
+            </span>
+            <button
+              type="button"
+              className="flex items-center gap-2 h-10 px-4 rounded-xl glass-surface text-sm font-bold text-muted hover:bg-rose/10 hover:text-rose transition cursor-pointer"
+              onClick={onLogout}
+              aria-label="Cerrar sesión"
+            >
+              <LogOut size={18} />
+              <span className="hidden sm:inline">Cerrar sesión</span>
+            </button>
           </div>
         </header>
 
-        <section className="dash-hero">
-          <div className="dash-hero__copy">{hero}</div>
+        {/* ── Hero section ── */}
+        <section className="glass-card-smooth relative overflow-hidden p-6 rounded-2xl flex gap-4 mx-4 mb-2">
+          {/* Hairline de gradiente de marca en el borde superior del hero. */}
+          <span
+            className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-accent-teal via-accent to-accent-pink opacity-80 pointer-events-none"
+            aria-hidden="true"
+          />
+          <div className="flex-1 flex flex-col gap-2">{hero}</div>
           {heroArt ? (
-            <div className="dash-hero__art" aria-hidden="true">
-              {heroArt.mascot ? <img className="dash-hero__robot" src={heroArt.mascot} alt="" decoding="async" /> : null}
-              {heroArt.island ? <img className="dash-hero__island" src={heroArt.island} alt="" decoding="async" /> : null}
+            <div className="relative w-32 shrink-0 hidden sm:block" aria-hidden="true">
+              {heroArt.mascot ? (
+                <img
+                  className="absolute -top-4 right-2 w-24 animate-mascot-float"
+                  src={heroArt.mascot}
+                  alt=""
+                  decoding="async"
+                />
+              ) : null}
+              {heroArt.island ? (
+                <img
+                  className="absolute bottom-0 right-0 w-20 animate-island-float opacity-80"
+                  src={heroArt.island}
+                  alt=""
+                  decoding="async"
+                />
+              ) : null}
             </div>
           ) : null}
         </section>
 
-        <div className="dash-content">{children}</div>
+        {/* ── Scrollable content ── */}
+        <div className="p-6 flex flex-col gap-6">{children}</div>
       </div>
     </div>
   );
 }
 
 /* ---- Small presentational helpers shared by the dashboards ---- */
+
+/* Tone → accent colour mapping for KPI cards. Drives the icon background
+   and the optional left-border highlight via an inline CSS variable. */
+const TONE_CLASSES: Record<string, string> = {
+  violet: "bg-accent/15 text-accent-strong",
+  green: "bg-mint/20 text-mint",
+  blue: "bg-accent-sky/20 text-accent-sky",
+  pink: "bg-accent-pink/20 text-accent-pink",
+  gold: "bg-amber-200/40 text-amber-600",
+};
 
 export function KpiCard({
   icon: Icon,
@@ -166,14 +288,35 @@ export function KpiCard({
   onClick?: () => void;
 }) {
   return (
-    <article className={`kpi-card kpi-card--${tone} ${onClick ? "is-clickable" : ""}`} onClick={onClick}>
-      <span className="kpi-card__icon">
+    <article
+      className={`glass-surface p-4 rounded-xl flex items-start gap-3 transition-all duration-150 ${
+        onClick ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-card" : ""
+      }`}
+      onClick={onClick}
+      /* When the card is actionable, expose it to keyboard + AT as a button. */
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `${label}: ${value}` : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
+      <span className={`grid place-items-center w-11 h-11 rounded-xl shrink-0 ${TONE_CLASSES[tone] ?? TONE_CLASSES.violet}`}>
         <Icon size={24} />
       </span>
-      <div className="kpi-card__body">
-        <span className="kpi-card__label">{label}</span>
-        <strong className="kpi-card__value">{value}</strong>
-        {trend ? <span className="kpi-card__trend">{trend}</span> : null}
+      <div className="flex flex-col leading-tight">
+        <span className="text-muted text-xs font-bold uppercase tracking-wide">{label}</span>
+        <strong className="text-text text-2xl font-black font-display">{value}</strong>
+        {trend ? (
+          <span className="text-accent-teal text-xs font-bold mt-0.5">{trend}</span>
+        ) : null}
       </div>
     </article>
   );

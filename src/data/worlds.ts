@@ -3,6 +3,8 @@ import { islandLevelLayouts, type LevelPosition } from "./levelPositions";
 import { assets, expansionIslandThumbs, islandDetailBackgrounds, gameplayBackgrounds } from "../utils/assets";
 import {
   getBestStarsForLevel,
+  getTotalStars,
+  getWorldMaxStars,
   getWorldStarProgress,
   isLevelCompleted,
   levelState,
@@ -74,8 +76,13 @@ export type World = {
   title: string;
   /** Short topic/theme label shown to teachers (e.g. "Atajos de teclado"). */
   topic: string;
-  /** 1-based difficulty order (position in WORLD_ORDER). */
+  /** 1-based difficulty order (position in WORLD_ORDER).
+   *  Same value as `order` for the free path; a course-path student may
+   *  see a smaller set of these but the number itself is the canonical
+   *  pedagogical position. */
   order: number;
+  /** "Mundo N" label in the same pedagogical position as `order`. */
+  displayNumber: number;
   thumbnail: string;
   background: string;
   /** Background painted behind the actual typing/shortcut gameplay screen. */
@@ -148,24 +155,25 @@ const expansionTitles = [
 ===================================================================== */
 
 /* Map placement: x is vw from left-edge of the track, y is % of viewport
-   height.  Islands alternate high (y≈11) and low (y≈49) to create the
-   classic staircase-path look.  Spacing is 17 vw between each island. */
+   height.  Islands alternate high (y≈13) and low (y≈49) to create the
+   classic staircase-path look.  Spacing is a constant 20 vw between each
+   island so the whole row reads evenly. */
 const worldMapPositions: Record<Activity["worldId"], MapPosition> = {
-  island1:  { x:  6, y: 13 },  // #1
-  island6:  { x: 23, y: 49 },  // #2
-  island2:  { x: 40, y: 13 },  // #3
-  island7:  { x: 57, y: 49 },  // #4
-  island13: { x: 74, y: 13 },  // #5
-  island3:  { x: 91, y: 49 },  // #6
-  island8:  { x: 108, y: 13 }, // #7
-  island4:  { x: 125, y: 49 }, // #8
-  island9:  { x: 142, y: 13 }, // #9
-  island10: { x: 159, y: 49 }, // #10
-  island5:  { x: 176, y: 13 }, // #11
-  island11: { x: 193, y: 49 }, // #12
-  island12: { x: 210, y: 13 }, // #13
-  island14: { x: 227, y: 49 }, // #14
-  island15: { x: 244, y: 13 }, // #15
+  island1:  { x:   6, y: 13 },  // #1
+  island6:  { x:  26, y: 49 },  // #2
+  island2:  { x:  46, y: 13 },  // #3
+  island7:  { x:  66, y: 49 },  // #4
+  island13: { x:  86, y: 13 },  // #5
+  island3:  { x: 106, y: 49 },  // #6
+  island8:  { x: 126, y: 13 },  // #7
+  island4:  { x: 146, y: 49 },  // #8
+  island9:  { x: 166, y: 13 },  // #9
+  island10: { x: 186, y: 49 },  // #10
+  island5:  { x: 206, y: 13 },  // #11
+  island11: { x: 226, y: 49 },  // #12
+  island12: { x: 246, y: 13 },  // #13
+  island14: { x: 266, y: 49 },  // #14
+  island15: { x: 286, y: 13 },  // #15
 };
 
 /* Build the meta for an expansion island (island6 … island15).
@@ -258,12 +266,14 @@ function buildLevels(worldId: Activity["worldId"], progress: CurriculumProgress)
 
 function buildWorld(worldId: Activity["worldId"], progress: CurriculumProgress): World {
   const meta = worldMeta[worldId];
+  const pedagogyPosition = pedagogyOrderOf(worldId);
   return {
     id: worldId,
     slug: worldId,
     title: meta.title,
     topic: WORLD_TOPICS[worldId],
-    order: WORLD_ORDER.indexOf(worldId) + 1,
+    order: pedagogyPosition,
+    displayNumber: pedagogyPosition,
     thumbnail: meta.thumbnail,
     background: meta.background,
     gameplayBg: meta.gameplayBg,
@@ -289,10 +299,19 @@ export const getGameplayBackgroundForWorld = getGameplayBackground;
    the bottom-right of the map — its on-screen position is unchanged, only its
    place in the sequence. Everything that needs a "Mundo N" number or an
    unlock order derives it from this array. */
-/** Canonical difficulty order used for progression unlocking and the
- *  free-path display.  See the comment above worldMapPositions for the
- *  pedagogical rationale. */
-export const WORLD_ORDER: Activity["worldId"][] = [
+/* =====================================================================
+   Canonical pedagogical order — THE single source of truth for
+   "which world is world N in difficulty".
+
+   `island1..island15` are stable internal ids (used by URLs, localStorage
+   and asset paths). They were created in the order the artist files
+   arrived, NOT the order a student should play them. The array below
+   encodes the correct difficulty sequence. Every other piece of code
+   (free-path display, unlock gate, "Mundo N" label, the grade-to-worlds
+   map in `userContext.ts`) MUST derive from this array — never
+   hand-maintain a parallel list.
+===================================================================== */
+export const WORLD_PEDAGOGY_ORDER: ReadonlyArray<Activity["worldId"]> = [
   "island1",   // 1  basic letters
   "island6",   // 2  syllables + short words
   "island2",   // 3  words
@@ -310,6 +329,26 @@ export const WORLD_ORDER: Activity["worldId"][] = [
   "island15",  // 15 grand final challenge
 ];
 
+/* O(1) lookup: worldId → 1-based pedagogical position. Used everywhere we
+   need to show "Mundo N" to a student, teacher or admin. */
+const _pedagogyIndex: Partial<Record<Activity["worldId"], number>> =
+  Object.fromEntries(WORLD_PEDAGOGY_ORDER.map((id, i) => [id, i + 1]));
+
+/** Returns the 1-based pedagogical position of a world (1..15). Returns
+ *  `0` for unknown ids — callers should treat that as "outside the
+ *  curriculum" and fall back to a neutral display. */
+export function pedagogyOrderOf(worldId: Activity["worldId"]): number {
+  return _pedagogyIndex[worldId] ?? 0;
+}
+
+/* `WORLD_ORDER` is now an alias for `WORLD_PEDAGOGY_ORDER` so the rest of
+   the codebase (which imports `WORLD_ORDER`) keeps compiling without
+   change. New code should prefer `WORLD_PEDAGOGY_ORDER` for clarity. */
+/** Canonical difficulty order used for progression unlocking and the
+ *  free-path display. Aliased to WORLD_PEDAGOGY_ORDER — prefer the
+ *  longer name in new code. */
+export const WORLD_ORDER: ReadonlyArray<Activity["worldId"]> = WORLD_PEDAGOGY_ORDER;
+
 export type WorldLockState = "completed" | "current" | "locked";
 
 /* A world counts as fully complete once every level is completed (all levels
@@ -326,51 +365,67 @@ export function worldStarProgress(
   return getWorldStarProgress(progress, worldId);
 }
 
-/* Build lock states over an ORDERED list of worldIds using the 70%-stars
-   rule: the first world is unlocked; each next world unlocks only once the
-   previous one has earned ≥70% of its possible stars.
-     - "completed" → this world has already reached the 70% star gate.
-     - "current"   → unlocked and being worked on (first world below 70%).
-     - "locked"    → previous world has not reached 70% yet.
-   When `unlockAll` is true (free path: demo / superadmin / teacher) nothing
-   is ever locked. */
+/* Cumulative star requirement to UNLOCK each world: the sum of the MAX stars of
+   every world BEFORE it in the given order. So world 1 needs 0, world 2 needs
+   world 1's max (21★), world 3 needs world 1 + world 2's max (42★), and so on —
+   the bar keeps rising as the student advances. worldId → required running
+   total. Entering a world never spends stars; this is a pure threshold. */
+export function getWorldStarRequirements(
+  orderedIds: ReadonlyArray<Activity["worldId"]> = WORLD_ORDER,
+): Record<string, number> {
+  const reqs: Record<string, number> = {};
+  let required = 0;
+  for (const id of orderedIds) {
+    reqs[id] = required;
+    required += getWorldMaxStars(id);
+  }
+  return reqs;
+}
+
+/* Build lock states over an ORDERED list of worldIds using the CUMULATIVE
+   account-wide star total:
+     - a world is UNLOCKED once the running star total (sum of best stars over
+       every level of every world) reaches the sum of the max stars of all the
+       worlds before it (see getWorldStarRequirements).
+     - "completed" → unlocked AND every level of the world is finished.
+     - "current"   → unlocked but still has levels left to finish.
+     - "locked"    → the account total has not reached this world's threshold.
+   When `unlockAll` is true (free path: demo / superadmin / teacher) nothing is
+   ever locked. */
 function buildStarStates(
-  orderedIds: Activity["worldId"][],
+  orderedIds: ReadonlyArray<Activity["worldId"]>,
   progress: CurriculumProgress,
   unlockAll: boolean,
 ): Record<string, WorldLockState> {
   const states: Record<string, WorldLockState> = {};
-  let previousUnlocksNext = true; // the first world is always available
+  const total = getTotalStars(progress);
+  let required = 0; // cumulative max stars of all PRECEDING worlds
   for (const id of orderedIds) {
-    const reached = getWorldStarProgress(progress, id).isUnlockedNext;
-    if (unlockAll) {
-      states[id] = reached ? "completed" : "current";
-      continue;
-    }
-    if (!previousUnlocksNext) {
-      states[id] = "locked";
-      continue;
-    }
-    states[id] = reached ? "completed" : "current";
-    previousUnlocksNext = reached;
+    const unlocked = unlockAll || total >= required;
+    states[id] = !unlocked
+      ? "locked"
+      : isWorldComplete(id, progress)
+        ? "completed"
+        : "current";
+    required += getWorldMaxStars(id);
   }
   return states;
 }
 
 /* Sequential unlocking over the full WORLD_ORDER (no user context).
-   Uses the 70%-stars rule. */
+   Uses the cumulative account-wide star total (see buildStarStates). */
 export function getWorldStates(
   progress: CurriculumProgress = loadProgress(),
 ): Record<Activity["worldId"], WorldLockState> {
   return buildStarStates(WORLD_ORDER, progress, false) as Record<Activity["worldId"], WorldLockState>;
 }
 
-/* Context-aware lock states. The 70%-stars chain is applied to EVERY user
-   over their ordered worlds, so the unlock gate is real while playing — you
-   must earn 70% of a world's stars to open the next one. Demo / superadmin
-   still SEE every world (visibility is handled by getWorldsForUser); locked
-   ones simply appear greyed and can be opened with the hidden 5-click dev
-   bypass for testing. */
+/* Context-aware lock states. The cumulative-star gate is applied to EVERY user
+   over their ordered worlds, so the unlock gate is real while playing — your
+   running star total must reach the sum of the max stars of all earlier worlds
+   to open the next one. Demo / superadmin still SEE every world (visibility is
+   handled by getWorldsForUser); locked ones simply appear greyed and can be
+   opened with the hidden 5-click dev bypass for testing. */
 export function getWorldStatesForUser(
   context: UserContext,
   progress: CurriculumProgress = loadProgress(),

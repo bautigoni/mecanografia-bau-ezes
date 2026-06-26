@@ -39,6 +39,12 @@ DEPLOY.md
 README.md
 CLAUDE.md
 
+# Secrets — never bake them into the image. They are mounted at
+# runtime via Docker compose `secrets:` (see docker-compose.yml).
+secrets/*
+!secrets/.gitignore
+!secrets/README.md
+
 # TypeScript / build caches.
 *.tsbuildinfo
 .cache
