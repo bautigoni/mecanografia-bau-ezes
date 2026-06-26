@@ -117,11 +117,20 @@ export function TeacherClassPage() {
     setEnabled(new Set(updated));
     setMessage(next ? "Nivel habilitado para el curso." : "Nivel deshabilitado para el curso.");
   }
-  function resetPw(s: EduTicUser) {
-    const pw = resetUserPassword(s.id);
-    if (pw) {
-      setMessage(`Clave temporal de ${s.name}: ${s.username} / ${pw}`);
-      setVersion((v) => v + 1);
+  async function resetPw(s: EduTicUser) {
+    if (usingApi) {
+      try {
+        const res = await api.resetUserPassword(s.id);
+        setMessage(`Clave temporal de ${s.name}: ${s.username} / ${res.temporaryPassword}`);
+      } catch {
+        setMessage("No se pudo restablecer la contraseña.");
+      }
+    } else {
+      const pw = resetUserPassword(s.id);
+      if (pw) {
+        setMessage(`Clave temporal de ${s.name}: ${s.username} / ${pw}`);
+        setVersion((v) => v + 1);
+      }
     }
   }
 

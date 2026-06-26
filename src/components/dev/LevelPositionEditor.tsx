@@ -280,7 +280,7 @@ export function LevelPositionEditor({
       {/* ── Fixed HUD panel. ── */}
       <div
         data-hud
-        className="fixed right-4 top-4 z-20 glass-surface p-4 rounded-xl w-72 flex flex-col gap-3 max-h-[calc(100dvh-2rem)] overflow-y-auto animate-hud-in"
+        className="fixed right-4 top-4 z-20 pointer-events-auto glass-surface p-4 rounded-xl w-72 flex flex-col gap-3 max-h-[calc(100dvh-2rem)] overflow-y-auto animate-hud-in"
         style={hudPos ? { left: hudPos.left, top: hudPos.top, right: "auto" } : undefined}
         role="dialog"
         aria-label="Editor de posiciones de niveles"
