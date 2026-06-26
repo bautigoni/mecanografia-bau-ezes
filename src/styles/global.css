@@ -553,6 +553,7 @@ a { color: inherit; text-decoration: none; }
    objetivo, lo tipeado y el teclado COMPLETO entren siempre sin recortes.
    Mantener al FINAL del archivo para ganar la cascada.
    ════════════════════════════════════════════════════════════════════ */
+.gp-key { min-height: 1.5rem; min-width: 2.25rem; font-size: 0.8rem; }
 @media (max-height: 720px) {
   .gp-key { height: 1.9rem; }
 }
@@ -560,7 +561,7 @@ a { color: inherit; text-decoration: none; }
   .gp-key { height: 1.65rem; font-size: 0.8rem; }
 }
 @media (max-height: 560px) {
-  .gp-key { height: 1.5rem; font-size: 0.74rem; }
+  .gp-key { height: 1.5rem; font-size: 0.8rem; }
 }
 #btnisland6lvl1 {
   position: absolute;
