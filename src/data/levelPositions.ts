@@ -65,16 +65,12 @@ export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = 
   ],
 
   island2: [
-    /* Layout matches the painted scene in island2.webp (1672×941, 16:9):
-       one big foreground chain (bottom half) plus a few smaller top platforms.
-       Coordinates are % of the island image (cover-rect math in IslandDetailPage
-       keeps them locked to the platforms at every viewport). */
-    { x: 43, y: 68 },   // N1 — round platform w/ blue glow (left of chain)
-    { x: 63, y: 76 },   // N2 — right side of the bottom chain
-    { x: 37, y: 78 },   // N3 — left platform of the bottom chain
-    { x: 50, y: 48 },   // N4 — center of the chain (mid-height)
-    { x: 24, y: 55 },   // N5 — left mid platform (smaller, mid-left)
-    { x: 45, y: 12 },   // N6 — top-left upper platform
+    { x: 49.1, y: 74.1, scale: 1.5, rotateX: -1, perspective: 1030 },
+    { x: 33.3, y: 66, scale: 1.5 },
+    { x: 32.4, y: 48.9, scale: 1.5 },
+    { x: 52.3, y: 34.8, scale: 1.3 },
+    { x: 68.2, y: 40.5, scale: 1.5 },
+    { x: 45, y: 12 },
   ],
 
   island3: [
@@ -104,16 +100,13 @@ export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = 
   ],
 
   island5: [
-    /* island5.webp: top decoration + one big central chain. The top pixels
-       at y 5-15 read as pastel sky (excluded by the strict detector), so
-       levels 1-7 follow the main chain in a path. */
-    { x: 31, y: 28 },   // N1 — upper-left of the main chain
-    { x: 41, y: 39 },   // N2 — upper-centre
-    { x: 53, y: 45 },   // N3 — right of main
-    { x: 43, y: 53 },   // N4 — centre of main
-    { x: 28, y: 46 },   // N5 — left of main
-    { x: 31, y: 38 },   // N6 — upper-left, slightly above
-    { x: 42, y: 39 },   // N7 — centre, near N2
+    { x: 47, y: 72.5, scale: 1.5 },
+    { x: 51.2, y: 52.4, scale: 1.5 },
+    { x: 61.4, y: 39.3, scale: 1.3, rotateX: -38.5 },
+    { x: 47.5, y: 32.3, scale: 1.4, rotateX: -25.5 },
+    { x: 35.6, y: 44.5, scale: 1.4, rotateX: -36 },
+    { x: 22.2, y: 68.3, scale: 2.2 },
+    { x: 86.8, y: 57, scale: 1.4 },
   ],
 
   island6: [
@@ -131,14 +124,12 @@ export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = 
   ],
 
   island7: [
-    { x: 25.3, y: 82.5 },
-    { x: 28.6, y: 40.6 },
-    { x: 46.5, y: 93.3 },
-    { x: 73.9, y: 79 },
-    { x: 79.7, y: 33.2 },
-    { x: 52, y: 40.2 },
-    // Nudged a few % right + down (2026-06-02) so the marker clears the
-    // next-world entrance overlay that was eating the click target.
+    { x: 25.4, y: 77.5, scale: 1.6 },
+    { x: 73.5, y: 70.6, scale: 1.2 },
+    { x: 83.2, y: 38.7 },
+    { x: 47.1, y: 52.8, scale: 1.1 },
+    { x: 40.3, y: 42.3 },
+    { x: 28.5, y: 45.9 },
     { x: 63, y: 43 },
     { x: 46, y: 56 },
   ],
@@ -201,12 +192,12 @@ export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = 
   ],
 
   island13: [
-    { x: 16.7, y: 57.4 },
-    { x: 43.3, y: 66.6 },
-    { x: 74.1, y: 62.8 },
-    { x: 56.1, y: 42.4 },
-    { x: 35.7, y: 16.9 },
-    { x: 54.9, y: 12.6 },
+    { x: 16.7, y: 57, scale: 1.4, rotateX: -42.5, rotateY: 1 },
+    { x: 56.7, y: 70.6, scale: 1.5, rotateX: 27 },
+    { x: 76.9, y: 60.1, scale: 1.5, rotateX: -40.5 },
+    { x: 62.7, y: 52.1 },
+    { x: 55.6, y: 24.9, scale: 0.9, rotateX: 41.5 },
+    { x: 34.9, y: 27.3, rotateX: -50 },
     { x: 60, y: 40 },
     { x: 46, y: 56 },
   ],
