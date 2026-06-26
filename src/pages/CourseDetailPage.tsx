@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, GraduationCap, Users, BookOpen, Plus, Trash2, UserPlus, KeyRound, Check,
@@ -77,6 +77,16 @@ export function CourseDetailPage() {
   const [edit, setEdit] = useState<{ id: string; name: string } | null>(null);
   const [move, setMove] = useState<{ id: string; name: string; to: string } | null>(null);
   const [cfg, setCfg] = useState({ name: "", grade: "" });
+
+  const levelsSectionRef = useRef<HTMLElement | null>(null);
+
+  /** Switch to Config tab and smooth-scroll to the levels toggle grid. */
+  const scrollToLevels = useCallback(() => {
+    setTab("config");
+    requestAnimationFrame(() => {
+      levelsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
 
   const flash = (m: string) => { setMsg(m); window.setTimeout(() => setMsg(""), 2600); };
 
@@ -348,8 +358,17 @@ export function CourseDetailPage() {
             </label>
             <button type="submit" disabled={busy} className="h-11 rounded-xl font-bold text-white bg-gradient-to-r from-accent to-accent-strong shadow-btn disabled:opacity-50 cursor-pointer">Guardar</button>
           </form>
-          <section className="glass-card-smooth rounded-2xl p-5 flex flex-col gap-3">
-            <h2 className="font-display font-extrabold text-lg text-text flex items-center gap-2"><Layers size={18} /> Niveles habilitados</h2>
+          <section ref={levelsSectionRef} id="course-levels-section" className="glass-card-smooth rounded-2xl p-5 flex flex-col gap-3 scroll-mt-6">
+            <h2 className="font-display font-extrabold text-lg text-text m-0">
+              <button
+                type="button"
+                onClick={scrollToLevels}
+                className="flex items-center gap-2 text-left cursor-pointer hover:text-accent-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong/60 rounded-md transition"
+                title="Ir a la configuración de niveles"
+              >
+                <Layers size={18} /> Niveles habilitados
+              </button>
+            </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {WORLD_OPTIONS.map((w) => {
                 const on = enabledSet.has(w.id);
