@@ -33,6 +33,29 @@ async function loadOwnedClass(actor: AccessClaims, id: string, reply: FastifyRep
   return cls;
 }
 
+/* Read-only access: admins by sede (as above), PLUS a profesor who is
+ * explicitly assigned to this class via class_teachers — independent of
+ * sede, mirroring the GET /api/classes listing rules. Used by the
+ * teacher dashboard's members/progress views. Never grants writes. */
+async function loadClassForRead(actor: AccessClaims, id: string, reply: FastifyReply) {
+  const [cls] = await db.select().from(schema.classes).where(eq(schema.classes.id, id)).limit(1);
+  if (!cls) {
+    reply.code(404).send({ error: "Curso no encontrado." });
+    return null;
+  }
+  if (canActOnSede({ role: actor.role, sedeId: actor.sede }, cls.sedeId)) return cls;
+  if (actor.role === "profesor" && actor.sub) {
+    const [assigned] = await db
+      .select({ classId: schema.classTeachers.classId })
+      .from(schema.classTeachers)
+      .where(and(eq(schema.classTeachers.classId, id), eq(schema.classTeachers.userId, actor.sub)))
+      .limit(1);
+    if (assigned) return cls;
+  }
+  reply.code(403).send({ error: "No podés ver cursos de otra sede." });
+  return null;
+}
+
 const createSchema = z.object({
   name: z.string().trim().min(1),
   sedeId: z.string().uuid().optional(),
@@ -196,7 +219,7 @@ export async function classRoutes(app: FastifyInstance) {
   app.get("/api/classes/:id/members", async (req, reply) => {
     const actor = await requireUser(req);
     const { id } = req.params as { id: string };
-    const cls = await loadOwnedClass(actor, id, reply);
+    const cls = await loadClassForRead(actor, id, reply);
     if (!cls) return;
     const cols = {
       id: schema.users.id,
@@ -312,7 +335,7 @@ export async function classRoutes(app: FastifyInstance) {
   app.get("/api/classes/:id/progress", async (req, reply) => {
     const actor = await requireUser(req);
     const { id } = req.params as { id: string };
-    const cls = await loadOwnedClass(actor, id, reply);
+    const cls = await loadClassForRead(actor, id, reply);
     if (!cls) return;
 
     const roster = await db

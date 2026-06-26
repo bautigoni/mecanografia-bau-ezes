@@ -1,28 +1,12 @@
 services:
   # ------------------------------------------------------------------
-  # Postgres 16 — single source of truth for users, sedes, classes,
-  # progress and the per-attempt audit log. Bound to loopback only
-  # (port 5432 on the host). Migrations + schema are applied at
-  # first start from ./db/init/*.sql.
+  # Postgres now runs on Supabase (sa-east-1 pooler) — the single source
+  # of truth for users, sedes, classes, progress and the audit log. The
+  # local `db` container was retired to free RAM on this 1 GB VM; the API
+  # connects via DATABASE_URL (secrets/database_url.txt → Supabase pooler,
+  # transaction mode 6543, sslmode=require). The `dbdata` volume and the
+  # `db_password` secret are kept only as a rollback path.
   # ------------------------------------------------------------------
-  db:
-    image: postgres:16-alpine
-    container_name: mecanografia_db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: typely
-      POSTGRES_USER: typely
-      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
-    volumes:
-      - dbdata:/var/lib/postgresql/data
-      - ./db/init:/docker-entrypoint-initdb.d:ro
-    secrets:
-      - db_password
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U typely -d typely"]
-      interval: 10s
-      retries: 5
-      start_period: 20s
 
   # ------------------------------------------------------------------
   # Fastify API — handles auth (manual + Google), users, sedes,
@@ -36,9 +20,6 @@ services:
       dockerfile: Dockerfile.api
     container_name: mecanografia_api
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -73,9 +54,6 @@ services:
         VITE_GOOGLE_ALLOWED_DOMAINS: "${VITE_GOOGLE_ALLOWED_DOMAINS:-}"
     container_name: mecanografia
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     ports:
       # Bind to loopback so the container is only reachable via the Caddy
       # reverse proxy on the host, never directly from the public internet.
