@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight, Lock, MapPin, RotateCcw, Star } from "lucide-react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { Toast } from "../components/common/Toast";
@@ -75,6 +75,12 @@ export function IslandDetailPage() {
   /* The level info popover is closed by default (least intrusive) and opens
      only when a level is tapped; tapping outside closes it again. */
   const [popoverOpen, setPopoverOpen] = useState(false);
+  /* Collision-aware popover: after it renders we measure it and nudge it (in
+     px) so it never spills off the viewport and never overlaps the fixed top
+     header. The base side/vertical anchoring still decides the initial open
+     direction; this just clamps it into the safe on-screen band. */
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverNudge, setPopoverNudge] = useState({ dx: 0, dy: 0 });
 
   /* ---- Dev-only level position editor state ---- */
   const mapRef = useRef<HTMLElement>(null);
@@ -239,6 +245,63 @@ export function IslandDetailPage() {
   const popoverTy =
     popoverVBand === "top" ? "-0.6rem" : popoverVBand === "bottom" ? "calc(-100% + 0.6rem)" : "-50%";
   const popoverState = selectedLevel.state.toLowerCase();
+
+  /* Keep the open popover fully inside the viewport AND below the fixed top
+     header. We measure the rendered popover and translate it by a few px when
+     it would spill off an edge: a node low on the screen flips its card up, a
+     high node flips it down, and a card near the header is pushed under it. On
+     a fresh open / selection change the nudge resets to zero first, then this
+     effect re-runs to clamp the clean position (converges in 1–2 frames). */
+  const lastPopoverKey = useRef("");
+  useLayoutEffect(() => {
+    const el = popoverRef.current;
+    if (!popoverOpen || !el) {
+      if (popoverNudge.dx !== 0 || popoverNudge.dy !== 0) setPopoverNudge({ dx: 0, dy: 0 });
+      lastPopoverKey.current = "";
+      return;
+    }
+    const key = String(safeIndex);
+    if (lastPopoverKey.current !== key) {
+      lastPopoverKey.current = key;
+      if (popoverNudge.dx !== 0 || popoverNudge.dy !== 0) {
+        setPopoverNudge({ dx: 0, dy: 0 });
+        return; // re-runs with a clean slate before measuring
+      }
+    }
+    /* Reconstruct the FULL-SIZE box from the rect centre + layout size. The
+       inner pop-in animation scales the panel around its centre, so the rect's
+       centre is stable while offsetWidth/Height stay at the un-transformed
+       layout size — this makes the clamp accurate even mid-animation. */
+    const rect = el.getBoundingClientRect();
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const cx = (rect.left + rect.right) / 2;
+    const cy = (rect.top + rect.bottom) / 2;
+    const left = cx - w / 2;
+    const right = cx + w / 2;
+    const top = cy - h / 2;
+    const bottom = cy + h / 2;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const margin = 14;
+    const topSafe = 96; // clear the fixed island header at the top
+    let dx = 0;
+    let dy = 0;
+    if (w < vw - margin * 2) {
+      if (left < margin) dx = margin - left;
+      else if (right > vw - margin) dx = vw - margin - right;
+    }
+    if (h >= vh - margin - topSafe) {
+      dy = topSafe - top; // taller than the safe band → pin under the header
+    } else if (top < topSafe) {
+      dy = topSafe - top;
+    } else if (bottom > vh - margin) {
+      dy = vh - margin - bottom;
+    }
+    if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+      setPopoverNudge((prev) => ({ dx: prev.dx + dx, dy: prev.dy + dy }));
+    }
+  }, [popoverOpen, safeIndex, islandContainer, bgReady, popoverNudge.dx, popoverNudge.dy]);
 
   function selectLevel(index: number) {
     const level = world.levels[index];
@@ -808,22 +871,30 @@ export function IslandDetailPage() {
                 Opens on tap, closes on tap-outside. Hidden while editing. */}
             {!editorOn && popoverOpen && (
               <div
+                ref={popoverRef}
                 data-level-popover=""
-                className="absolute z-30 pointer-events-auto animate-popover-in"
+                className="absolute z-50 pointer-events-auto"
                 style={{
                   left: `${selectedPos.x}%`,
                   top: `${selectedPos.y}%`,
-                  transform: `translate(${popoverTx}, ${popoverTy})`,
+                  /* Base anchor (rem/%) + the collision nudge (px). The pop-in
+                     animation lives on the INNER panel, so it never overrides
+                     this transform — otherwise the clamp could never settle. */
+                  transform: `translate(calc((${popoverTx}) + ${popoverNudge.dx}px), calc((${popoverTy}) + ${popoverNudge.dy}px))`,
                 }}
               >
-                <div className="glass-card p-4 rounded-2xl min-w-[14rem] relative">
+                <div
+                  className="animate-popover-in p-4 rounded-2xl min-w-[14rem] relative backdrop-blur-xl border border-white/70 shadow-[0_20px_50px_rgba(40,70,120,0.28)]"
+                  style={{ background: "rgba(255,255,255,0.9)" }}
+                >
                   {/* Tail — rotated square pointing toward the node */}
                   <span
                     className={[
-                      "absolute w-3 h-3 glass-card rotate-45",
+                      "absolute w-3 h-3 rotate-45 border border-white/70",
                       popoverRight ? "-left-1.5" : "-right-1.5",
                       popoverVBand === "top" ? "top-3" : popoverVBand === "bottom" ? "bottom-3" : "top-1/2 -translate-y-1/2",
                     ].filter(Boolean).join(" ")}
+                    style={{ background: "rgba(255,255,255,0.9)" }}
                     aria-hidden="true"
                   />
                   <div className="flex items-center justify-between gap-2 mb-1">
@@ -868,8 +939,14 @@ export function IslandDetailPage() {
       <StarCounter className="fixed top-4 right-4 z-30" />
 
       {/* Barra ÉPICA de progreso al próximo personaje — abajo-centro, igual
-          que en el mapa de mundos (pointer-events-none: no tapa los niveles). */}
-      <SkinProgressBar />
+          que en el mapa de mundos (pointer-events-none: no tapa los niveles).
+          Se desvanece cuando hay un popover de nivel abierto para que los dos
+          paneles de vidrio NUNCA se superpongan abajo (antes el popover de los
+          niveles de la fila inferior quedaba escondido detrás de esta barra y
+          parecía que el nivel "no se podía entrar"). */}
+      <SkinProgressBar
+        className={`transition-opacity duration-200 ${popoverOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+      />
 
       {/* Celebración al desbloquear una fase de personaje nueva — acá es donde
           el alumno aterriza con "Volver" justo después de cruzar el umbral. */}
@@ -889,7 +966,14 @@ export function IslandDetailPage() {
 
       {/* Compact floating island header — sits in the top-safe area and never
           covers the level nodes. Replaces the old large title/progress panel. */}
-      <header className="fixed top-0 left-1/2 -translate-x-1/2 z-20 glass-strong rounded-b-2xl px-5 py-3 flex items-center gap-4 shadow-card animate-hud-in max-w-[92vw]">
+      <header
+        className="fixed top-0 left-1/2 -translate-x-1/2 z-20 glass-strong rounded-b-2xl px-5 py-3 flex items-center gap-4 shadow-card animate-hud-in max-w-[92vw]"
+        /* Mismo fondo blanco OPACO que la barra de personaje de abajo, para que
+           ambos paneles tengan EXACTAMENTE el mismo color sin importar el arte
+           que tengan detrás (antes el de arriba dejaba pasar el cielo azul y el
+           de abajo las nubes blancas, y se veían de distinto color). */
+        style={{ background: "rgba(255,255,255,0.88)" }}
+      >
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/20 text-violet-700 font-bold text-[clamp(0.95rem,1.7vmin,1.3rem)] whitespace-nowrap">
           <Star size={15} fill="currentColor" />
           Mundo {worldNumber}
