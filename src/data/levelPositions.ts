@@ -71,6 +71,7 @@ export const islandLevelLayouts: Record<Activity["worldId"], LevelPosition[]> = 
     { x: 52.3, y: 34.8, scale: 1.3 },
     { x: 68.2, y: 40.5, scale: 1.5 },
     { x: 45, y: 12 },
+    { x: 63.5, y: 63.5, scale: 1.5 },
   ],
 
   island3: [

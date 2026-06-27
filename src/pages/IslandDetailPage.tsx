@@ -8,6 +8,7 @@ import { StarCounter } from "../components/common/StarCounter";
 import { CharacterSkin } from "../components/common/CharacterSkin";
 import { SkinUnlockCelebration } from "../components/common/SkinUnlockCelebration";
 import { SkinProgressBar } from "../components/common/SkinProgressBar";
+import { LevelStars } from "../components/common/LevelStars";
 import { getWorldBySlug, getWorlds, worldStarProgress, WORLD_PEDAGOGY_ORDER, type Level, type LevelPosition } from "../data/worlds";
 import { LevelPositionEditor } from "../components/dev/LevelPositionEditor";
 import { assets } from "../utils/assets";
@@ -850,10 +851,8 @@ export function IslandDetailPage() {
                     </span>
                   )}
                   {isCompleted && (
-                    <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-0.5 text-yellow-400 drop-shadow-sm">
-                      {Array.from({ length: 3 }).map((_, i) => (
-                        <Star key={i} size={14} fill={i < level.stars ? "currentColor" : "none"} />
-                      ))}
+                    <span className="absolute -bottom-3.5 left-1/2 -translate-x-1/2">
+                      <LevelStars earned={level.stars} size={17} gap={1.5} />
                     </span>
                   )}
 
@@ -904,10 +903,8 @@ export function IslandDetailPage() {
                     </span>
                   </div>
                   <h3 className="text-sm text-muted mb-2">{selectedLevel.name}</h3>
-                  <span className="flex gap-0.5 text-yellow-400 mb-3" aria-hidden="true">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <Star key={i} size={15} fill={i < selectedLevel.stars ? "currentColor" : "none"} />
-                    ))}
+                  <span className="block mb-3">
+                    <LevelStars earned={selectedLevel.stars} size={19} gap={2} />
                   </span>
                   <Button className="w-full" onClick={openLevel}>
                     {selectedLevel.state === "Bloqueado" ? (
