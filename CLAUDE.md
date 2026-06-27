@@ -257,6 +257,29 @@ Containerised behind Nginx + Caddy. `Dockerfile` (frontend, multi-stage
 `node_modules`, `dist`, `.env*`, `secrets/*`, `Images*/`, `Skills/`, `.claude/`,
 docs. Full runbook in `DEPLOY.md`.
 
+### 13.1 Frontend deploy to the Oracle VM — RULE
+
+**Never build the frontend Docker image on the Oracle VM** (`168.75.68.75`,
+`/opt/apps/typely`, ~956MB RAM). `docker compose build mecanografia` there takes
+15-20 min and BuildKit OOM-crashes. The **required** procedure (≈1 min) is:
+
+1. Build the static bundle **locally** — it must include the Google vars or you
+   break sign-in (Vite inlines them):
+   `VITE_GOOGLE_CLIENT_ID="…" VITE_GOOGLE_ALLOWED_DOMAINS="" npm run build`.
+2. `tar -czf fe-dist.tgz dist nginx.conf` and `scp` it to the VM.
+3. On the VM build a **trivial nginx image that only COPYs the prebuilt `dist/`**
+   (`FROM nginx:alpine` + COPY `nginx.conf` + COPY `dist`), tag it
+   `typely-mecanografia:latest`, then
+   `docker compose up -d --no-build --force-recreate mecanografia`.
+4. Verify the served bundle hash matches local:
+   `curl -s http://127.0.0.1:3005/ | grep -o 'assets/index-[A-Za-z0-9_-]*\.js'`
+   must equal the hash in local `dist/index.html`, and HTTP must be `200`.
+
+The slow on-VM build (`DOCKER_BUILDKIT=0` + detached `nohup`, never BuildKit) is
+the fallback ONLY for the **API** image, which can't be shipped as a static
+bundle. The VM tracks `dev` (its local branch is named `main` but mirrors
+`origin/dev`); the DB is **Supabase**, not the local `db` container.
+
 ## 14. Skills (for agents)
 
 - `Skills/skill.md` — **EduTic Design Skill**: pixel-spec for the login card and
@@ -288,6 +311,9 @@ docs. Full runbook in `DEPLOY.md`.
   `dev` when everything is ready (see §17).
 - After any code change run `npm run build` (= `tsc --noEmit && vite build`); fix
   failures before claiming done. Report which files changed and how to test.
+- Deploy the frontend to the Oracle VM with the prebuilt-`dist` procedure in
+  §13.1 — never trigger a full `docker compose build` of `mecanografia` on the
+  956MB VM (it OOM-crashes and wastes 15-20 min).
 
 ## 16. Quick Start
 
