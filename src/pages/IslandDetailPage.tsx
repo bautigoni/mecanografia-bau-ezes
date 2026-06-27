@@ -758,8 +758,14 @@ export function IslandDetailPage() {
 
               /* Image transform: delta from base (0 = as rendered). */
               const imgTransform = hasDelta ? transform3d(deltaRx, deltaRy, deltaRz, deltaScale, effPersp) : undefined;
-              /* Number transform: fixed base perspective (matches the pre-rendered
-                 image) + effective scale/perspective. No dynamic rotate deltas. */
+              /* Number Y offset in screen space: raised by default, sinks on hover
+                 to match the pressed button image. Guarded by !editorOn so the
+                 editor preview stays in the resting position. */
+              const numOffsetY = !editorOn && !isBlocked && hoveredIndex === index ? -1 : -6;
+              /* Number 3D transform: perspective MUST be the first function (CSS
+                 rule); keep it as in the original pre-rendered image. The screen
+                 Y translation lives on a separate wrapper element (see JSX) so
+                 it runs in the un-rotated parent frame. */
               const numTransform = `perspective(${effPersp}px) rotateX(${PERSPECTIVE_BASE.rotateX}deg) rotateY(${PERSPECTIVE_BASE.rotateY}deg) rotateZ(${PERSPECTIVE_BASE.rotateZ}deg) scale(${effScale})`;
 
               const numSize = `${2.3 * numScale}vmin`;
@@ -769,7 +775,7 @@ export function IslandDetailPage() {
                 level.state === "Completado"
                   ? "drop-shadow-[0_0_8px_rgba(89,205,183,0.55)]"
                   : level.state === "Bloqueado"
-                    ? "opacity-60 saturate-50"
+                    ? "grayscale"
                     : "";
 
               return (
@@ -809,14 +815,14 @@ export function IslandDetailPage() {
                     style={hasDelta ? { transform: imgTransform } : undefined}
                   >
                     <img
-                      className={`w-full h-full object-contain ${!editorOn && hoveredIndex === index ? "hidden" : ""}`}
+                      className={`w-full h-full object-contain ${!editorOn && !isBlocked && hoveredIndex === index ? "hidden" : ""}`}
                       src={assets.levelButton}
                       alt=""
                       decoding="async"
                       draggable={false}
                     />
                     <img
-                      className={`w-full h-full object-contain ${!editorOn && hoveredIndex === index ? "" : "hidden"}`}
+                      className={`w-full h-full object-contain ${!editorOn && !isBlocked && hoveredIndex === index ? "" : "hidden"}`}
                       src={assets.levelButtonPressed}
                       alt=""
                       decoding="async"
@@ -824,18 +830,24 @@ export function IslandDetailPage() {
                     />
                   </span>
 
-                  {/* Number layer: fixed base perspective + scale. */}
-                  <span className="absolute inset-0 flex items-center justify-center" style={{ transform: numTransform }}>
-                    <span
-                      className={[
-                        "font-display font-black select-none",
-                        isCompleted ? "text-mint" : "",
-                        isBlocked ? "text-muted" : "",
-                        !isCompleted && !isBlocked ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" : "",
-                      ].filter(Boolean).join(" ")}
-                      style={{ fontSize: numSize }}
-                    >
-                      {level.levelNumber}
+                  {/* Number layer: screen-space Y translate wrapper (sinks on hover),
+                      then the 3D-perspective span (must keep perspective() first). */}
+                  <span
+                    className="absolute inset-0 flex items-center justify-center"
+                    style={{ transform: `translateY(${numOffsetY}px)` }}
+                  >
+                    <span style={{ transform: numTransform }}>
+                      <span
+                        className={[
+                          "font-display font-black select-none",
+                          isCompleted ? "text-mint" : "",
+                          isBlocked ? "text-muted" : "",
+                          !isCompleted && !isBlocked ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" : "",
+                        ].filter(Boolean).join(" ")}
+                        style={{ fontSize: numSize }}
+                      >
+                        {level.levelNumber}
+                      </span>
                     </span>
                   </span>
 
